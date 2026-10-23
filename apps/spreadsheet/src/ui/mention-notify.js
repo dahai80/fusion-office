@@ -84,7 +84,7 @@ function askToShare(people, { unsaved }) {
     const done = (value) => { answer = value; modal.close(); };
     const content = el('div.mention-share', {},
       el('p.modal-text', {}, unsaved
-        ? `This spreadsheet is not saved to Puter yet, so ${list} cannot open the comment. Save it and share it with ${people.length === 1 ? 'them' : 'them all'}?`
+        ? `This spreadsheet is not saved to the workspace yet, so ${list} cannot open the comment. Save it and share it with ${people.length === 1 ? 'them' : 'them all'}?`
         : `${list} cannot open this spreadsheet yet. Share it with ${people.length === 1 ? 'them' : 'them all'} so they can see the comment?`),
       el('div.row.mention-share-mode', {}, el('span.field-label', {}, 'Give them'), mode),
       el('div.row.row-end', {},

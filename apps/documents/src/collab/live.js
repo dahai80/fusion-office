@@ -195,7 +195,7 @@ export class LiveSession extends EventTarget {
     return call(sdk(), this.link.server, { op: 'members', room: this.link.room });
   }
   async inviteUser(username, role) {
-    if (this.local) throw new Error('Inviting people needs a document saved to Puter. Local sharing works between tabs of this browser only.');
+    if (this.local) throw new Error('Inviting people needs a document saved in the workspace. Local sharing works between tabs of this browser only.');
     return call(sdk(), this.link.server, { op: 'invite-user', room: this.link.room, username, role });
   }
   /** A link that admits whoever opens it with `role` (invitations expire after seven days). */
@@ -254,7 +254,7 @@ export async function shareDocument({ engine, doc, user, name, baseBytes, local,
     link = { local: true, room };
   } else {
     const owner = sdk();
-    if (!owner) throw new Error('Sharing needs Puter.');
+    if (!owner) throw new Error('Sharing needs the workspace.');
     const server = await deploy(owner, progress);
     link = { server, room };
   }

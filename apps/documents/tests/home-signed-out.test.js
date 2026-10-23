@@ -39,7 +39,7 @@ it('offers the sign-in in place of the list, then lists the documents once signe
   await Promise.resolve();
 
   const list = view.el.querySelector('.file-list');
-  expect(list.textContent).toContain('Sign in to see your documents');
+  expect(list.textContent).toContain('Your documents');
   expect(sdk.fs.readdir).not.toHaveBeenCalled();
   expect(list.querySelector('.file-row')).toBeNull();
   const account = view.el.querySelector('.user-btn');
@@ -49,10 +49,10 @@ it('offers the sign-in in place of the list, then lists the documents once signe
   [...list.querySelectorAll('button')].find((b) => b.textContent === 'New document').click();
   expect(newDoc).toHaveBeenCalledTimes(1);
 
-  [...list.querySelectorAll('button')].find((b) => b.textContent === 'Sign in').click();
+  [...list.querySelectorAll('button')].find((b) => b.textContent === 'Open the workspace').click();
   await vi.waitFor(() => expect(sdk.auth.signIn).toHaveBeenCalledTimes(1));
   await vi.waitFor(() => expect(list.querySelector('.file-row .file-name')?.textContent).toBe('Report'));
-  expect(list.textContent).not.toContain('Sign in to see your documents');
+  expect(list.textContent).not.toContain('Your documents');
   expect(account.title).toBe('nariman');
   expect(account.textContent).toBe('n');
 });

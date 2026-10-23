@@ -300,7 +300,7 @@ export function createMailings({ editor, pkg, error, onChange = () => {}, markDi
   function chooseDelivery(count, note) {
     return new Promise(resolve => {
       let choice = null;
-      const modal = dialog({ title: 'Send Email Messages', submit: `Send ${count} ${count === 1 ? 'Message' : 'Messages'}`, body: el('p.modal-text', {}, `Each recipient gets a separate message from your Puter email address.${note} You can also download them as files to send from another mail app.`),
+      const modal = dialog({ title: 'Send Email Messages', submit: `Send ${count} ${count === 1 ? 'Message' : 'Messages'}`, body: el('p.modal-text', {}, `Each recipient gets a separate message from your email address.${note} You can also download them as files to send from another mail app.`),
         actions: [button('Download Instead', () => { choice = 'download'; modal.close(); })], onSubmit: () => { choice = 'send'; }, onClose: () => resolve(choice) });
     });
   }

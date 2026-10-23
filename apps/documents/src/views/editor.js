@@ -1054,7 +1054,7 @@ export function editorView({ doc, goHome, newDoc, importFile, openPath, newFromT
     save: () => save(), download, saveTemplate: cloud ? saveTemplate : null, savePdf: () => savePdf(), rename: cloud ? () => { title.focus(); title.select(); } : null,
     saveStatus: () => status.getAttribute('aria-label'),
     saveAs: cloud ? async name => {
-      try { await ready; if (!engine || failed) return 'The document is not open.'; engine.finishComposition(); if (session.signedOut && !await session.signIn()) return 'Sign in to save a copy.'; }
+      try { await ready; if (!engine || failed) return 'The document is not open.'; engine.finishComposition(); if (session.signedOut && !await session.signIn()) return 'Open the workspace to save a copy.'; }
       catch (e) { return e?.message || String(e); }
       const failure = await doc.saveAs(name, { stillWanted: () => !destroyed });
       if (!failure) { title.value = doc.name; refreshTitle(); document.title = `${doc.name} — Documents`; }
@@ -1397,7 +1397,7 @@ export function editorView({ doc, goHome, newDoc, importFile, openPath, newFromT
     if (destroyed || failed) return;
     if (pkg?.readOnly) { renderStatus('Read only', 'monitor'); status.disabled = true; saveButton.disabled = true; return; }
     const signedOut = !local && session.signedOut;
-    const [label, name, state] = signedOut ? ['Sign in to save', 'cloud', 'signed-out']
+    const [label, name, state] = signedOut ? ['Open the workspace to save', 'cloud', 'signed-out']
       : doc.status === 'saving' ? ['Saving…', 'spinner', 'saving']
       : doc.status === 'error' ? ['Not saved', 'alert', 'error']
       : doc.status === 'offline' ? ['Offline', 'wifiOff', 'offline']

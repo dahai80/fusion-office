@@ -192,7 +192,7 @@ export function homeView({ openPath, newDoc, newFromTemplate, importFile }) {
   function manageTemplates(templates) {
     const pending = new Set();
     const list = el('div.version-list', { role: 'list', 'aria-label': 'My templates' });
-    const modal = openModal({ title: 'My templates', content: el('div', {}, el('p.modal-text', {}, `Saved in ${P.FOLDER}/Templates on your Puter drive. Open a document and choose "Save as template" in its File menu to add one.`), list) });
+    const modal = openModal({ title: 'My templates', content: el('div', {}, el('p.modal-text', {}, `Saved in ${P.FOLDER}/Templates on your local workspace. Open a document and choose "Save as template" in its File menu to add one.`), list) });
     const render = (items) => {
       list.replaceChildren(...(items.length ? items.map((t) => el('div.file-row', { role: 'listitem' },
         el('span.file-main', {}, el('span.file-icon', { html: icon('brand', 20, 1.7) }), el('span.file-text', {}, el('span.file-name', {}, t.name), el('span.file-meta', {}, relativeTime(t.modified)))),
@@ -416,10 +416,10 @@ export function homeView({ openPath, newDoc, newFromTemplate, importFile }) {
       listStatus.textContent = '';
       list.append(el('div.empty', {},
         el('div.empty-icon', { html: icon('cloud', 28) }),
-        el('h3.empty-title', {}, 'Sign in to see your documents'),
+        el('h3.empty-title', {}, 'Your documents'),
         el('p.empty-sub', {}, 'Documents are saved as .docx files in this workspace. Open one, or start writing.'),
         el('div.row', { style: { justifyContent: 'center', marginTop: '6px' } },
-          el('button.btn.btn-primary', { type: 'button', html: icon('login', 16, 2.2), onclick: () => session.signIn() }, el('span', {}, 'Sign in')),
+          el('button.btn.btn-primary', { type: 'button', html: icon('login', 16, 2.2), onclick: () => session.signIn() }, el('span', {}, 'Open the workspace')),
           el('button.btn.btn-outline', { type: 'button', html: icon('plus', 16, 2.2), onclick: newDoc }, el('span', {}, 'New document')))));
       return;
     }

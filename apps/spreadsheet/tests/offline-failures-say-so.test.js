@@ -31,7 +31,7 @@ it('words a failure to connect, and keeps the service’s own message', () => {
   expect(P.unreachable(new TypeError('Load failed'))).toBe(true);
   expect(P.unreachable(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(true);
   expect(P.unreachable(new Error('A file with that name already exists'))).toBe(false);
-  expect(P.failureText(new TypeError('Failed to fetch'), 'Could not rename')).toBe('Could not rename: Puter could not be reached. Check your connection, then try again');
+  expect(P.failureText(new TypeError('Failed to fetch'), 'Could not rename')).toBe('Could not rename: the workspace could not be reached. Check your connection, then try again');
   expect(P.failureText({ error: { message: 'Storage capacity limit reached' } }, 'Could not rename')).toBe('Storage capacity limit reached');
   expect(P.failureText(null, 'Could not rename')).toBe('Could not rename');
   online = false;

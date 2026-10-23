@@ -5733,7 +5733,7 @@ export function createEditor({
     if (!file) {
       const choice = await choose(
         'This PDF was moved or deleted',
-        `${name} is no longer where it was opened from in your Puter cloud. Your changes are still here: save them as a new file, or put the file back where it was.`,
+        `${name} is no longer where it was opened from in your workspace. Your changes are still here: save them as a new file, or put the file back where it was.`,
         [
           ['Keep editing', 'cancel'],
           ['Put it back', 'restore'],
@@ -5747,7 +5747,7 @@ export function createEditor({
     if (!changed) return { path: file.path, name: file.name };
     const choice = await choose(
       'This PDF changed elsewhere',
-      `${file.name} was saved in your Puter cloud after you opened it here, perhaps in another window or on another device. Replace that version with yours, or keep both by saving yours as a new file.`,
+      `${file.name} was saved in the workspace after you opened it here, perhaps in another window or on another device. Replace that version with yours, or keep both by saving yours as a new file.`,
       [
         ['Keep editing', 'cancel'],
         ['Replace it', 'replace', 'btn danger'],
@@ -5766,7 +5766,7 @@ export function createEditor({
     return (
       (await choose(
         'This PDF could not be saved',
-        `Puter could not save ${name}${reason ? ` (${reason})` : ''}. Your changes are still here. Save them as a new file in your PDF Editor folder instead?`,
+        `The workspace could not save ${name}${reason ? ` (${reason})` : ''}. Your changes are still here. Save them as a new file in your PDF Editor folder instead?`,
         [
           ['Keep editing', 'cancel'],
           ['Save as a new file', 'copy', 'btn primary'],
@@ -5990,7 +5990,7 @@ export function createEditor({
         // The picker wrote a new file: later saves check that one, not the file opened before.
         remote = null;
         updateStatus();
-        toast(`Saved to Puter as ${name}.`);
+        toast(`Saved as ${name}.`);
         const savedPath = path;
         const info = await written(item, savedPath, size);
         if (!destroyed && token === saveGeneration && path === savedPath) remote = info;

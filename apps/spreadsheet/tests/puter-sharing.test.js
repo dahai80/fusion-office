@@ -22,7 +22,7 @@ describe('sharing through Puter', () => {
 
   it('turns a refusal into words for the dialog, keeping its code', async () => {
     withSDK({ share: async () => { throw { code: 'user_does_not_exist', message: 'no' }; }, getShares() {} });
-    await expect(P.shareFile('a.xlsx', 'ghost')).rejects.toMatchObject({ code: 'user_does_not_exist', message: expect.stringMatching(/No Puter account/) });
+    await expect(P.shareFile('a.xlsx', 'ghost')).rejects.toMatchObject({ code: 'user_does_not_exist', message: expect.stringMatching(/No one by that name/) });
     expect(P.shareProblem({ message: 'Something odd' })).toBe('Something odd');
     // Puter's own words for these say what went wrong, not what to do about it.
     expect(P.shareProblem({ code: 'account_is_not_verified', message: 'Account email is not verified' })).toMatch(/Confirm your email address/);

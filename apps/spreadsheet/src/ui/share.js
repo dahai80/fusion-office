@@ -19,8 +19,8 @@ const nowCan = (mode) => (mode === 'write' || mode === 'manage' ? 'can now edit'
 
 /** What a row says under the name: how the access came about, when that is not plain. */
 function rowMeta(row) {
-  if (row.who === 'anyone') return `Anyone signed in to Puter who has the link · ${modeLabel(row.mode).toLowerCase()}`;
-  if (row.pending) return 'Invited · access starts when they join Puter with this address';
+  if (row.who === 'anyone') return `Anyone with the link · ${modeLabel(row.mode).toLowerCase()}`;
+  if (row.pending) return 'Invited · access starts when they open the link';
   if (row.inheritedFrom) return `Through the folder ${P.displayName(row.inheritedFrom)}`;
   if (row.mode === 'manage') return 'Can edit and share';
   return null;
@@ -221,7 +221,7 @@ export function openShareDialog({ path, name, uid = null, onChange = null, doc =
   }
 
   const addForm = el('form.share-add', { onsubmit: (e) => { e.preventDefault(); add(); } }, who, mode, shareBtn);
-  const hint = el('p.field-hint', {}, 'Share with a Puter username, or an email address: someone without an account is invited to join.');
+  const hint = el('p.field-hint', {}, 'Share with a name or an email address. People open the link in this workspace.');
   const doneBtn = el('button.btn.btn-ghost', { type: 'button', onclick: () => modal.close() }, 'Done');
   // Editing together (see coauthor.js) comes first: it is what most people sharing a spreadsheet want.
   const live = doc && coauthorSection({ doc, onStarted: (room) => { modal.close(); onLive?.(room); } });

@@ -3910,7 +3910,7 @@ export function editorView({ doc, goHome, openPath, newDoc, templateDoc, importF
           await insertImageFile(new File([bytes], picked.name, { type }), target);
         } catch (e) {
           if (destroyed) return;
-          toast(`Could not load that image from Puter: ${e?.message || e?.error?.message || 'unknown error'}`, { icon: 'alert', duration: 4000 });
+          toast(`Could not load that image: ${e?.message || e?.error?.message || 'unknown error'}`, { icon: 'alert', duration: 4000 });
           keepFocus();
         }
         return;
@@ -5592,8 +5592,8 @@ export function editorView({ doc, goHome, openPath, newDoc, templateDoc, importF
       const why = reason ? ` (${String(reason).replace(/\.$/, '')})` : '';
       const content = el('div', {},
         el('p.modal-text', {}, kept
-          ? `Puter could not save this spreadsheet${why}. Your changes are kept in this browser, ${room ? 'and sent to the shared workbook when you open it here again' : 'and saving is offered again when you open it here'}.`
-          : `Puter could not save this spreadsheet${why}, and this browser could not keep a copy of your changes either. Leaving now discards them.`),
+          ? `The workspace could not save this spreadsheet${why}. Your changes are kept in this browser, ${room ? 'and sent to the shared workbook when you open it here again' : 'and saving is offered again when you open it here'}.`
+          : `The workspace could not save this spreadsheet${why}, and this browser could not keep a copy of your changes either. Leaving now discards them.`),
         el('div.row.row-end', { style: { flexWrap: 'wrap' } },
           el('button.btn.btn-ghost', { type: 'button', onclick: () => modal.close() }, 'Keep editing'),
           el(`button.btn${kept ? '' : '.btn-danger'}`, { type: 'button', onclick: () => { resolve('leave'); modal.close(); } }, kept ? 'Leave' : 'Leave without saving'),
@@ -5664,7 +5664,7 @@ export function editorView({ doc, goHome, openPath, newDoc, templateDoc, importF
     if (session.signedOut && (!await session.signIn() || destroyed)) return;
     const name = await promptDialog({
       title: 'Save a copy', label: 'Name', value: `${doc.name} copy`, confirmLabel: 'Save copy',
-      hint: `Saved to ${P.FOLDER}/ in your Puter cloud. You will continue in the copy.`,
+      hint: `Saved to ${P.FOLDER}/ in your workspace. You will continue in the copy.`,
       validate: (v) => (fileBaseName(v) ? null : 'Enter a name'),
     });
     if (name == null) return;

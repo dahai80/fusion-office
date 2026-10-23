@@ -343,7 +343,7 @@ export function unreachable(err) {
  */
 export function failureText(err, what) {
   if (globalThis.navigator?.onLine === false) return `${what}: you are offline. Connect to the internet, then try again`;
-  if (unreachable(err)) return `${what}: Puter could not be reached. Check your connection, then try again`;
+  if (unreachable(err)) return `${what}: the workspace could not be reached. Check your connection, then try again`;
   return String(err?.message || err?.error?.message || (typeof err === 'string' ? err : '')).trim() || what;
 }
 
@@ -728,20 +728,20 @@ export async function puterShareLink(path) {
 export function shareProblem(err) {
   const code = err?.code || err?.error?.code || '';
   switch (code) {
-    case 'user_does_not_exist': return 'No Puter account has that username. Check the spelling, or enter their email address to invite them.';
+    case 'user_does_not_exist': return 'No one by that name was found. Check the spelling, or enter an email address to invite them.';
     case 'recipient_not_accepting_shares': return 'That person is not accepting shares.';
     case 'email_not_allowed': return 'That email address cannot receive an invitation.';
     case 'cannot_share_with_self': return 'That is you. Enter someone else’s username or email address.';
     case 'cannot_share_with_owner': return 'That person owns this spreadsheet already.';
     case 'forbidden': return 'Only the owner of this spreadsheet, or someone they let manage it, can share it.';
     case 'subject_does_not_exist': return 'This spreadsheet cannot be shared from here. Only files you own, or may manage, can be shared.';
-    case 'share_daily_limit_reached': return 'You have shared as much as Puter allows in one day. Try again tomorrow.';
-    case 'phone_verification_required': return 'Puter needs a verified phone number on your account before you can share files.';
-    case 'card_verification_required': return 'Puter needs a verified card on your account before you can share files.';
+    case 'share_daily_limit_reached': return 'You have shared as much as allowed today. Try again tomorrow.';
+    case 'phone_verification_required': return 'A verified phone number is needed before you can share files.';
+    case 'card_verification_required': return 'A verified payment method is needed before you can share files.';
     case 'invalid_mode': return 'That level of access cannot be given.';
-    case 'account_is_not_verified': return 'Confirm your email address on Puter before you share files.';
+    case 'account_is_not_verified': return 'Confirm your email address before you share files.';
     case 'too_many_requests': return 'That was too many changes at once. Wait a moment, then try again.';
-    default: return err?.message || err?.error?.message || (typeof err === 'string' ? err : 'Puter could not complete the share');
+    default: return err?.message || err?.error?.message || (typeof err === 'string' ? err : 'The share could not be completed');
   }
 }
 

@@ -1,6 +1,6 @@
 /**
- * Full-screen stand-ins for the app: the Puter SDK did not load, or the URL
- * points at a cloud file and there is no session yet to read it with.
+ * Full-screen stand-ins for the app: the storage backend did not load, or the
+ * URL points at a file and there is no workspace session yet to read it with.
  * Working itself needs neither; a new sheet opens straight away.
  */
 
@@ -17,15 +17,15 @@ export function errorView(title, message, onRetry) {
 }
 
 /**
- * A file on Puter was asked for without a session. `onSignIn` opens Puter's
- * dialog (and resolves when it closes); `onSkip` starts a new spreadsheet.
+ * A file was asked for without a workspace session. `onSignIn` opens the
+ * workspace (and resolves when it is ready); `onSkip` starts a new spreadsheet.
  */
 export function signInView({ title, message, onSignIn, onSkip }) {
   /**
    * The wait is said under the button rather than inside its label: a label drawn at the disabled
    * 45% measures 2.0:1, and it is the only sign anything is happening. The button is turned off with
    * aria-disabled, not disabled, so the browser does not blur it and a keyboard user comes back from
-   * Puter's dialog where they left off; the click is refused here instead.
+   * the workspace prompt where they left off; the click is refused here instead.
    */
   let waiting = false;
   const status = el('p.auth-status', { role: 'status' });
@@ -36,7 +36,7 @@ export function signInView({ title, message, onSignIn, onSkip }) {
       waiting = true;
       cta.setAttribute('aria-disabled', 'true');
       cta.setAttribute('aria-busy', 'true');
-      status.textContent = 'Waiting for Puter…';
+      status.textContent = 'Opening the workspace…';
       try { await onSignIn(); }
       finally {
         waiting = false;
@@ -45,7 +45,7 @@ export function signInView({ title, message, onSignIn, onSkip }) {
         status.textContent = '';
       }
     },
-  }, 'Sign in to Puter');
+  }, 'Open this spreadsheet');
   return el('div.auth-view.view', {},
     el('div.auth-card', {},
       el('div.empty-icon', { html: icon('lock', 28) }),

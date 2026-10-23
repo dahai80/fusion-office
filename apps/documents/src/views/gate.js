@@ -1,6 +1,6 @@
 /**
- * Full-screen stand-ins for the app: the Puter SDK did not load, or the URL
- * points at a cloud document and there is no session yet to read it with.
+ * Full-screen stand-ins for the app: the storage backend did not load, or the URL
+ * points at a document and there is no workspace session yet to read it with.
  * Writing itself needs neither; a new document opens straight away.
  */
 
@@ -17,8 +17,8 @@ export function errorView(title, message, onRetry) {
 }
 
 /**
- * A document on Puter was asked for without a session. `onSignIn` opens
- * Puter's dialog (and resolves when it closes); `onSkip` starts a new document.
+ * A document was asked for without a workspace session. `onSignIn` opens
+ * the workspace prompt (and resolves when it closes); `onSkip` starts a new document.
  */
 export function signInView({ title, message, onSignIn, onSkip }) {
   const cta = el('button.btn.btn-primary', {

@@ -399,7 +399,7 @@ export function mountTaskSheet(projectId, taskId, { onClose } = {}) {
             title: isBroken
               ? `${att.path} is no longer there`
               : linked
-                ? `${att.path} (in your Puter Drive)`
+                ? `${att.path} (in your workspace)`
                 : canPreview(att) ? `Open ${att.name}` : `Download ${att.name}`,
             onclick: () => (canPreview(att) ? openAttachment(att) : downloadAttachment(att)),
           }, att.name),
@@ -516,7 +516,7 @@ export function mountTaskSheet(projectId, taskId, { onClose } = {}) {
           renderAttachments();
           toast(items.length === 1
             ? 'Linked from your workspace'
-            : `${items.length} files linked from your Puter Drive`, { icon: 'link' });
+            : `${items.length} files linked from your workspace`, { icon: 'link' });
         }
       } catch (err) {
         console.error(err);

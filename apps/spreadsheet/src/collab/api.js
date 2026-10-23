@@ -22,7 +22,7 @@ export class CollabError extends Error {
 export function collabPuter() {
   const p = globalThis.puter;
   if (!p?.workers?.exec || !p.workers.create || !p.kv?.get || !p.fs?.getReadURL || !p.auth?.getUser) {
-    throw new Error('Editing together needs Puter. Open the spreadsheet from Puter or check your connection, then try again.');
+    throw new Error('Editing together needs the workspace service. Check your connection, then try again.');
   }
   return p;
 }
@@ -63,7 +63,7 @@ export async function call(puter, server, input) {
  */
 export async function deploy(puter, progress = () => {}, fetchBundle = defaultBundle) {
   const account = puter.authToken;
-  const check = () => { if (puter.authToken !== account) throw new Error('Your Puter account changed. Try again.'); };
+  const check = () => { if (puter.authToken !== account) throw new Error('Your workspace changed. Try again.'); };
   let config = await puter.kv.get(WORKER_KEY);
   check();
   progress('Preparing the collaboration server…');

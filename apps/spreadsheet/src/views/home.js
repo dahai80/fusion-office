@@ -551,10 +551,10 @@ export function homeView({ openPath, openFile, newDoc, sampleDoc, templateDoc, i
       list.removeAttribute('role');
       list.append(el('div.empty', {},
         el('div.empty-icon', { html: icon('cloud', 26) }),
-        el('h3', {}, 'Sign in to see your spreadsheets'),
-        el('p', {}, 'Spreadsheets are saved as .xlsx files in your own Puter cloud. Sign in to open them here, or start working without an account.'),
+        el('h3', {}, 'Your spreadsheets'),
+        el('p', {}, 'Spreadsheets are saved as .xlsx files in your local workspace. Open them here, or start working without an account.'),
         el('div.row', { style: { justifyContent: 'center', marginTop: '18px', flexWrap: 'wrap' } },
-          el('button.btn.btn-primary', { type: 'button', html: icon('login', 16, 2.2), onclick: () => session.signIn() }, el('span', {}, 'Sign in to Puter')),
+          el('button.btn.btn-primary', { type: 'button', html: icon('login', 16, 2.2), onclick: () => session.signIn() }, el('span', {}, 'Open the workspace')),
           el('button.btn.btn-outline', { type: 'button', html: icon('plus', 16, 2.2), onclick: newDoc }, el('span', {}, 'New spreadsheet')))));
       return;
     }

@@ -28,7 +28,7 @@ it('does not offer to sign in and save a document that never opened', async () =
   const dialog = document.querySelector('[role="dialog"]');
   // Signing in could not save this document: only leaving or staying is offered, and no "still opening" toast.
   expect(dialog.getAttribute('aria-label')).toBe('Leave without saving?');
-  expect([...dialog.querySelectorAll('button')].map((button) => button.textContent)).not.toContain('Sign in and save');
+  expect([...dialog.querySelectorAll('button')].map((button) => button.textContent)).not.toContain('Save and leave');
   expect([...document.querySelectorAll('.toast')].map((toast) => toast.textContent).join(' ')).not.toContain('still opening');
   document.querySelector('.modal-panel .btn-danger').click();
   await vi.waitFor(() => expect(window.__docs.current?.kind).toBe('home'));

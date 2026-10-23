@@ -40,7 +40,7 @@ export function matchPeople(people, query) {
   if (isEmail(query) && !known((p) => p.email === q)) list.push({ name: q, email: q, typed: true, hint: 'Email address' });
   // A username is offered once nobody listed matches: until then they are the likelier pick.
   else if (query.length >= 2 && isUsername(query) && !list.length) {
-    list.push({ name: query, user: query, typed: true, hint: 'Puter username' });
+    list.push({ name: query, user: query, typed: true, hint: 'Person' });
   }
   return list;
 }
@@ -99,7 +99,7 @@ export function attachMentionPicker(area, { people }) {
     el('span.mention-avatar', { 'aria-hidden': 'true' }, p.typed ? '@' : authorInitials(p.name)),
     el('span.mention-who', {}, el('span.mention-name', {}, p.typed ? `Mention ${p.name}` : p.name),
       el('span.mention-hint', {}, p.hint || (p.email && p.email !== p.name ? p.email : p.user && p.user !== p.name ? `@${p.user}` : ''))))));
-    if (!items.length) list.append(el('li.mention-empty', { role: 'presentation' }, 'Type a Puter username or an email address'));
+    if (!items.length) list.append(el('li.mention-empty', { role: 'presentation' }, 'Type a name or an email address'));
     area.setAttribute('aria-activedescendant', items.length ? `${listId}-${active}` : '');
   }
 

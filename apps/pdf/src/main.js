@@ -67,8 +67,8 @@ function sameAccount(first, second) {
   if (first.uuid && second.uuid) return first.uuid === second.uuid;
   // The desktop's provisional label resolves to its existing account, not a new session.
   return (
-    first.username === 'Puter user' ||
-    second.username === 'Puter user' ||
+    first.username === 'Local user' ||
+    second.username === 'Local user' ||
     first.username === second.username
   );
 }
@@ -138,7 +138,7 @@ function refreshSDKAccount(hint) {
     if (signedIn && !user) {
       // A confirmed session can be signed out while its profile is still loading.
       // Callback metadata may be stale, so only the verified profile supplies its name.
-      setAccount({ username: 'Puter user' });
+      setAccount({ username: 'Local user' });
       version = accountGeneration;
     }
     return signedIn ? P.currentUser() : null;
@@ -192,7 +192,7 @@ async function ensureSignedIn({ signal = accountController.signal } = {}) {
       .then(async (account) => {
         await settleAccount(controller.signal);
         controller.signal.throwIfAborted();
-        if (!user) setAccount(account || { username: 'Puter user' });
+        if (!user) setAccount(account || { username: 'Local user' });
         return user;
       })
       .finally(() => {
@@ -375,7 +375,7 @@ async function canLeave(signal) {
         el(
           'p',
           {},
-          `${leavingEditor.name} has unsaved changes. Save them to Puter before leaving, or leave and discard them.`,
+          `${leavingEditor.name} has unsaved changes. Save them to the workspace before leaving, or leave and discard them.`,
         ),
         [
           button('Cancel', null, () => dialog.close()),
@@ -908,7 +908,7 @@ function showHome({ accountRefresh = false } = {}) {
             if (
               await confirmAction(
                 'Delete PDF?',
-                `Delete ${file.name} from your Puter cloud? This cannot be undone.`,
+                `Delete ${file.name} from your workspace? This cannot be undone.`,
                 'Delete PDF',
                 { signal },
               )
@@ -1128,7 +1128,7 @@ const initPuter = async () => {
   P.onAuth(run(refreshSDKAccount));
   if (P.isApp()) {
     // The desktop already has a session. File and close events must not wait for its profile.
-    setAccount({ username: 'Puter user' });
+    setAccount({ username: 'Local user' });
     const onItems = (items) => {
       items = Array.isArray(items) ? items : [items];
       if (items.length) run(() => openDesktopItems(items))();
@@ -1159,7 +1159,7 @@ const initPuter = async () => {
     const account = await P.currentUser();
     if (version !== accountGeneration) return;
     if (token !== P.sessionToken()) return refreshSDKAccount();
-    setAccount(account || { username: 'Puter user' }, { profileOnly: P.isApp() });
+    setAccount(account || { username: 'Local user' }, { profileOnly: P.isApp() });
   } else {
     accountToken = token;
     sessionState = 'out';

@@ -71,7 +71,7 @@ class Session extends EventTarget {
 
   /** The name to show and to sign comments with. */
   get username() {
-    return this.user?.username || (this.state === 'out' ? 'Guest' : 'Puter user');
+    return this.user?.username || (this.state === 'out' ? 'Guest' : 'Local user');
   }
 
   get accountId() {

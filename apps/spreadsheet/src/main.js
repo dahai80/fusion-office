@@ -70,22 +70,22 @@ export function leaveWithoutSessionDialog({ kept = true } = {}) {
   return new Promise((resolve) => {
     const content = el('div', {},
       el('p.modal-text', {}, kept
-        ? 'This spreadsheet is not saved to Puter yet. Sign in to save it to your own cloud, or leave: your edits stay on this device, and can be recovered from Unsaved spreadsheets on the home screen.'
-        : 'This spreadsheet is not saved anywhere yet, and this browser could not keep a copy of it either. Sign in to Puter to save it to your own cloud, or leave and lose it.'),
+        ? 'This spreadsheet is not saved to the workspace yet. Leave and your edits stay on this device, where you can recover them from Unsaved spreadsheets on the home screen.'
+        : 'This spreadsheet is not saved anywhere yet, and this browser could not keep a copy of it either. Leave and you lose it.'),
       el('div.row.row-end', { style: { flexWrap: 'wrap' } },
         el('button.btn.btn-ghost', { type: 'button', onclick: () => modal.close() }, 'Keep editing'),
         el('button.btn.btn-danger', { type: 'button', onclick: () => { resolve('leave'); modal.close(); } }, 'Leave without saving'),
-        el('button.btn.btn-primary', { type: 'button', onclick: () => { resolve('sign-in'); modal.close(); } }, 'Sign in and save')));
+        el('button.btn.btn-primary', { type: 'button', onclick: () => { resolve('sign-in'); modal.close(); } }, 'Save and leave')));
     const modal = openModal({ title: 'Save before leaving?', content, onClose: () => resolve('stay') });
   });
 }
 
-/** A cloud file was asked for without a session: offer the sign-in, or a new sheet. */
+/** A file was asked for without a workspace session: offer to open it, or a new sheet. */
 function mountSignInGate(requestedHash) {
   document.title = 'Spreadsheet';
   mount('gate', { el: signInView({
-    title: 'Sign in to open this spreadsheet',
-    message: 'Spreadsheets live in your own Puter cloud. Sign in to open this one, or start a new spreadsheet without an account.',
+    title: 'Open this spreadsheet',
+    message: 'Spreadsheets live in your local workspace. Open this one, or start a new spreadsheet.',
     onSignIn: async () => { if (await session.signIn() && location.hash === requestedHash) route(); },
     onSkip: () => go('#/'),
   }) });
@@ -321,7 +321,7 @@ async function route({ reload = false, file = null, draftKey = null } = {}) {
  */
 async function start() {
   if (!P.hasSDK()) {
-    show(errorView('Could not reach Puter', 'Puter could not be loaded. Check your connection and try again.', () => location.reload()));
+    show(errorView('Could not start the workspace', 'The storage backend could not be loaded. Reload the page and try again.', () => location.reload()));
     return;
   }
   setupFileDrop();

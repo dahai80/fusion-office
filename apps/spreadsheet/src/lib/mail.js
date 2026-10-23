@@ -157,7 +157,7 @@ export function describeResult(out, { noun = 'email' } = {}) {
 /** A refused request in words. */
 export function failureMessage(status, data) {
   const code = data?.error || '';
-  if (status === 401 || code === 'sign_in_required') return 'Sign in to Puter again to send email.';
+  if (status === 401 || code === 'sign_in_required') return 'Sign in again to send email.';
   if (status === 429 || code === 'daily_limit') return "You've reached today's email limit. Try again tomorrow.";
   if (status === 413 || code === 'attachment_too_large') return `The attachment is too large to email (at most ${formatSize(MAX_ATTACHMENT_BYTES)}).`;
   if (code === 'too_many_recipients') return `You can send to at most ${MAX_RECIPIENTS} people at a time.`;
@@ -182,7 +182,7 @@ export function createMailer({ getPuter = () => globalThis.puter, workerUrl = EM
   }
 
   async function post(route, body) {
-    if (!available()) throw new Error('Email is not available here. Open the spreadsheet in Puter to send email.');
+    if (!available()) throw new Error('Email is not available here.');
     let res;
     try {
       res = await getPuter().workers.exec(`${workerUrl}${route}`, {

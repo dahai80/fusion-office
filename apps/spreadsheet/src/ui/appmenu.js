@@ -60,7 +60,7 @@ export function openAppMenu(anchor, { onOptions = null } = {}) {
   ];
   if (!P.isApp()) {
     items.push({ separator: true });
-    if (session.signedOut) items.push({ label: 'Sign in to Puter', icon: 'login', hint: 'Save spreadsheets to your own cloud', onSelect: () => session.signIn() });
+    if (session.signedOut) items.push({ label: 'Open the workspace', icon: 'login', hint: 'Save spreadsheets to your local workspace', onSelect: () => session.signIn() });
     else items.push({ label: 'Sign out', icon: 'logout', onSelect: confirmSignOut });
   }
   openMenu({ anchor, items, align: 'end', label: 'Account', minWidth: 240 });
@@ -108,7 +108,7 @@ export function renderAccountButton(button) {
 export async function confirmSignOut() {
   const ok = await confirmDialog({
     title: 'Sign out?',
-    message: 'Your spreadsheets stay in your Puter account. Anything unsaved in an open document is saved first, and the copies this browser kept are removed from this computer.',
+    message: 'Your spreadsheets stay in your local workspace. Anything unsaved in an open document is saved first, and the copies this browser kept are removed from this computer.',
     confirmLabel: 'Sign out', danger: false,
   });
   if (!ok) return;

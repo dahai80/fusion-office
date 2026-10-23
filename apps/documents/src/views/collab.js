@@ -160,7 +160,7 @@ export function createCollaboration({ editor, pkg, doc, local, error, onChange =
     const url = await live.inviteLink(role);
     const name = documentName() || 'a document';
     const who = user().name;
-    const text = `${note ? `${note}\n\n` : ''}${who} invited you to ${role === 'editor' ? 'edit' : role === 'commenter' ? 'comment on' : 'view'} “${name}” in Documents.\n\nOpen it: ${url}\n\nYou will be asked to sign in to Puter. The invitation expires in seven days.`;
+    const text = `${note ? `${note}\n\n` : ''}${who} invited you to ${role === 'editor' ? 'edit' : role === 'commenter' ? 'comment on' : 'view'} “${name}” in Documents.\n\nOpen it: ${url}\n\nYou will need to open it in this workspace. The invitation expires in seven days.`;
     return sendMail({ to: address, subject: `${who} shared “${name}” with you`, text, username: who });
   }
   async function sendCopy(address, format, note) {

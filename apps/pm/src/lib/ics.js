@@ -25,7 +25,7 @@ import { taskSpan, doneColumnIds } from './board.js';
 /** Where UIDs live. Never a real host — it only has to be stable and ours. */
 const UID_DOMAIN = 'project-management.puter';
 
-const PRODID = '-//Puter//Project Management//EN';
+const PRODID = '-//Fusion Office//Project Management//EN';
 
 /** Escape the four characters RFC 5545 gives meaning to inside a value. */
 export function escapeIcsText(text) {

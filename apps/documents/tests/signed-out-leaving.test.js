@@ -35,7 +35,7 @@ it('offers keep editing, leave, or sign in and save when leaving unsaved work wi
   // Keep editing: the document, its edits, and its URL stay.
   view.el.querySelector('[aria-label="All Documents"]').click();
   await vi.waitFor(() => expect(dialogTitle()).toBe('Save before leaving?'));
-  expect(buttons().map((b) => b.textContent)).toEqual(['Keep editing', 'Leave without saving', 'Sign in and save']);
+  expect(buttons().map((b) => b.textContent)).toEqual(['Keep editing', 'Leave without saving', 'Save and leave']);
   expect(document.querySelector('.toast')).toBeNull();
   buttons()[0].click();
   await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());

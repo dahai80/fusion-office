@@ -119,7 +119,7 @@ function leaveDialog(doc) {
       el('div.row.row-end', { style: { flexWrap: 'wrap' } },
         el('button.btn.btn-ghost', { type: 'button', onclick: () => modal.close() }, 'Keep editing'),
         el('button.btn.btn-danger', { type: 'button', onclick: () => { resolve('leave'); modal.close(); } }, 'Leave without saving'),
-        el('button.btn.btn-primary', { type: 'button', onclick: () => { resolve('sign-in'); modal.close(); } }, 'Sign in and save')));
+        el('button.btn.btn-primary', { type: 'button', onclick: () => { resolve('sign-in'); modal.close(); } }, 'Save and leave')));
     const modal = openModal({ title: LEAVE_TITLES[1], content, onClose: () => resolve('stay') });
   });
 }
@@ -135,11 +135,11 @@ function mount(kind, view) {
   }
 }
 
-/** A cloud document was asked for without a session: offer the sign-in, or a new document. */
+/** A document was asked for without a workspace session: offer to open it, or start a new document. */
 function mountSignInGate(requestedHash, what) {
   document.title = 'Documents';
   mount('gate', { el: signInView({
-    title: `Sign in to open this ${what}`,
+    title: `Open this ${what}`,
     message: `Documents live in this workspace. Open this ${what}, or start a new document.`,
     onSignIn: async () => { if (await session.signIn() && location.hash === requestedHash) route(); },
     onSkip: () => go('#/'),

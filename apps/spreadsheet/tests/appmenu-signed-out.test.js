@@ -39,14 +39,14 @@ it('offers the sign-in instead of sign-out while nobody is signed in', async () 
   await session.init();
   openAppMenu(anchor);
   expect(header()).toContain('Not signed in');
-  expect(items().some((l) => l.startsWith('Sign in to Puter'))).toBe(true);
+  expect(items().some((l) => l.startsWith('Open the workspace'))).toBe(true);
   expect(items().some((l) => l.startsWith('Sign out'))).toBe(false);
-  [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.startsWith('Sign in to Puter')).click();
+  [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.startsWith('Open the workspace')).click();
   await vi.waitFor(() => expect(sdk.auth.signIn).toHaveBeenCalledTimes(1));
   await vi.waitFor(() => expect(session.signedIn).toBe(true));
 
   openAppMenu(anchor);
   expect(header()).toContain('nariman');
   expect(items().some((l) => l.startsWith('Sign out'))).toBe(true);
-  expect(items().some((l) => l.startsWith('Sign in to Puter'))).toBe(false);
+  expect(items().some((l) => l.startsWith('Open the workspace'))).toBe(false);
 });

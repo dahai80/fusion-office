@@ -34,7 +34,7 @@ it('opens into a new document without a session, and saves once the status pill 
   expect(document.querySelector('.auth-view')).toBeNull();
   const pill = view.el.querySelector('.save-status');
   expect(pill.classList.contains('signed-out')).toBe(true);
-  expect(pill.textContent).toContain('Sign in to save');
+  expect(pill.textContent).toContain('Open the workspace to save');
   expect(pill.disabled).toBe(false);
   const account = view.el.querySelector('.user-btn');
   expect(account.title).toBe('Not signed in');
@@ -50,7 +50,7 @@ it('opens into a new document without a session, and saves once the status pill 
   expect(write).not.toHaveBeenCalled();
   expect(sdk.auth.signIn).not.toHaveBeenCalled();
   expect(doc.dirty).toBe(true);
-  expect(pill.textContent).toContain('Sign in to save');
+  expect(pill.textContent).toContain('Open the workspace to save');
 
   // The pill opens Puter's sign-in; the pending edit is written right after it.
   pill.click();

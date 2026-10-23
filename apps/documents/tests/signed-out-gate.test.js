@@ -28,7 +28,7 @@ it('asks for the sign-in before reading a cloud document from the URL, then open
 
   await vi.waitFor(() => expect(window.__docs.current?.kind).toBe('gate'));
   const gate = document.getElementById('app');
-  expect(gate.textContent).toContain('Sign in to open this document');
+  expect(gate.textContent).toContain('Open this document');
   // Nothing was fetched: without a session the read itself would pop the dialog.
   expect(read).not.toHaveBeenCalled();
   expect(location.hash).toBe('#/edit/Documents%2FA.docx');

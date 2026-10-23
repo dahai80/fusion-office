@@ -69,11 +69,11 @@ describe('opening the app without a session', () => {
     history.replaceState(null, '', '#/edit/Spreadsheets%2FBudget.xlsx');
     await import('../src/main.js');
     const app = document.querySelector('#app');
-    await vi.waitFor(() => expect(app.textContent).toContain('Sign in to open this spreadsheet'));
+    await vi.waitFor(() => expect(app.textContent).toContain('Open this spreadsheet'));
     expect(mocks.fromPath).not.toHaveBeenCalled();
     expect(location.hash).toBe('#/edit/Spreadsheets%2FBudget.xlsx');
 
-    [...app.querySelectorAll('button')].find((b) => b.textContent === 'Sign in to Puter').click();
+    [...app.querySelectorAll('button')].find((b) => b.textContent === 'Open this spreadsheet').click();
     await vi.waitFor(() => expect(mocks.session.signIn).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(editors).toHaveLength(1));
     expect(mocks.fromPath).toHaveBeenCalledWith('Spreadsheets/Budget.xlsx');
@@ -84,7 +84,7 @@ describe('opening the app without a session', () => {
     history.replaceState(null, '', '#/edit/Spreadsheets%2FBudget.xlsx');
     await import('../src/main.js');
     const app = document.querySelector('#app');
-    await vi.waitFor(() => expect(app.textContent).toContain('Sign in to open this spreadsheet'));
+    await vi.waitFor(() => expect(app.textContent).toContain('Open this spreadsheet'));
     [...app.querySelectorAll('button')].find((b) => b.textContent === 'New spreadsheet').click();
     await vi.waitFor(() => expect(editors).toHaveLength(1));
     expect(editors[0].view.doc.path).toBeNull();

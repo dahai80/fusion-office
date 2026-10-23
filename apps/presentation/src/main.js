@@ -16307,7 +16307,7 @@ async function readyToClose() {
     if (doc !== target) return false;
     const kept = revision === draftRevision;
     const choice = await dialog({
-      title: `Save “${target.name}” to Puter before closing?`,
+      title: `Save “${target.name}” to the workspace before closing?`,
       body: el(
         "p",
         { class: "dialog-body" },

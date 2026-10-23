@@ -96,9 +96,9 @@ it('says what the gate is waiting for without taking the focus off the button', 
   cta.focus();
   cta.click();
   await Promise.resolve();
-  expect(status.textContent).toBe('Waiting for Puter…');
+  expect(status.textContent).toBe('Opening the workspace…');
   // The label and the accessible name stay put, and so does the keyboard.
-  expect(cta.textContent).toBe('Sign in to Puter');
+  expect(cta.textContent).toBe('Open this spreadsheet');
   expect(cta.disabled).toBe(false);
   expect(cta.getAttribute('aria-disabled')).toBe('true');
   expect(cta.getAttribute('aria-busy')).toBe('true');
