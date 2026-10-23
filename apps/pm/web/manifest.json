@@ -1,0 +1,14 @@
+{
+  "id": "fusion-office-pm",
+  "title": "Fusion Office Projects",
+  "title_en": "Fusion Office Projects",
+  "version": "1.0.0",
+  "path": "/office/pm",
+  "icon": "SquareKanban",
+  "entry": "/shell/fusion-office-pm/",
+  "devices": [
+    "desktop",
+    "mobile-readonly"
+  ],
+  "category": "domain"
+}

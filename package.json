@@ -1,0 +1,31 @@
+{
+    "name": "fusion-office",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Local-first office suite for the Fusion ecosystem: documents, spreadsheet, presentation, pdf, project management. Migrated from HeyPuter/everything (MIT, except spreadsheet: AGPL-3.0) with AI capabilities via fusion-gateway.",
+    "license": "MIT",
+    "type": "module",
+    "engines": {
+        "node": ">=22.18.0"
+    },
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "devDependencies": {
+        "patch-package": "^8.0.1"
+    },
+    "scripts": {
+        "postinstall": "patch-package --patch-dir apps/presentation/patches && node scripts/link-test-node-modules.mjs",
+        "build": "node scripts/build-all.mjs",
+        "test": "node scripts/test-all.mjs",
+        "verify:ai": "node scripts/verify-ai.mjs",
+        "shell:serve": "node scripts/shell-serve.mjs",
+        "shell:smoke": "node scripts/shell-serve.mjs --smoke",
+        "dev:documents": "npm run dev -w apps/documents",
+        "dev:spreadsheet": "npm run dev -w apps/spreadsheet",
+        "dev:presentation": "npm run dev -w apps/presentation",
+        "dev:pdf": "npm run dev -w apps/pdf",
+        "dev:pm": "npm run dev -w apps/pm"
+    }
+}

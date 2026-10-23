@@ -1,0 +1,31 @@
+{
+  "name": "@fusion-office/pm",
+  "version": "1.0.0",
+  "description": "Lightweight local-first project management — kanban boards, timelines, milestones, comments, and attachments",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "icons": "bash scripts/build-icons.sh",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HeyPuter/project-management.git"
+  },
+  "homepage": "https://github.com/HeyPuter/project-management#readme",
+  "devDependencies": {
+    "vite": "^8.2.0",
+    "vitest": "^4.0.18",
+    "jsdom": "^27.0.0"
+  },
+  "dependencies": {
+    "@fusion-office/storage": "*",
+    "lucide": "^1.28.0",
+    "@fusion-office/ai-client": "*"
+  }
+}

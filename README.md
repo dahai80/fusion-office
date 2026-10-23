@@ -1,2 +1,209 @@
-# fusion-office
-Fusion office application
+# Fusion Office
+
+Local-first office suite for the Fusion ecosystem. Five browser applications share one
+storage layer and one AI client, run entirely on your machine, and mount into the Fusion
+union web shell through `fusion-gateway`.
+
+## What is included
+
+| App | Purpose | Source |
+| --- | --- | --- |
+| `apps/documents` | Word processor with `.docx` open/save, track changes, comments, spellcheck | MIT, migrated from HeyPuter/everything |
+| `apps/spreadsheet` | Spreadsheet with formulas, charts, pivot tables, `.xlsx` | AGPL-3.0-only, migrated from HeyPuter/everything |
+| `apps/presentation` | Slide editor with `.pptx` support and AI deck generation | MIT, migrated from HeyPuter/everything |
+| `apps/pdf` | PDF viewer, annotation, form filling, OCR, AI Q&A | MIT, migrated from HeyPuter/everything |
+| `apps/pm` | Local project management with tasks, boards, timeline | MIT, migrated from HeyPuter/everything |
+| `packages/storage` | Local-first file storage: File System Access API, OPFS fallback, IndexedDB index | First-party |
+| `packages/ai-client` | OpenAI-compatible client for `fusion-gateway` with streaming, tools, and JSON helpers | First-party |
+
+Every application runs as a static Vite build. There is no server component, no account
+system, and no cloud dependency. Files live in a folder you pick or in the browser's
+origin-private file system.
+
+## Architecture
+
+```text
+apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
+        |                |                |             |         |
+        +----------------+----------------+-------------+---------+
+                                   |
+                         packages/storage   packages/ai-client
+                                   |                |
+                        FSA / OPFS / IndexedDB     |
+                                                   |
+                                          fusion-gateway :11432
+                                                   |
+                                            fusion-mlx :11434
+```
+
+- Each app is an independent Vite entry point. Vite uses a relative `base`, so the same
+  build works standalone and behind the gateway's `/shell/<id>/` prefix.
+- `packages/storage` resolves a writable root once per session: the File System Access
+  API directory picker when available, otherwise OPFS. A best-effort IndexedDB index
+  tracks path, size, and modification time for listings.
+- `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
+  `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
+  embeds model logic.
+- AI traffic is gated by the gateway API key. Browser builds read the key at build time
+  from `VITE_FUSION_GATEWAY_KEY`; without it the UI reports that the local AI service is
+  not configured instead of sending a request.
+
+## Requirements
+
+- Node.js 22.18 or newer and npm 10 or newer.
+- A modern Chromium-based browser for the File System Access API. Safari and Firefox
+  fall back to OPFS.
+- Optional: `fusion-gateway` on `127.0.0.1:11432` with a loaded chat model, for AI
+  features.
+
+## Quick start
+
+```bash
+npm install
+npm run build
+npm run dev:documents
+```
+
+Swap `dev:documents` for `dev:spreadsheet`, `dev:presentation`, `dev:pdf`, or `dev:pm`.
+Each dev server prints its own URL. Data stays in the browser profile used to open it.
+
+To place a production build behind the union shell, see [Union shell integration](#union-shell-integration).
+
+## AI through fusion-gateway
+
+AI calls use the shared `@fusion-office/ai-client` package. Configure it with environment
+variables before starting a dev server or build:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `VITE_FUSION_GATEWAY_URL` | `http://127.0.0.1:11432` | Gateway base URL |
+| `VITE_FUSION_GATEWAY_KEY` | empty | API key sent as `Authorization: Bearer` |
+| `VITE_FUSION_MODEL` | `mlx-community/Qwen3.5-9B-4bit` | Default chat model |
+
+Copy `.env.example` to `.env.local` in the app directory (or export the variables in the
+shell) and put a gateway API key in `VITE_FUSION_GATEWAY_KEY`. Keys are compiled into the
+browser bundle, so use a scoped key, never the master key, and never commit `.env.local`.
+
+AI surfaces by app:
+
+- Documents: assistant pane, grammar checks, translation, smart lookup, and image prompts.
+- Spreadsheet: formula generation and explanation, data questions, translation, and
+  sheet functions such as `AI` and `TRANSLATE`.
+- Presentation: prompt-to-deck generation, assistant panel, and slide review.
+- PDF: the **Ask AI** sidebar tab answers questions from extracted page text and
+  summarizes the document. Scanned documents need OCR first.
+- Projects: **Break down with AI** turns a task into a checklist through a JSON reply.
+
+Verify end-to-end connectivity with a real loaded model:
+
+```bash
+FUSION_GATEWAY_KEY=<scoped-key> node scripts/verify-ai.mjs
+```
+
+The script checks model registration, plain chat, streaming chat, tool-event streaming,
+the PDF question shape, and the project checklist JSON shape. It exits non-zero if any
+step fails.
+
+## Union shell integration
+
+Each app ships `web/manifest.json` and registers with `fusion-gateway` at
+`POST /api/v1/shell/manifests`. The gateway proxies `/shell/<id>/` to the app's upstream
+static server and requires a shell session token, not an API key.
+
+`scripts/shell-serve.mjs` starts a static server per built app, registers all five
+manifests, heartbeats them, and unregisters on exit:
+
+```bash
+FUSION_GATEWAY_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
+```
+
+For a one-shot route check, add `--smoke` and provide the master key used to derive the
+shell session secret:
+
+```bash
+FUSION_GATEWAY_ADMIN_KEY=<admin-key> \
+FUSION_GATEWAY_MASTER_KEY=<master-key> \
+node scripts/shell-serve.mjs --smoke
+```
+
+The smoke run registers each module, requests `/shell/fusion-office-<app>/` with a minted
+short-lived session, verifies the HTML app root and one hashed asset, then unregisters
+everything and exits. Both keys stay in environment variables and are never written to
+the repository.
+
+## Build and test
+
+```bash
+npm run build            # build all five apps sequentially
+npm test                 # run all five vitest suites sequentially
+npm run build -w apps/pdf
+npm test -w apps/pdf
+npm test -w apps/pdf -- tests/ai-panel.test.js
+```
+
+`npm install` runs `patch-package` for the presentation app and links shared test
+dependencies. Browser end-to-end suites exist in documents, presentation, and pdf and
+require Playwright browsers:
+
+```bash
+npx playwright install
+npm run test:browser -w apps/documents
+npm run test:e2e -w apps/presentation
+npm run test:e2e -w apps/pdf
+```
+
+## Project layout
+
+```text
+apps/<app>/src        application code
+apps/<app>/tests      vitest suites
+apps/<app>/web        shell manifest
+apps/<app>/dist       production build output (ignored)
+packages/ai-client    gateway client
+packages/storage      local-first storage
+scripts/              build, test, AI verification, shell serving
+dev/                  local development helpers and verification logs
+```
+
+## Configuration
+
+| File | Purpose |
+| --- | --- |
+| `.env.example` | Template for gateway URL, key, and model |
+| `.env.local` | Local overrides, ignored by git |
+| `apps/<app>/web/manifest.json` | Module identity used by the union shell |
+
+Applications have no runtime configuration endpoint. Values are read from `import.meta.env`
+at build time and from the browser environment at runtime.
+
+## Storage model
+
+- The first write prompts for a workspace directory through the File System Access API.
+  The handle is remembered for the session.
+- When the directory picker is unavailable or declined for reasons other than cancellation,
+  storage falls back to OPFS under the page origin.
+- File contents are real `.docx`, `.xlsx`, `.pptx`, `.pdf`, JSON, and image files. Nothing
+  is stored in a proprietary database.
+- An IndexedDB store keeps a best-effort path/size/time index for listings. Loss of the
+  index does not lose files.
+- Tests use a stub `globalThis.puter` object only when `import.meta.env.MODE === 'test'`.
+  Production builds never touch that global.
+
+## Licenses and provenance
+
+- `apps/documents`, `apps/presentation`, `apps/pdf`, and `apps/pm`: MIT, migrated from
+  [HeyPuter/everything](https://github.com/HeyPuter/everything).
+- `packages/storage`, `packages/ai-client`, and the root tooling: MIT, first-party.
+- `apps/spreadsheet`: AGPL-3.0-only, migrated from HeyPuter/everything. The root MIT
+  license does not cover this app. Distributing a combined binary or hosted service that
+  includes it triggers AGPL obligations, so a public release needs a licensing decision
+  before the repository changes visibility.
+
+See `LICENSE` and `apps/spreadsheet/LICENSE`. Upstream fixes belong upstream; report them
+to HeyPuter/everything instead of patching a divergent copy here.
+
+## Status
+
+Milestones M0 through M5 of the migration plan are implemented: workspace setup, storage
+extraction, AI client, per-app AI integration, and union-shell manifests. The suite runs
+offline except for live AI verification, which requires a local gateway and a loaded model.

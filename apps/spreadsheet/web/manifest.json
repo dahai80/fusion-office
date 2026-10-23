@@ -1,0 +1,14 @@
+{
+  "id": "fusion-office-spreadsheet",
+  "title": "Fusion Office Spreadsheet",
+  "title_en": "Fusion Office Spreadsheet",
+  "version": "1.0.0",
+  "path": "/office/spreadsheet",
+  "icon": "Table2",
+  "entry": "/shell/fusion-office-spreadsheet/",
+  "devices": [
+    "desktop",
+    "mobile-readonly"
+  ],
+  "category": "domain"
+}

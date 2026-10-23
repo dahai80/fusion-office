@@ -1,0 +1,14 @@
+{
+  "id": "fusion-office-documents",
+  "title": "Fusion Office Documents",
+  "title_en": "Fusion Office Documents",
+  "version": "1.0.0",
+  "path": "/office/documents",
+  "icon": "FileText",
+  "entry": "/shell/fusion-office-documents/",
+  "devices": [
+    "desktop",
+    "mobile-readonly"
+  ],
+  "category": "domain"
+}

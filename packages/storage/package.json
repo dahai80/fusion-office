@@ -1,0 +1,12 @@
+{
+    "name": "@fusion-office/storage",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Local-first storage layer for fusion-office apps: File System Access API with OPFS fallback, plus IndexedDB index.",
+    "license": "MIT",
+    "type": "module",
+    "main": "src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "fusion-office-presentation",
+  "title": "Fusion Office Presentation",
+  "title_en": "Fusion Office Presentation",
+  "version": "1.0.0",
+  "path": "/office/presentation",
+  "icon": "Presentation",
+  "entry": "/shell/fusion-office-presentation/",
+  "devices": [
+    "desktop",
+    "mobile-readonly"
+  ],
+  "category": "domain"
+}

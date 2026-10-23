@@ -1,0 +1,175 @@
+import { el } from './lib/ui.js';
+
+/**
+ * The page overlay of Prepare a form: every field on the page as a labelled box that can be
+ * selected, dragged, resized by its corner, opened for its properties (double-click or
+ * Enter), and deleted (Delete). The editor turns the gestures into document edits.
+ *
+ * callbacks: { onMove(field, rect), onOpen(field), onDelete(field), onSelect(field) }
+ * Rectangles handed out are in PDF user space { x, y, width, height }.
+ */
+const TYPE_LABELS = {
+  text: 'Text field',
+  date: 'Date field',
+  checkbox: 'Check box',
+  radio: 'Radio button',
+  dropdown: 'Dropdown',
+  listbox: 'List box',
+  button: 'Button',
+  signature: 'Signature field',
+};
+export const fieldTypeLabel = (type) => TYPE_LABELS[type] || 'Field';
+
+export function createFormDesigner({ onMove, onOpen, onDelete, onSelect }) {
+  const root = el('div', { class: 'form-designer', hidden: true });
+  let viewport = null;
+  let fields = [];
+  let selected = null; // `${name}#${widgetIndex}`
+  let drag = null;
+  const keyOf = (field) => `${field.name}#${field.widgetIndex}`;
+
+  /** The field's box on screen, from its PDF rectangle. */
+  function screenBox(field) {
+    const { x, y, width, height } = field.rect;
+    const [x1, y1] = viewport.convertToViewportPoint(x, y);
+    const [x2, y2] = viewport.convertToViewportPoint(x + width, y + height);
+    return {
+      left: Math.min(x1, x2),
+      top: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1),
+    };
+  }
+  /** A screen box back in PDF user space. */
+  function pdfRect(box) {
+    const [ax, ay] = viewport.convertToPdfPoint(box.left, box.top);
+    const [bx, by] = viewport.convertToPdfPoint(box.left + box.width, box.top + box.height);
+    return {
+      x: Math.min(ax, bx),
+      y: Math.min(ay, by),
+      width: Math.abs(bx - ax),
+      height: Math.abs(by - ay),
+    };
+  }
+
+  function place(node, box) {
+    Object.assign(node.style, {
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+    });
+  }
+
+  function select(field, focus = false) {
+    selected = field ? keyOf(field) : null;
+    root.querySelectorAll('.designer-field').forEach((node) => {
+      const on = node.dataset.key === selected;
+      node.classList.toggle('is-selected', on);
+      node.setAttribute('aria-pressed', String(on));
+      if (on && focus) node.focus({ preventScroll: true });
+    });
+    onSelect?.(field || null);
+  }
+
+  function startDrag(e, field, node, mode) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    select(field);
+    const box = screenBox(field);
+    drag = { field, node, mode, x: e.clientX, y: e.clientY, box, moved: false, id: e.pointerId };
+    node.setPointerCapture(e.pointerId);
+  }
+  function moveDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x,
+      dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+    drag.moved = true;
+    const box =
+      drag.mode === 'move'
+        ? { ...drag.box, left: drag.box.left + dx, top: drag.box.top + dy }
+        : {
+            ...drag.box,
+            width: Math.max(8, drag.box.width + dx),
+            height: Math.max(8, drag.box.height + dy),
+          };
+    drag.current = box;
+    place(drag.node, box);
+  }
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const done = drag;
+    drag = null;
+    if (done.moved && done.current) onMove(done.field, pdfRect(done.current));
+  }
+
+  function render(next, nextViewport) {
+    fields = next;
+    viewport = nextViewport;
+    root.replaceChildren(
+      ...fields.map((field) => {
+        const node = el(
+          'button',
+          {
+            type: 'button',
+            class: `designer-field type-${field.type}`,
+            'data-key': keyOf(field),
+            'aria-label': `${fieldTypeLabel(field.type)} ${field.name}`,
+            'aria-pressed': String(keyOf(field) === selected),
+            title: `${field.name} (${fieldTypeLabel(field.type)}). Double-click for properties.`,
+            onpointerdown: (e) => startDrag(e, field, node, 'move'),
+            onpointermove: moveDrag,
+            onpointerup: endDrag,
+            onpointercancel: endDrag,
+            ondblclick: () => onOpen(field),
+            onkeydown: (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onOpen(field);
+              } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                onDelete(field);
+              } else if (e.key.startsWith('Arrow')) {
+                // Arrow keys nudge a point at a time; Shift moves ten.
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                const { x, y, width, height } = field.rect;
+                const dx = { ArrowLeft: -step, ArrowRight: step }[e.key] || 0,
+                  dy = { ArrowDown: -step, ArrowUp: step }[e.key] || 0;
+                onMove(field, { x: x + dx, y: y + dy, width, height });
+              }
+            },
+            onfocus: () => select(field),
+          },
+          el('span', { class: 'designer-name' }, field.name),
+          el('span', {
+            class: 'designer-resize',
+            'aria-hidden': 'true',
+            onpointerdown: (e) => startDrag(e, field, node, 'resize'),
+          }),
+        );
+        place(node, screenBox(field));
+        if (keyOf(field) === selected) node.classList.add('is-selected');
+        return node;
+      }),
+    );
+  }
+
+  return {
+    root,
+    render,
+    setEnabled(on) {
+      root.hidden = !on;
+      if (!on) select(null);
+    },
+    get selected() {
+      return fields.find((field) => keyOf(field) === selected) || null;
+    },
+    focusField(name) {
+      const field = fields.find((entry) => entry.name === name);
+      if (field) select(field, true);
+    },
+  };
+}

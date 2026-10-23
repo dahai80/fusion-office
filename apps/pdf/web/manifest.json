@@ -1,0 +1,14 @@
+{
+  "id": "fusion-office-pdf",
+  "title": "Fusion Office PDF",
+  "title_en": "Fusion Office PDF",
+  "version": "1.0.0",
+  "path": "/office/pdf",
+  "icon": "FileSearch",
+  "entry": "/shell/fusion-office-pdf/",
+  "devices": [
+    "desktop",
+    "mobile-readonly"
+  ],
+  "category": "domain"
+}

@@ -1,0 +1,12 @@
+{
+    "name": "@fusion-office/ai-client",
+    "version": "0.1.0",
+    "private": true,
+    "description": "LLM client for fusion-office apps: OpenAI-compatible calls to fusion-gateway (:11432) with streaming, JSON mode, and model management.",
+    "license": "MIT",
+    "type": "module",
+    "main": "src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    }
+}
