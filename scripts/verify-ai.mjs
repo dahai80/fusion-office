@@ -1,3 +1,4 @@
+import { JSDOM } from 'jsdom';
 import {
     configure,
     isConfigured,
@@ -6,7 +7,14 @@ import {
     chatStream,
     chatStreamEvents,
     jsonChat,
-} from '../packages/ai-client/src/index.js';
+} from '@fusion-office/ai-client';
+
+const dom = new JSDOM('', { url: 'http://localhost/' });
+globalThis.window = dom.window;
+globalThis.document = dom.window.document;
+globalThis.localStorage = dom.window.localStorage;
+globalThis.indexedDB = dom.window.indexedDB;
+globalThis.Blob = dom.window.Blob;
 
 const gateway = process.env.FUSION_GATEWAY_URL || 'http://127.0.0.1:11432';
 const key = process.env.FUSION_GATEWAY_KEY;
@@ -135,6 +143,45 @@ async function main() {
             throw new Error(`no items: ${preview(JSON.stringify(parsed))}`);
         }
         return `${parsed.items.length} items: ${preview(parsed.items.join(' | '))}`;
+    });
+
+    await step('documents adapter', async () => {
+        const P = await import('../apps/documents/src/lib/puter.js');
+        const reply = await P.aiChat('Reply with exactly: DOC_OK');
+        const text = reply?.message?.content || '';
+        if (!text.includes('DOC_OK')) throw new Error(`unexpected answer: ${preview(text)}`);
+        return preview(text);
+    });
+
+    await step('spreadsheet adapter', async () => {
+        const P = await import('../apps/spreadsheet/src/lib/puter.js');
+        const text = await P.aiChat('Reply with exactly: SHEET_OK', { feature: 'formula' });
+        if (!text.includes('SHEET_OK')) throw new Error(`unexpected answer: ${preview(text)}`);
+        return preview(text);
+    });
+
+    await step('presentation adapter', async () => {
+        const cloud = await import('../apps/presentation/src/cloud.js');
+        const reply = await cloud.aiChat('Reply with exactly: SLIDE_OK');
+        const text = reply?.message?.content || '';
+        if (!text.includes('SLIDE_OK')) throw new Error(`unexpected answer: ${preview(text)}`);
+        let streamed = '';
+        for await (const event of cloud.aiChatStream([{ role: 'user', content: 'Say one word.' }])) {
+            if (event.type === 'text') streamed += event.text;
+        }
+        if (!streamed.trim()) throw new Error('presentation stream was empty');
+        return `${preview(text)}; stream ${preview(streamed)}`;
+    });
+
+    await step('pdf panel', async () => {
+        const { createAiPanel } = await import('../apps/pdf/src/ai-panel.js');
+        const panel = createAiPanel({
+            getText: async () => '[Page 1] Quarterly revenue grew 12 percent to 4.2 million.',
+        });
+        await panel.ask('How much did revenue grow?');
+        const answer = panel.el.querySelector('.ai-answer-text')?.textContent || '';
+        if (!/12/.test(answer)) throw new Error(`answer missed the figure: ${preview(answer)}`);
+        return preview(answer);
     });
 
     const failed = results.filter((item) => !item.ok);

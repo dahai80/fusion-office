@@ -13,6 +13,7 @@
         "packages/*"
     ],
     "devDependencies": {
+        "jsdom": "^27.0.0",
         "patch-package": "^8.0.1"
     },
     "scripts": {

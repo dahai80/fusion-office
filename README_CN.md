@@ -43,8 +43,9 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   修改时间索引，用于列表展示。
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
-- AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`；
-  未配置时界面明确提示本地 AI 服务未配置，不会发送请求。
+- AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`。
+  PDF 和项目 AI 入口会先检查 `isConfigured()` 并在缺少配置时明确说明，不会发送请求；
+  其余应用则把网关错误显示在各自的界面中。
 
 ## 环境要求
 
@@ -93,8 +94,9 @@ Key，禁止使用 master key，禁止提交 `.env.local`。
 FUSION_GATEWAY_KEY=<受限-key> node scripts/verify-ai.mjs
 ```
 
-脚本依次检查模型注册、普通对话、流式对话、工具事件流、PDF 提问结构和项目清单 JSON
-结构。任一步失败都会以非零状态退出。
+脚本依次检查模型注册、普通对话、流式对话、工具事件流、PDF 提问结构、项目清单 JSON
+结构，以及文档、表格、演示、PDF 面板的真实适配器路径。加载浏览器模块时只使用 jsdom，
+不启动浏览器。任一步失败都会以非零状态退出。
 
 ## 联合 Web Shell 集成
 

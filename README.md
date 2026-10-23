@@ -45,8 +45,9 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
   embeds model logic.
 - AI traffic is gated by the gateway API key. Browser builds read the key at build time
-  from `VITE_FUSION_GATEWAY_KEY`; without it the UI reports that the local AI service is
-  not configured instead of sending a request.
+  from `VITE_FUSION_GATEWAY_KEY`. PDF and project AI surfaces check `isConfigured()` and
+  explain what is missing before sending anything; the other apps surface the gateway's
+  error in their own UI.
 
 ## Requirements
 
@@ -101,8 +102,9 @@ FUSION_GATEWAY_KEY=<scoped-key> node scripts/verify-ai.mjs
 ```
 
 The script checks model registration, plain chat, streaming chat, tool-event streaming,
-the PDF question shape, and the project checklist JSON shape. It exits non-zero if any
-step fails.
+the PDF question shape, the project checklist JSON shape, and the real adapter paths in
+documents, spreadsheet, presentation, and the PDF panel. It uses jsdom only to load those
+browser modules and exits non-zero if any step fails.
 
 ## Union shell integration
 
