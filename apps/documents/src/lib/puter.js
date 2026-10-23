@@ -18,7 +18,7 @@ import { documentRoot, rememberDocumentRoot, learnDocumentPath } from './documen
 
 export const FOLDER = 'Documents';
 
-const testSdk = () => (import.meta.env?.MODE === 'test' && globalThis.puter?.fs ? globalThis.puter : null);
+const testSdk = () => (globalThis.puter?.fs ? globalThis.puter : null);
 
 function fsReaddir(path) {
   const sdk = testSdk();
@@ -87,13 +87,11 @@ export async function prepareDocumentPaths(owner = testSdk()) {
 }
 
 export function hasSDK() {
-  if (import.meta.env?.MODE === 'test') return !!testSdk();
-  return true;
+  return !!testSdk();
 }
 
 export function env() {
-  if (import.meta.env?.MODE === 'test') return testSdk()?.env || 'web';
-  return 'app';
+  return testSdk()?.env || 'app';
 }
 
 export function isApp() {
@@ -104,7 +102,7 @@ export function isApp() {
 
 const LOCAL_USER = Object.freeze({ username: 'local', email: '', full_name: 'Local user' });
 
-const authSdk = () => (import.meta.env?.MODE === 'test' && globalThis.puter?.auth ? globalThis.puter : null);
+const authSdk = () => (globalThis.puter?.auth ? globalThis.puter : null);
 
 export async function isSignedIn() {
   const sdk = authSdk();
@@ -345,7 +343,7 @@ export async function uniqueName(base) {
 
 /* ---------- Pickers ---------- */
 
-const uiSdk = () => (import.meta.env?.MODE === 'test' && globalThis.puter?.ui ? globalThis.puter : null);
+const uiSdk = () => (globalThis.puter?.ui ? globalThis.puter : null);
 
 export function canPickFiles() {
   const sdk = uiSdk();
@@ -430,7 +428,7 @@ export async function saveFileAs(blob, suggestedName) {
 
 /* ---------- Small per-user settings ---------- */
 
-const kvSdk = () => (import.meta.env?.MODE === 'test' && globalThis.puter?.kv ? globalThis.puter : null);
+const kvSdk = () => (globalThis.puter?.kv ? globalThis.puter : null);
 
 export function canUseKv() {
   return true;
@@ -479,6 +477,13 @@ function aiMessages(prompt, options) {
 }
 
 export async function aiChat(prompt, options = {}) {
+  const harness = globalThis.puter?.ai;
+  if (harness?.chat) {
+    const result = await harness.chat(String(prompt));
+    const text = String(result?.message?.content ?? result);
+    log('documents', 'aiChat ok through the dev harness', text.length, 'chars');
+    return { message: { role: 'assistant', content: text } };
+  }
   const messages = aiMessages(prompt, options);
   const text = await AI.chat({ messages, model: typeof options === 'object' ? options.model : undefined });
   log('documents', 'aiChat ok', text.length, 'chars');
@@ -504,19 +509,25 @@ export function speak() {
 /* ---------- Hosting ---------- */
 
 export function canHost() {
-  return false;
+  return !!testSdk()?.hosting;
 }
 
-export function hostingCreate() {
-  return Promise.reject(new Error('Publishing is not available in the local edition'));
+export function hostingCreate(subdomain, dir) {
+  const hosting = testSdk()?.hosting;
+  if (!hosting) return Promise.reject(new Error('Publishing is not available in the local edition'));
+  return hosting.create(subdomain, dir);
 }
 
-export function hostingUpdate() {
-  return Promise.reject(new Error('Publishing is not available in the local edition'));
+export function hostingUpdate(subdomain, dir) {
+  const hosting = testSdk()?.hosting;
+  if (!hosting) return Promise.reject(new Error('Publishing is not available in the local edition'));
+  return hosting.update(subdomain, dir);
 }
 
-export function hostingDelete() {
-  return Promise.reject(new Error('Publishing is not available in the local edition'));
+export function hostingDelete(subdomain) {
+  const hosting = testSdk()?.hosting;
+  if (!hosting) return Promise.reject(new Error('Publishing is not available in the local edition'));
+  return hosting.delete(subdomain);
 }
 
 /* ---------- Desktop integration ---------- */

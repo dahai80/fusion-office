@@ -6,6 +6,14 @@ import collabDevServer from './dev/collab-dev-server.mjs';
 export default defineConfig({
   plugins: [puterLocalhost('documents'), collabDevServer()],
   base: './',
+  // npm workspaces hoist fflate to the repository root; browser tests import it
+  // by the path that existed when every app had its own node_modules.
+  resolve: {
+    alias: [{
+      find: /^\/node_modules\/fflate\/esm\/browser\.js$/,
+      replacement: fileURLToPath(new URL('../../node_modules/fflate/esm/browser.js', import.meta.url)),
+    }],
+  },
   build: {
     target: 'es2022',
     cssTarget: 'safari15',

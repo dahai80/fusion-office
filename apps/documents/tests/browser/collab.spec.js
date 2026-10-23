@@ -121,7 +121,7 @@ test('restores a named version from Version History', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
   await text(page).fill('First version.');
   await text(page).press('ControlOrMeta+s');
-  await expect(page.locator('.canvas-save-status')).toHaveAttribute('aria-label', 'Saved to Puter');
+  await expect(page.locator('.canvas-save-status')).toHaveAttribute('aria-label', 'Saved');
   await page.locator('.ed-menubar').getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Browse Version History', exact: true }).click();
   const pane = page.getByRole('complementary', { name: 'Version History pane' });
@@ -132,7 +132,7 @@ test('restores a named version from Version History', async ({ page }) => {
   await expect(pane.getByRole('listitem').first()).toContainText('Clean draft');
   await text(page).fill('Second version, much changed.');
   await text(page).press('ControlOrMeta+s');
-  await expect(page.locator('.canvas-save-status')).toHaveAttribute('aria-label', 'Saved to Puter');
+  await expect(page.locator('.canvas-save-status')).toHaveAttribute('aria-label', 'Saved');
   // Open it beside the document, read-only.
   await pane.getByRole('button', { name: /Clean draft/ }).click();
   await expect(page.getByRole('complementary', { name: 'Earlier version (read only)' })).toBeVisible();

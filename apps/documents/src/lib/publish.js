@@ -193,7 +193,7 @@ export async function publishPage(docPath, name, html, { existing = null, random
       try { await P.hostingDelete(subdomain); }
       catch (cleanupError) {
         if (!P.isNotFound(cleanupError)) {
-          throw new Error(`The page may still be live at ${siteUrl(subdomain)}, but its publication record could not be saved. Check this address and remove the page from Puter hosting.`, { cause: error });
+          throw new Error(`The page may still be live at ${siteUrl(subdomain)}, but its publication record could not be saved. Check this address and remove the page from the hosting site.`, { cause: error });
         }
       }
     }
