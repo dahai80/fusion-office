@@ -1372,3 +1372,28 @@ kbd {
 }
 
 .offline-ic { color: var(--warn); display: inline-flex; flex-shrink: 0; }
+
+/* Project assistant */
+.pm-assistant { display: flex; flex-direction: column; gap: 10px; min-height: 320px; }
+.pm-as-log { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 52vh; padding: 4px 2px; }
+.pm-as-empty { margin: 0; color: var(--ink-3); font-size: 13px; }
+.pm-as-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-as-suggestion { border: 1px solid var(--hairline); background: var(--surface); color: var(--ink); border-radius: var(--r-full); padding: 6px 12px; font: 12.5px/1.2 var(--font); cursor: pointer; }
+.pm-as-suggestion:hover { border-color: var(--accent); color: var(--accent-strong); }
+.pm-as-message { padding: 8px 10px; border-radius: var(--r-md); font-size: 13px; line-height: 1.45; max-width: 92%; }
+.pm-as-message p { margin: 0 0 6px; }
+.pm-as-message p:last-child { margin-bottom: 0; }
+.pm-as-message.is-me { align-self: flex-end; background: var(--accent-wash); }
+.pm-as-message.is-assistant { background: var(--surface-2); border: 1px solid var(--hairline); align-self: flex-start; }
+.pm-as-step { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--ink-3); margin-bottom: 4px; }
+.pm-as-step-label { flex: 1; min-width: 0; }
+.pm-as-step[data-status='done'] .pm-as-step-status { color: var(--ok); }
+.pm-as-step[data-status='error'] .pm-as-step-status { color: var(--danger); }
+.pm-as-approval { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--surface); }
+.pm-as-approval p { margin: 0 0 6px; font-size: 12.5px; }
+.pm-as-actions { display: flex; gap: 6px; }
+.pm-as-status { margin: 0; min-height: 1.4em; font-size: 12px; color: var(--ink-3); }
+.pm-as-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--hairline); padding-top: 10px; }
+.pm-as-input { resize: vertical; min-height: 64px; }
+.pm-as-bar { display: flex; gap: 8px; justify-content: flex-end; }
+.pm-as-mark { display: inline-flex; color: var(--accent); margin-left: 6px; }

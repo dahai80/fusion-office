@@ -490,6 +490,35 @@ export async function aiChat(prompt, options = {}) {
   return { message: { role: 'assistant', content: text } };
 }
 
+const lastUserText = messages => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'user') continue;
+    return typeof messages[i].content === 'string' ? messages[i].content : '';
+  }
+  return '';
+};
+
+/** The agent's stream: text as it arrives and, after it, the tool calls it asked for. */
+export async function* aiChatStream(messages, options = {}) {
+  const harness = globalThis.puter?.ai;
+  if (harness?.chat) {
+    const result = await harness.chat(lastUserText(messages), { messages, tools: options.tools });
+    const text = String(result?.message?.content ?? result ?? '');
+    if (text) yield { type: 'text', text };
+    for (const call of result?.message?.tool_calls || []) {
+      const args = call.function?.arguments;
+      let input = {};
+      if (typeof args === 'string' && args.trim()) {
+        try { input = JSON.parse(args); } catch { input = { __unreadable: args }; }
+      } else if (args && typeof args === 'object') input = args;
+      yield { type: 'tool', id: call.id, name: call.function?.name, input };
+    }
+    log('documents', 'aiChatStream ok through the dev harness', text.length, 'chars');
+    return;
+  }
+  yield* AI.chatStreamEvents({ messages, tools: options.tools, toolChoice: options.toolChoice, model: options.model, maxTokens: options.maxTokens });
+}
+
 export function canMakeImages() {
   return false;
 }

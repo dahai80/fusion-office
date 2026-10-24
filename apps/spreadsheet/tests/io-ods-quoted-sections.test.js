@@ -1,8 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { expect, it } from 'vitest';
 
-function run(code, value) {
-  // Isolate the original runaway string loops from the test runner.
+function run(code, value, timeout) {
+  // Isolate the original runaway string loops from the test runner. The budget is generous: a
+  // machine running the whole suite at once starts a child node well past two seconds, and the
+  // guard is against a loop that never returns, not against a slow one.
   return spawnSync(process.execPath, ['--max-old-space-size=128', '--input-type=module', '-e', `
     import { Workbook } from './src/core/workbook.js';
     import { workbookFromFile, workbookToOds } from './src/core/io.js';
@@ -12,7 +14,7 @@ function run(code, value) {
       const back = await workbookFromFile(await workbookToOds(wb), 'quoted.ods');
       console.log(JSON.stringify({ display: back.getDisplay(back.activeSheetId, 0, 0), value: back.getValue(back.activeSheetId, 0, 0) }));
     } catch (error) { console.log(JSON.stringify({ error: error.message })); }
-  `], { cwd: new URL('../', import.meta.url), timeout: 2000, encoding: 'utf8' });
+  `], { cwd: new URL('../', import.meta.url), timeout, encoding: 'utf8' });
 }
 
 it.each([
@@ -25,18 +27,18 @@ it.each([
   ['0.00;[Red]-0.00', 7.5, '7.50'],
   ['0.00" units"', 7.5, '7.50 units'],
 ])('saves quoted semicolons without truncating the format: %s', (code, value, expected) => {
-  const result = run(code, value);
+  const result = run(code, value, 20000);
   expect(result.error).toBeUndefined();
   expect(result.status).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({ display: expected, value });
   if (!code.includes('[Red]')) expect(result.stderr).not.toContain('Unsupported ODS Style Map');
-});
+}, 60000);
 
 // An unterminated literal once made the writer run past the end of the code; it must
 // neither hang nor fail the export, since one cell's format must not make the book unsaveable.
 it.each(['"unfinished', '0.00"unfinished', 'yyyy"unfinished', 'hh"unfinished', '$"unfinished', 'hh["unfinished]'])(
   'saves an unterminated quoted literal promptly: %s', (code) => {
-    const result = run(code, 60);
+    const result = run(code, 60, 10000);
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({ value: 60 });

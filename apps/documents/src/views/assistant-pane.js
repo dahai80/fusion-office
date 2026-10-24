@@ -1,227 +1,211 @@
 /**
- * The Assistant pane: a conversation with Puter's AI beside the pages, about
- * and for this document. Above the box the person chooses what goes with a
- * message, the selected text or the whole document, and the chip says how
- * much that is; nothing else is sent. Replies that are text for the document
- * show what they would insert or replace, and land only when the person
- * applies them, as one change Undo takes back (the reply offers Undo too).
+ * The Assistant pane: a conversation beside the pages that can read and change
+ * the open document through tools. Each change it makes is one undoable step,
+ * and the pane says what it did and where. A change that replaces the person's
+ * own words asks first.
  *
  * The pane, its button on the Home tab and the floating button beside the
- * pages are offered only where Puter's AI is available.
+ * pages are offered only where the AI service is available.
  */
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { aiActionById, askAi, answerParagraphs } from '../lib/ai.js';
-import { assistantPrompt, readReply, assistantError, SUGGESTIONS, MAX_ASSISTANT_CHARS } from '../lib/assistant.js';
+import { createAgent } from '@fusion-office/ai-client';
+import { SUGGESTIONS } from '../lib/assistant.js';
+import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
 import { commandIconEl } from '../ui/ribbon.js';
-import { tableCells } from '../engine/tables.js';
 
 const words = text => (String(text).trim().match(/\S+/gu) || []).length;
 const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-export function createAssistantPane({ editor, pkg, error, available = () => P.canUseAi(), chat = prompt => P.aiChat(prompt) }) {
-  let scope = 'selection', history = [], busy = false, stopped = null;
-  const pane = sidePane({ title: 'Assistant', label: 'Assistant pane', className: 'as-pane', onOpen: () => { renderContext(); renderEmpty(); fab.setAttribute('aria-expanded', 'true'); titleButton.setAttribute('aria-pressed', 'true'); }, onClose: () => { fab.setAttribute('aria-expanded', 'false'); titleButton.setAttribute('aria-pressed', 'false'); editor()?.focus(); } });
+const PROMPTS = {
+  improve: 'Improve the writing of the selection. Keep its meaning and length.',
+  grammar: 'Fix the spelling and grammar of the selection.',
+  shorten: 'Make the selection shorter while keeping its meaning.',
+  summarize: 'Summarize the selection in a few sentences.',
+};
+
+const STATUS_TEXT = {
+  running: 'Working…',
+  done: 'Done',
+  error: 'Failed',
+  declined: 'Skipped',
+  skipped: 'Stopped',
+};
+
+export function createAssistantPane({ editor, pkg, error, available = () => P.canUseAi(), chat = (messages, options) => P.aiChatStream(messages, options) }) {
+  let busy = false, currentTurn = null, refused = null;
+
+  const pane = sidePane({ title: 'Assistant', label: 'Assistant pane', className: 'as-pane', onOpen: () => { renderContext(); renderEmpty(); fab.setAttribute('aria-expanded', 'true'); titleButton.setAttribute('aria-pressed', 'true'); }, onClose: () => { fab.setAttribute('aria-expanded', 'false'); titleButton.setAttribute('aria-pressed', 'false'); agent.stop(); editor()?.focus(); } });
   pane.heading.prepend(el('span.as-mark', { 'aria-hidden': 'true' }, commandIconEl('assistant', 16)));
-  const newChat = el('button.btn.btn-ghost.btn-sm.as-new', { type: 'button', onclick: () => { history = []; log.replaceChildren(); renderEmpty(); input.focus(); } }, 'New chat');
+  const newChat = el('button.btn.btn-ghost.btn-sm.as-new', { type: 'button', onclick: () => newChatNow() }, 'New chat');
   pane.heading.after(newChat);
 
   const log = el('div.as-log', { role: 'log', 'aria-label': 'Conversation with the assistant', tabIndex: -1 });
   const empty = el('div.as-empty');
-  const scopeSelection = el('button.as-scope-option', { type: 'button', role: 'radio', onclick: () => setScope('selection') }, 'Selection');
-  const scopeDocument = el('button.as-scope-option', { type: 'button', role: 'radio', onclick: () => setScope('document') }, 'Whole document');
-  const scopeGroup = el('div.as-scope', { role: 'radiogroup', 'aria-label': 'Send with your message' }, scopeSelection, scopeDocument);
   const context = el('p.as-context', { 'aria-live': 'polite' });
-  const input = el('textarea.input.as-input', { rows: 3, placeholder: 'Ask about this document, or ask for a draft or a rewrite…', 'aria-label': 'Message the assistant', enterKeyHint: 'send' });
+  const input = el('textarea.input.as-input', { rows: 3, placeholder: 'Ask the assistant to read or change this document…', 'aria-label': 'Message the assistant', enterKeyHint: 'send' });
   const send = el('button.btn.btn-primary.as-send', { type: 'submit', 'aria-label': 'Send', title: 'Send (Enter)' }, 'Send');
-  const form = el('form.as-form', { onsubmit: e => { e.preventDefault(); submit(input.value); } }, scopeGroup, context, el('div.as-box', {}, input, send), el('p.as-disclaimer', {}, 'Only the text shown above is sent to the local AI service. Replies can be wrong: check them before you use them.'));
+  const form = el('form.as-form', { onsubmit: e => { e.preventDefault(); if (busy) stop(); else submit(input.value); } }, context, el('div.as-box', {}, input, send), el('p.as-disclaimer', {}, 'The assistant works on the open document through tools. Every change can be undone. Replies can be wrong: check them before you use them.'));
   input.addEventListener('keydown', e => {
     if (isComposing(e)) return;
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input.value); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!busy) submit(input.value); }
   });
   pane.body.append(log, form);
 
-  // A small button at the edge of the pages opens the pane (where Puter's AI is available).
-  // In the title bar beside Comments, as the other apps' assistants sit in their top bars.
   const titleButton = el('button.ed-pill.as-title-button', { type: 'button', 'aria-label': 'Assistant', title: `Assistant (${MOD_KEY}+Shift+I)`, 'aria-pressed': 'false', hidden: true, onclick: () => toggle() }, commandIconEl('assistant', 16));
   titleButton.addEventListener('mousedown', e => e.preventDefault());
   const fab = el('button.as-fab', { type: 'button', 'aria-label': 'Assistant', title: `Assistant (${MOD_KEY}+Shift+I)`, 'aria-expanded': 'false', hidden: true, onclick: () => toggle() }, commandIconEl('assistant', 20));
   fab.addEventListener('mousedown', e => e.preventDefault());
-  // Mod+Shift+I opens and closes the pane from anywhere in the editor.
   const keys = new AbortController();
   window.addEventListener('keydown', e => {
     if (e.defaultPrevented || isComposing(e) || !(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey || shortcutCode(e) !== 'KeyI' || !editor()) return;
     e.preventDefault(); toggle();
   }, { signal: keys.signal });
 
-  /* ---- What goes with a message ---- */
+  /* ---- The agent ---- */
+
+  const agent = createAgent({
+    chat: (messages, options) => chat(messages, options),
+    tools: TOOLS,
+    system: SYSTEM_PROMPT,
+    snapshot: () => documentSnapshot(editor(), { docName: pkg()?.name }),
+    settings: () => ({ approval: 'destructive' }),
+    changes: name => changesDocument(name),
+    describe: (name, args) => describeCallFor(editor(), name, args),
+    runTool: (name, args) => {
+      const engine = editor();
+      if (!engine) return { ok: false, content: 'Error: no document is open.' };
+      if (changesDocument(name) && (pkg()?.readOnly || engine.viewOnly)) return { ok: false, content: 'Error: the document is read-only.' };
+      return runTool(engine, name, args);
+    },
+    approve: step => askApproval(step),
+  });
+
+  /* ---- What the person can see ---- */
+
   function selection() {
     const engine = editor(); if (!engine) return null;
     if (engine.session.path !== null) return null;
     const [start, end] = engine.model.range;
-    if (start === end) return null;
-    return { start, end, text: engine.model.text.slice(start, end) };
+    return start === end ? null : { start, end, text: engine.model.text.slice(start, end) };
   }
-  function payload() {
-    const engine = editor(); if (!engine) return null;
-    if (scope === 'selection') { const s = selection(); return s ? { scope, ...s } : null; }
-    return { scope, text: engine.session.body.text };
-  }
-  function setScope(next) { scope = next; renderContext(); renderEmpty(); input.focus(); }
+
   function renderContext() {
     const s = selection();
-    if (scope === 'selection' && !s) scope = 'document';
-    scopeSelection.setAttribute('aria-checked', String(scope === 'selection'));
-    scopeDocument.setAttribute('aria-checked', String(scope === 'document'));
-    scopeSelection.disabled = !s;
-    const p = payload();
-    const count = p ? words(p.text) : 0;
-    context.textContent = !p ? 'Nothing selected.' : scope === 'selection' ? `Sends the ${plural(count, 'word')} you selected.` : `Sends the whole document (${plural(count, 'word')}).`;
-    context.classList.toggle('is-over', !!p && p.text.length > MAX_ASSISTANT_CHARS);
+    context.textContent = !editor() ? 'No document is open.' : s
+      ? `Selected: ${plural(words(s.text), 'word')}. The assistant can work on the selection or the whole document.`
+      : 'The assistant can read and change the whole document.';
   }
+
   function renderEmpty() {
     if (log.querySelector('.as-message')) { empty.remove(); return; }
-    const list = scope === 'selection' && selection() ? SUGGESTIONS.selection : SUGGESTIONS.document;
+    const list = selection() ? SUGGESTIONS.selection : SUGGESTIONS.document;
     empty.replaceChildren(el('p.as-empty-title', {}, 'How can I help with this document?'),
-      el('div.as-suggestions', {}, ...list.map(s => el('button.as-suggestion', { type: 'button', onclick: () => (s.id ? runAction(s.id, s.label) : submit(s.ask)) }, s.label))),
-      hint('The assistant sees only the selection or the whole document, as you choose below.'));
+      el('div.as-suggestions', {}, ...list.map(s => el('button.as-suggestion', { type: 'button', onclick: () => submit(s.id ? PROMPTS[s.id] : s.ask) }, s.label))),
+      hint('Ask in plain words. The assistant reads what it needs and changes the document for you.'));
     log.append(empty);
   }
 
-  /* ---- Messages ---- */
   const message = (who, ...children) => { empty.remove(); const node = el(`div.as-message.is-${who}`, {}, ...children); log.append(node); node.scrollIntoView?.({ block: 'nearest' }); return node; };
+
+  /* ---- Sending ---- */
 
   async function submit(text) {
     const request = String(text || '').trim();
     if (!request || busy) return;
-    const p = payload();
-    if (!p) { toast('Select some text, or choose Whole document.', { icon: 'info' }); return; }
-    if (p.text.length > MAX_ASSISTANT_CHARS) { toast('That is more text than the assistant takes at once. Select a shorter passage.', { icon: 'alert' }); return; }
+    if (!editor()) { toast('Open a document first.', { icon: 'info' }); return; }
     input.value = '';
-    message('me', el('p', {}, request), el('p.as-sent', {}, scope === 'selection' ? `With ${plural(words(p.text), 'selected word')}` : 'With the whole document'));
-    await reply(() => chat(assistantPrompt({ request, text: p.text, scope: p.scope, history })).then(readReply), p, request);
-  }
-
-  /** One of the writing assistant's actions on the selection (Improve, Shorten, …). */
-  async function runAction(id, label) {
-    const action = aiActionById(id); const p = payload();
-    if (!action || !p || busy) return;
-    message('me', el('p', {}, label), el('p.as-sent', {}, scope === 'selection' ? `With ${plural(words(p.text), 'selected word')}` : 'With the whole document'));
-    await reply(async () => { const text = await askAi(action, p.text, { chat }); return { kind: 'text', text, paragraphs: answerParagraphs(text), mode: action.mode }; }, p, label);
-  }
-
-  async function reply(ask, p, request) {
-    busy = true; send.disabled = true;
-    const token = stopped = {};
-    const waiting = message('assistant', el('p.as-thinking', {}, 'Thinking…'));
+    message('me', el('p', {}, request));
+    currentTurn = message('assistant', el('div.as-answer'));
+    const answer = currentTurn.querySelector('.as-answer');
+    let said = '';
+    const steps = [];
+    const rows = new Map();
+    busy = true; syncSend();
     try {
-      const answer = await ask();
-      if (stopped !== token) return;
-      history.push({ request, reply: answer.text });
-      waiting.replaceChildren(...answerView(answer, p));
+      const result = await agent.send(request, event => {
+        if (event.type === 'text') {
+          said += event.text;
+          answer.replaceChildren(...paragraphs(said));
+        } else if (event.type === 'step') {
+          const known = steps.findIndex(s => s.id === event.step.id);
+          if (known < 0) { steps.push(event.step); rows.set(event.step.id, stepRow(event.step)); currentTurn.append(rows.get(event.step.id)); }
+          else { steps[known] = event.step; updateStep(rows.get(event.step.id), event.step); }
+        }
+      });
+      if (result.error) failure(answer, result.error);
+      else if (!said.trim() && !steps.length) failure(answer, 'The assistant did not answer.');
+      if (steps.some(s => s.changed)) currentTurn.append(undoRow());
     } catch (e) {
-      if (stopped !== token) return;
-      waiting.classList.add('is-error');
-      waiting.replaceChildren(el('p', {}, e?.message && !/AI service|could not answer/i.test(e.message) && e.message.length < 140 ? e.message : assistantError(e)));
-    } finally { busy = false; send.disabled = false; }
-  }
-
-  function answerView(answer, p) {
-    if (answer.kind === 'table') return [tablePreview(answer.rows), actions(answer, p, false)];
-    const body = el('div.as-answer', {}, ...answer.paragraphs.map(t => el('p', {}, t)));
-    if (answer.kind !== 'text') return [body, actions(answer, p, false)];
-    const replacing = p.scope === 'selection' && answer.mode !== 'append';
-    const original = replacing ? el('p.as-replaces', {}, `Replaces “${p.text.length > 140 ? `${p.text.slice(0, 140).trim()}…` : p.text}”`) : null;
-    return [el('p.as-kind', {}, replacing ? 'Suggested replacement' : 'Suggested text'), body, original, actions(answer, p, true)];
-  }
-
-  function actions(answer, p, insertable) {
-    const row = el('div.as-actions');
-    const copy = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => navigator.clipboard?.writeText(answer.text).then(() => toast('Copied')).catch(() => error(new Error('The clipboard is not available.'))) }, 'Copy');
-    const canEdit = () => { const engine = editor(); return !!engine && !pkg()?.readOnly && !engine.viewOnly; };
-    const apply = (label, how) => el(`button.btn.btn-sm${how === 'replace' ? '.btn-primary' : '.btn-outline'}`, { type: 'button', disabled: !canEdit(), onclick: e => insert(answer, p, how, row, e.currentTarget) }, label);
-    if (answer.kind === 'table') { row.append(apply('Insert Table at Cursor', 'cursor'), copy); return row; }
-    if (insertable) {
-      if (p.scope === 'selection' && p.start !== undefined && answer.mode !== 'append') row.append(apply('Replace Selection', 'replace'), apply('Insert Below', 'below'));
-      else if (p.scope === 'selection' && p.start !== undefined) row.append(apply('Insert After Selection', 'after'));
-      else row.append(apply('Insert at Cursor', 'cursor'));
-    } else row.append(apply('Insert at Cursor', 'cursor'));
-    row.append(copy);
-    return row;
-  }
-
-  /** Apply a reply as one undoable change, where the person said. */
-  function insert(answer, p, how, row, button) {
-    if (answer.kind === 'table') { insertTable(answer.rows, row, button); return; }
-    const engine = editor(); if (!engine) return;
-    engine.finishComposition();
-    if (engine.session.path !== null) engine.editStory(null);
-    const model = engine.model;
-    if (p.start !== undefined && (how === 'replace' || how === 'below' || how === 'after') && model.text.slice(p.start, p.end) !== p.text) {
-      error(new Error('The selected text changed since you asked. Select it again and ask once more.')); return;
+      failure(answer, e);
+    } finally {
+      busy = false; syncSend(); currentTurn = null;
     }
-    const text = answer.paragraphs.join('\n');
-    const ok = engine.execute(() => {
-      const m = engine.model;
-      if (how === 'replace') m.select(p.start, p.end);
-      else if (how === 'below' || how === 'after') {
-        // After the selection's last paragraph, as new paragraphs.
-        const end = how === 'after' ? p.end : (() => { const at = m.text.indexOf('\n', p.end); return at < 0 ? m.text.length : at; })();
-        m.select(end, end);
-        return m.replace(how === 'after' ? ` ${text}` : `\n${text}`);
-      }
-      return m.replace(text);
+  }
+
+  function syncSend() {
+    send.textContent = busy ? 'Stop' : 'Send';
+    send.setAttribute('aria-label', busy ? 'Stop' : 'Send');
+    send.title = busy ? 'Stop' : 'Send (Enter)';
+  }
+
+  function stop() { agent.stop(); }
+
+  function newChatNow() {
+    agent.reset();
+    log.replaceChildren();
+    renderEmpty();
+    input.focus();
+  }
+
+  function paragraphs(text) {
+    return String(text).split(/\n{2,}/).map(part => part.trim()).filter(Boolean).map(part => el('p', {}, part.replace(/\n/g, ' ')));
+  }
+
+  function failure(answer, reason) {
+    const text = reason?.message || String(reason || '');
+    answer.replaceChildren();
+    answer.append(el('p.as-error', {}, text && text.length < 200 && !/AI service|could not answer/i.test(text) ? text : 'The assistant could not answer. Check that the local gateway and a model are running.'));
+  }
+
+  function stepRow(step) {
+    return el('div.as-step', { 'data-step': step.id },
+      el('span.as-step-icon', { 'aria-hidden': 'true' }, step.status === 'running' ? '•' : step.status === 'error' ? '!' : '✓'),
+      el('span.as-step-label', {}, step.label || step.name),
+      el('span.as-step-status', { role: 'status' }, STATUS_TEXT[step.status] || step.status));
+  }
+
+  function updateStep(row, step) {
+    if (!row) return;
+    row.dataset.status = step.status;
+    row.querySelector('.as-step-icon').textContent = step.status === 'running' ? '•' : step.status === 'error' ? '!' : '✓';
+    row.querySelector('.as-step-status').textContent = STATUS_TEXT[step.status] || step.status;
+    if (step.error) row.title = step.error;
+  }
+
+  function undoRow() {
+    const applied = el('span.as-applied', { role: 'status' }, 'Changes made');
+    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { const engine = editor(); if (!engine) return; engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
+    return el('div.as-actions', {}, applied, undo);
+  }
+
+  /** A change that replaces the person's words asks first; the tool waits for the answer. */
+  function askApproval(step) {
+    return new Promise(resolve => {
+      const turn = currentTurn;
+      if (!turn) { resolve(false); return; }
+      const answer = ok => { card.remove(); refused = null; resolve(ok); };
+      const card = el('div.as-approval', {},
+        el('p', {}, `${step.label || step.name}. Allow this change?`),
+        el('div.as-actions', {},
+          el('button.btn.btn-primary.btn-sm', { type: 'button', onclick: () => answer(true) }, 'Allow'),
+          el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => answer(false) }, 'Skip')));
+      refused = answer;
+      turn.append(card);
+      card.scrollIntoView?.({ block: 'nearest' });
     });
-    if (!ok) return;
-    engine.focus();
-    done(row, button, how === 'replace' ? 'Replaced' : 'Inserted');
-  }
-
-  /** Insert a reply's rows as a real table at the caret, one undoable change. */
-  function insertTable(rows, row, button) {
-    const engine = editor(); if (!engine) return;
-    engine.finishComposition();
-    if (engine.session.path !== null) engine.editStory(null);
-    const columns = rows[0].length;
-    const ok = engine.execute(() => {
-      const m = engine.model;
-      const [start, end] = m.range;
-      if (start !== end) m.select(end);
-      if (!m.insertTable(rows.length, columns)) return false;
-      const cells = tableCells(m.tableContext.table);
-      rows.forEach((values, r) => values.forEach((text, c) => {
-        const cell = cells[r * columns + c];
-        if (!cell || !text) return;
-        m.selectCell(cell.id);
-        m.replace(text, { checkpoint: false });
-      }));
-      m.selectCell(cells[0].id);
-      return true;
-    });
-    if (!ok) return;
-    engine.focus();
-    done(row, button, 'Table inserted');
-  }
-
-  function done(row, button, message) {
-    button.disabled = true;
-    const applied = el('span.as-applied', { role: 'status' }, message);
-    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { editor()?.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
-    row.replaceChildren(applied, undo);
-  }
-
-  /** A few rows of the reply's table, enough to recognise it before inserting. */
-  function tablePreview(rows) {
-    const head = el('tr', {}, ...rows[0].map(cell => el('th', {}, cell)));
-    const shown = rows.slice(1, 9);
-    const body = shown.map(values => el('tr', {}, ...values.map(cell => el('td', {}, cell))));
-    const more = rows.length - 1 - shown.length;
-    return el('div.as-table-preview', {},
-      el('p.as-kind', {}, `Table · ${plural(rows.length - 1, 'row')} · ${plural(rows[0].length, 'column')}`),
-      el('div.as-table-scroll', {}, el('table', {}, el('thead', {}, head), el('tbody', {}, ...body))),
-      more > 0 ? hint(`And ${plural(more, 'more row')}, inserted too.`) : null);
   }
 
   function toggle() { if (!available()) return; pane.toggle(); if (pane.isOpen) queueMicrotask(() => input.focus()); }
@@ -231,7 +215,6 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     get available() { return available(); },
     open() { if (!available()) return; pane.open(); queueMicrotask(() => input.focus()); },
     toggle,
-    /** The editor's selection moved: what goes with a message follows it. */
     refresh() {
       fab.hidden = titleButton.hidden = !available() || !editor();
       if (pane.isOpen && !busy) { renderContext(); if (!log.querySelector('.as-message')) renderEmpty(); }
@@ -244,6 +227,6 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       if (!['tools', 'view'].includes(id) || !available()) return [];
       return [{ separator: true }, { label: 'Assistant', icon: 'assistant', shortcut: `${MOD_KEY}+Shift+I`, checked: id === 'view' ? pane.isOpen : undefined, disabled: !editor(), onSelect: () => toggle() }];
     },
-    destroy() { stopped = null; keys.abort(); pane.destroy(); },
+    destroy() { refused?.(false); keys.abort(); agent.stop(); pane.destroy(); },
   };
 }

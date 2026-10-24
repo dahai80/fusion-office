@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
+// The project assistant checks isConfigured() before it sends anything. The specs
+// mock the gateway, so a placeholder key is enough to make the assistant render.
+process.env.VITE_FUSION_GATEWAY_KEY ||= 'playwright-test-key';
+
 const port = Number(process.env.PLAYWRIGHT_PORT || 5191);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PLAYWRIGHT_PORT must be a port number from 1 to 65535.');
 const baseURL = `http://127.0.0.1:${port}`;

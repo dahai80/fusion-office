@@ -1,14 +1,7 @@
 import { el } from './lib/ui.js';
 import * as AI from '@fusion-office/ai-client';
-
-const SYSTEM_PROMPT = [
-    'You answer questions about a PDF document.',
-    'The document text is given below, page by page.',
-    'Answer only from that text. If the answer is not there, say so plainly.',
-    'Be concise. Quote short passages when they help.',
-].join(' ');
-
-const MAX_CONTEXT = 14000;
+import { createAgent } from '@fusion-office/ai-client';
+import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCall, pdfSnapshot, runTool } from './ai-tools.js';
 
 function aiError(error) {
     const message = String(error?.message || error || '');
@@ -21,22 +14,25 @@ function aiError(error) {
     return 'The assistant could not answer. Try again in a moment.';
 }
 
-export function createAiPanel({ getText, isConfigured = () => AI.isConfigured() } = {}) {
+const STATUS_TEXT = { running: 'Working…', done: 'Done', error: 'Failed', declined: 'Skipped', skipped: 'Stopped' };
+
+export function createAiPanel({ commands, name = () => '', isConfigured = () => AI.isConfigured() } = {}) {
     const question = el('textarea', {
         class: 'input ai-question',
         rows: 3,
-        placeholder: 'Ask a question about this PDF',
+        placeholder: 'Ask about this PDF, or ask it to find a page',
         'aria-label': 'Question about this document',
     });
+    const steps = el('div', { class: 'ai-steps' });
     const answer = el('div', { class: 'ai-answer-text' });
-    const answerBox = el('div', { class: 'ai-answer', role: 'region', 'aria-label': 'Answer' }, answer);
+    const answerBox = el('div', { class: 'ai-answer', role: 'region', 'aria-label': 'Answer' }, steps, answer);
     const status = el('p', { class: 'panel-note muted ai-status', role: 'status' });
     const askButton = el('button', { class: 'btn primary panel-action', type: 'button' }, 'Ask');
     const summarizeButton = el('button', { class: 'btn panel-action', type: 'button' }, 'Summarize');
     const root = el(
         'div',
         { class: 'ai-panel' },
-        el('p', { class: 'panel-note muted' }, 'Answers come from the local AI service through fusion-gateway.'),
+        el('p', { class: 'panel-note muted' }, 'The assistant reads the pages and can move to them. Answers come from the local AI service through fusion-gateway.'),
         question,
         el('div', { class: 'ai-actions' }, askButton, summarizeButton),
         status,
@@ -44,16 +40,34 @@ export function createAiPanel({ getText, isConfigured = () => AI.isConfigured() 
     );
     let busy = false;
 
+    const agent = createAgent({
+        chat: (messages, options) => AI.chatStreamEvents({ messages, tools: options.tools, model: options.model, maxTokens: options.maxTokens }),
+        tools: TOOLS,
+        system: SYSTEM_PROMPT,
+        snapshot: () => pdfSnapshot(commands, { name: name() }),
+        settings: () => ({ approval: 'never' }),
+        changes: changesDocument,
+        describe: (tool, args) => describeCall(commands, tool, args),
+        runTool: (tool, args) => runTool(commands, tool, args),
+    });
+
     function setBusy(on) {
         busy = on;
-        askButton.disabled = on;
         summarizeButton.disabled = on;
         question.disabled = on;
+        askButton.textContent = on ? 'Stop' : 'Ask';
         root.classList.toggle('busy', on);
     }
 
+    function stepRow(step) {
+        const row = el('div', { class: 'ai-step', 'data-step': step.id });
+        row.dataset.status = step.status;
+        row.append(el('span', { class: 'ai-step-label' }, step.label || step.name), el('span', { class: 'ai-step-status' }, STATUS_TEXT[step.status] || step.status));
+        return row;
+    }
+
     async function ask(prompt) {
-        if (busy) return;
+        if (busy) { agent.stop(); return; }
         const text = String(prompt || question.value || '').trim();
         if (!text) {
             status.textContent = 'Type a question first.';
@@ -66,28 +80,30 @@ export function createAiPanel({ getText, isConfigured = () => AI.isConfigured() 
         }
         setBusy(true);
         answer.textContent = '';
+        steps.replaceChildren();
         answerBox.hidden = false;
-        status.textContent = 'Reading the document…';
+        status.textContent = 'Reading…';
+        const rows = new Map();
         try {
-            const context = String((await getText?.()) || '').slice(0, MAX_CONTEXT);
-            if (!context) {
-                status.textContent = 'This PDF has no text to read. Scanned pages need OCR first.';
-                return;
-            }
-            const messages = [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: `Document text:\n\n${context}\n\nQuestion: ${text}` },
-            ];
-            status.textContent = 'Thinking…';
-            let first = true;
-            await AI.chatStream({ messages }, (delta) => {
-                if (first) {
+            const result = await agent.send(text, (event) => {
+                if (event.type === 'text') {
                     status.textContent = '';
-                    first = false;
+                    answer.textContent += event.text;
+                } else if (event.type === 'step') {
+                    status.textContent = '';
+                    const step = event.step, known = rows.get(step.id);
+                    if (!known) {
+                        const row = stepRow(step);
+                        rows.set(step.id, row);
+                        steps.append(row);
+                    } else {
+                        known.dataset.status = step.status;
+                        known.querySelector('.ai-step-status').textContent = STATUS_TEXT[step.status] || step.status;
+                    }
                 }
-                answer.textContent += delta;
             });
-            if (first) status.textContent = 'The assistant returned nothing. Try again.';
+            if (result.error) status.textContent = aiError(result.error);
+            else if (!answer.textContent.trim() && !rows.size) status.textContent = 'The assistant returned nothing. Try again.';
             else if (question.value.trim() === text) question.value = '';
         } catch (error) {
             status.textContent = aiError(error);
@@ -109,11 +125,16 @@ export function createAiPanel({ getText, isConfigured = () => AI.isConfigured() 
         el: root,
         ask,
         reset() {
+            // A document reload during a tool call must not wipe the answer still arriving;
+            // an edit the assistant asked for reloads the PDF while the turn is running.
+            if (agent.running) return;
+            agent.stop();
+            agent.reset();
             question.value = '';
             answer.textContent = '';
+            steps.replaceChildren();
             answerBox.hidden = true;
             status.textContent = '';
         },
     };
 }
-

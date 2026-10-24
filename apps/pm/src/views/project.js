@@ -14,6 +14,7 @@ import { openTaskArchive } from '../ui/archive.js';
 import { openRestorePoints } from '../ui/restorepoints.js';
 import { menuButton } from '../ui/navdrawer.js';
 import { offlineNotice } from '../ui/offlinebar.js';
+import { openProjectAssistant } from '../ui/assistant.js';
 import { boardView } from './board.js';
 import { timelineView } from './timeline.js';
 import { milestonesView } from './milestones.js';
@@ -175,6 +176,13 @@ export function projectView({ id, tab, navigate }) {
       title,
       saveDot,
       el('span.grow'),
+      el('button.icon-btn.project-assistant', {
+        type: 'button',
+        'aria-label': 'Project assistant',
+        title: 'Ask the assistant to read or change this project',
+        html: icon('sparkle', 18, 2),
+        onclick: () => openProjectAssistant(id),
+      }),
       menuBtn
     ),
     tabsNav,

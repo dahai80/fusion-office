@@ -13,6 +13,15 @@ function column(rows, formula) {
   return { wb, id: wb.activeSheetId };
 }
 
+/** How many cells the workbook read while `run` ran. */
+function reads(wb, run) {
+  let calls = 0;
+  const compute = wb._compute.bind(wb);
+  wb._compute = (s, r, c) => { calls++; return compute(s, r, c); };
+  try { run(); } finally { delete wb._compute; }
+  return calls;
+}
+
 it.each([
   ['SUM(B:B)', () => 'SUM(B:B)'],
   ['COUNTA(B:B)+A2', (r) => `COUNTA(B:B)+A${r}`],
@@ -21,12 +30,15 @@ it.each([
 ])('a column of %s a thousand rows long settles as a cycle in moments', (_, formula) => {
   const rows = 1000;
   const { wb, id } = column(rows, formula);
-  const start = performance.now();
   // Read from the bottom, as a formula below the block or the last row on screen reads it, then every cell.
-  expect(wb.getValue(id, rows - 1, 1)).toEqual({ error: '#CYCLE!' });
-  for (let r = 1; r < rows; r++) expect(wb.getValue(id, r, 1)).toEqual({ error: '#CYCLE!' });
-  // A few hundred rows took seconds to minutes, and a thousand ran the tab out of memory.
-  expect(performance.now() - start).toBeLessThan(15000);
+  const calls = reads(wb, () => {
+    expect(wb.getValue(id, rows - 1, 1)).toEqual({ error: '#CYCLE!' });
+    for (let r = 1; r < rows; r++) expect(wb.getValue(id, r, 1)).toEqual({ error: '#CYCLE!' });
+  });
+  // A few hundred rows took seconds to minutes, and a thousand ran the tab out of memory. The
+  // work is counted rather than timed so a loaded machine cannot fail it: VLOOKUP is the worst
+  // of the four at about three thousand reads a row, against the millions a per-row resettle costs.
+  expect(calls).toBeLessThan(rows * rows * 8);
   expect(wb.getValue(id, 0, 1)).toBe(1);
   // Nothing is left marked as being calculated: a formula entered next calculates as usual.
   wb.setInput(id, 0, 3, '=A2+A3');
@@ -51,11 +63,13 @@ it.each([
   // four thousand rows took eight seconds and gigabytes, and ten thousand ran the tab out of memory.
   const rows = 4000;
   const { wb, id } = column(rows, formula);
-  const start = performance.now();
-  expect(wb.getValue(id, rows - 1, 1)).toEqual({ error: '#CYCLE!' });
-  expect(wb.getValue(id, 1, 1)).toEqual({ error: '#CYCLE!' });
-  expect(wb.getValue(id, rows >> 1, 1)).toEqual({ error: '#CYCLE!' });
-  expect(performance.now() - start).toBeLessThan(3000);
+  const calls = reads(wb, () => {
+    expect(wb.getValue(id, rows - 1, 1)).toEqual({ error: '#CYCLE!' });
+    expect(wb.getValue(id, 1, 1)).toEqual({ error: '#CYCLE!' });
+    expect(wb.getValue(id, rows >> 1, 1)).toEqual({ error: '#CYCLE!' });
+  });
+  // A few hundred reads a row: the resettle that took eight seconds read the column again per cell.
+  expect(calls).toBeLessThan(rows * 400);
   wb.setInput(id, 0, 3, '=A2+A3');
   expect(wb.getValue(id, 0, 3)).toBe(3);
 }, 60000);

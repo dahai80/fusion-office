@@ -151,17 +151,20 @@ test('the Assistant rewrites the selection as one undoable change', async ({ pag
   await page.locator('.as-title-button').click();
   const pane = page.getByRole('complementary', { name: 'Assistant pane' });
   await expect(pane).toBeVisible();
-  await expect(pane.getByText(/Sends the 7 words you selected/)).toBeVisible();
+  await expect(pane.getByText(/Selected: 7 words/)).toBeVisible();
   await pane.getByRole('button', { name: 'Make it shorter' }).click();
-  await expect(pane.getByText('Suggested replacement')).toBeVisible();
+  // Replacing the person's own words asks first.
+  await expect(pane.getByText('Replace the selected text. Allow this change?')).toBeVisible();
   await shot(page, 'assistant');
-  await pane.getByRole('button', { name: 'Replace Selection' }).click();
-  await expect.poll(() => editorText(page)).toBe('This sentence is a little long winded. (revised)');
+  await pane.getByRole('button', { name: 'Allow' }).click();
+  await expect.poll(() => editorText(page)).toBe('Shorter sentence.');
+  await expect(pane.getByText(/Done\./)).toBeVisible();
   await pane.getByRole('button', { name: 'Undo' }).click();
   await expect.poll(() => editorText(page)).toBe('This sentence is a little long winded.');
-  // A question about the whole document is answered, not inserted.
-  await pane.getByRole('radio', { name: 'Whole document' }).click();
+  // A question reads the document and answers in the chat, not in it.
   await pane.getByRole('textbox', { name: 'Message the assistant' }).fill('What is this about?');
   await pane.getByRole('textbox', { name: 'Message the assistant' }).press('Enter');
-  await expect(pane.getByText(/offline assistant read/)).toBeVisible();
+  await expect(pane.getByText('Read the document')).toBeVisible();
+  await expect(pane.getByText(/I read the document/)).toBeVisible();
+  await expect.poll(() => editorText(page)).toBe('This sentence is a little long winded.');
 });

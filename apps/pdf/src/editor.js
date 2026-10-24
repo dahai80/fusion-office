@@ -791,27 +791,82 @@ export function createEditor({
   accessibilityReport.el.setAttribute('role', 'tabpanel');
   accessibilityReport.el.setAttribute('aria-labelledby', 'sidebar-tab-accessibility');
   accessibilityReport.el.hidden = true;
-  const aiPanel = createAiPanel({
-    getText: async () => {
-      if (!pdf) return '';
+  async function aiPageText(index) {
+    const page = await pdf.getPage(index);
+    const content = await page.getTextContent();
+    return content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
+  }
+  const aiCommands = {
+    info: () => ({
+      pages: pdf?.numPages ?? 0,
+      page: pageIndex + 1,
+      zoom: Math.round(zoom * 100),
+      bookmarks: outline.hasItems,
+    }),
+    readPages: async (from, count) => {
+      if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };
+      const first = Math.min(pdf.numPages, Math.max(1, Math.trunc(Number(from) || 1)));
+      const last = Math.min(pdf.numPages, first + Math.min(20, Math.max(1, Math.trunc(Number(count) || 5))) - 1);
       const parts = [];
       let used = 0;
-      for (let index = 1; index <= pdf.numPages && used < 14000; index++) {
+      for (let index = first; index <= last && used < 14000; index++) {
         try {
-          const page = await pdf.getPage(index);
-          const content = await page.getTextContent();
-          const text = content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
-          if (!text) continue;
+          const text = await aiPageText(index);
+          if (!text) { parts.push(`[Page ${index}] (no text on this page)`); continue; }
           const part = `[Page ${index}] ${text}`;
           parts.push(part);
           used += part.length;
         } catch (error) {
           console.warn('[pdf] AI text extraction failed on page', index, error);
+          parts.push(`[Page ${index}] (could not be read)`);
         }
       }
-      return parts.join('\n\n').slice(0, 14000);
+      return { ok: true, content: parts.join('\n\n').slice(0, 14000) };
     },
-  });
+    find: async (query, matchCase) => {
+      if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };
+      const needle = String(query || '');
+      if (!needle) return { ok: false, content: 'Error: give some text to find.' };
+      const wanted = matchCase ? needle : needle.toLowerCase();
+      const found = [];
+      for (let index = 1; index <= pdf.numPages; index++) {
+        let text = '';
+        try { text = await aiPageText(index); } catch { continue; }
+        const hay = matchCase ? text : text.toLowerCase();
+        let count = 0;
+        for (let at = hay.indexOf(wanted); at !== -1; at = hay.indexOf(wanted, at + wanted.length)) count++;
+        if (count) found.push({ page: index, count });
+      }
+      return { ok: true, content: found.length ? JSON.stringify(found) : `No page contains "${needle}".` };
+    },
+    goTo: (page) => {
+      if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };
+      const target = Math.trunc(Number(page));
+      if (!(target >= 1 && target <= pdf.numPages)) return { ok: false, content: `Error: the PDF has pages 1 to ${pdf.numPages}.` };
+      navigate(target - 1);
+      return { ok: true, content: `Showing page ${target}.` };
+    },
+    zoom: async (mode) => {
+      const wanted = String(mode || '');
+      if (wanted === 'fit' || wanted === 'page') await setZoom(wanted);
+      else {
+        const percent = Number(wanted);
+        if (!(percent >= 25 && percent <= 400)) return { ok: false, content: 'Error: use "fit", "page", or a percentage from 25 to 400.' };
+        await setZoom(String(percent / 100));
+      }
+      return { ok: true, content: `Zoom is now ${wanted}.` };
+    },
+    bookmark: async (title, page) => {
+      const text = String(title || '').trim();
+      if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };
+      if (!text) return { ok: false, content: 'Error: give the bookmark a title.' };
+      const target = Math.trunc(Number(page ?? pageIndex + 1));
+      if (!(target >= 1 && target <= pdf.numPages)) return { ok: false, content: `Error: the PDF has pages 1 to ${pdf.numPages}.` };
+      await mutate((doc) => addBookmark(doc, { title: text, pageIndex: target - 1 }), `Bookmark “${text}” added`, 'annotate');
+      return { ok: true, changed: true, content: `Bookmarked page ${target} as “${text}”.` };
+    },
+  };
+  const aiPanel = createAiPanel({ commands: aiCommands, name: () => name });
   aiPanel.el.id = 'sidebar-panel-ai';
   aiPanel.el.setAttribute('role', 'tabpanel');
   aiPanel.el.setAttribute('aria-labelledby', 'sidebar-tab-ai');

@@ -50,6 +50,7 @@
     if (f.message || !f.delay) throw Object.assign(new Error(f.message || `${op} failed`), f.code ? { code: f.code } : {});
   }
   const dirs = new Set(Object.keys(state.fs).map((p) => p.split('/').slice(0, -1).join('/')).filter(Boolean));
+  const toolCall = (name, input) => ({ message: { role: 'assistant', content: '', tool_calls: [{ id: `call_mock_${name}`, type: 'function', function: { name, arguments: JSON.stringify(input) } }] }, toString: () => '' });
 
   window.puter = {
     env: params.get('env') || 'web',
@@ -111,9 +112,39 @@
         console.log(`[puter-mock] txt2speech ${String(text).length} chars`);
         return a;
       },
-      /** A canned rewrite so the writing assistant can be exercised offline. */
-      async chat(prompt) {
+      /** A canned rewrite or tool call so the assistant can be exercised offline. */
+      async chat(prompt, options = {}) {
         await delay(700);
+        // The Assistant pane runs an agent: the mock reads the transcript and
+        // answers with a tool call, or with text once a tool has run.
+        if (Array.isArray(options.messages) && options.tools?.length) {
+          const last = options.messages.at(-1);
+          if (last?.role === 'tool') {
+            const content = String(last.content || '');
+            const text = /^\[\d+\]/m.test(content) ? `I read the document. ${content.slice(0, 160)}` : `Done. ${content.slice(0, 160)}`;
+            return { message: { role: 'assistant', content: text }, toString: () => text };
+          }
+          const user = [...options.messages].reverse().find(m => m.role === 'user');
+          const request = String(typeof user?.content === 'string' ? user.content : '').split('</app_state>').at(-1).trim();
+          if (/table|表格/i.test(request)) {
+            return toolCall('insert_table', { rows: [['Word', 'Meaning'], ['apple', '苹果'], ['bridge', '桥'], ['cloud', '云']] });
+          }
+          if (/replace|rewrite|shorter|改写|替换/i.test(request)) return toolCall('replace_selection', { text: 'Shorter sentence.' });
+          if (/find|search|查找/i.test(request)) {
+            const query = /"([^"]+)"/.exec(request)?.[1] || 'sentence';
+            return toolCall('find_text', { query });
+          }
+          if (/bold|format|加粗|格式/i.test(request)) return toolCall('format_text', { target: 'document', bold: true, font_size: 16 });
+          if (/link|链接/i.test(request)) return toolCall('insert_link', { url: 'https://example.com', text: 'Example site' });
+          if (/page break|分页/i.test(request)) return toolCall('insert_page_break', {});
+          if (/add .*(line|paragraph|text)|insert|写入|追加/i.test(request)) {
+            return toolCall('insert_text', { text: 'Added by the assistant.', where: 'end' });
+          }
+          if (/info|details|结构/i.test(request)) return toolCall('get_document_info', {});
+          if (/read|summari[sz]e|what (is|does)|about/i.test(request)) return toolCall('read_document', {});
+          const text = `The offline assistant answers: ${request}`;
+          return { message: { role: 'assistant', content: text }, toString: () => text };
+        }
         // Smart Lookup asks for a definition and related topics in a fixed format.
         if (/concise reference assistant/.test(prompt)) {
           const term = /Term:\n"+\n([\s\S]*?)\n"+/.exec(String(prompt))?.[1] || 'term';

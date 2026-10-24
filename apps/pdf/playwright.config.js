@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+// The AI panel checks isConfigured() before it sends anything. The specs mock the
+// gateway, so a placeholder key is enough to make the panel render its controls.
+process.env.VITE_FUSION_GATEWAY_KEY ||= 'playwright-test-key';
 // E2E_PORT lets parallel checkouts run their own server.
 const port = Number(process.env.E2E_PORT) || 5186;
 export default defineConfig({

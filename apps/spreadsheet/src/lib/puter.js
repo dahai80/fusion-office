@@ -112,7 +112,7 @@ async function* streamParts(messages, options) {
     maxTokens: options?.max_tokens,
   })) {
     if (event.type === 'tool')
-      yield { type: 'tool', id: event.id, name: event.name, input: event.input };
+      yield { type: 'tool_use', id: event.id, name: event.name, input: event.input };
     else if (event.text)
       yield { type: 'text', text: event.text };
   }

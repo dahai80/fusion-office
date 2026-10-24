@@ -96,6 +96,15 @@
 .as-answer { padding: 6px 8px; border-radius: 6px; background: var(--ed-hover); margin: 4px 0 8px; }
 .as-message.is-assistant > .as-answer:first-child { background: none; padding: 0; margin: 0 0 8px; }
 .as-thinking { color: var(--ed-ink-3); }
+.as-step { display: flex; gap: 6px; align-items: baseline; margin: 2px 0; font-size: 12px; color: var(--ed-ink-2); }
+.as-step-icon { width: 12px; text-align: center; color: var(--ed-ink-3); }
+.as-step-label { flex: 1; min-width: 0; }
+.as-step-status { font-size: 11.5px; color: var(--ed-ink-3); }
+.as-step[data-status='done'] .as-step-icon { color: var(--pos); }
+.as-step[data-status='error'] .as-step-icon, .as-step[data-status='error'] .as-step-status { color: var(--critical); }
+.as-error { color: var(--critical); }
+.as-approval { margin: 8px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--ed-accent) 35%, var(--ed-line)); border-radius: 8px; background: var(--ed-hover); }
+.as-approval p { margin: 0 0 6px; font-size: 12.5px; }
 .as-table-preview { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
 .as-table-scroll { max-height: 220px; overflow: auto; border: 1px solid var(--ed-line); border-radius: 6px; }
 .as-table-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; }

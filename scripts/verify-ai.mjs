@@ -175,8 +175,17 @@ async function main() {
 
     await step('pdf panel', async () => {
         const { createAiPanel } = await import('../apps/pdf/src/ai-panel.js');
+        const pageText = '[Page 1] Quarterly revenue grew 12 percent to 4.2 million.';
         const panel = createAiPanel({
-            getText: async () => '[Page 1] Quarterly revenue grew 12 percent to 4.2 million.',
+            name: () => 'quarterly.pdf',
+            commands: {
+                info: () => ({ pages: 1, page: 1, zoom: 100, bookmarks: false }),
+                readPages: () => ({ ok: true, content: pageText }),
+                find: () => ({ ok: true, content: '[]' }),
+                goTo: () => ({ ok: true, content: 'Showing page 1.' }),
+                zoom: () => ({ ok: true, content: 'Zoom set to 100%.' }),
+                bookmark: () => ({ ok: true, content: 'Bookmark added.' }),
+            },
         });
         await panel.ask('How much did revenue grow?');
         const answer = panel.el.querySelector('.ai-answer-text')?.textContent || '';

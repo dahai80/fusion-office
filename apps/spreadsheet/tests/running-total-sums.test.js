@@ -18,21 +18,27 @@ function totals(rows) {
 it.each(['top down', 'bottom up'])('a running total down 20,000 rows read %s calculates in moments', (order) => {
   const rows = 20000;
   const { wb, id, sums } = totals(rows);
-  // Timed on its own: checking the answers is not the calculation. Top down took about a second and a half before,
-  // bottom up seventeen seconds; both now well under one.
+  // Counted, not timed: a loaded machine inflates the clock but not the reads. Top down took about a
+  // second and a half before, bottom up seventeen seconds, both by reading each cell again per row.
   const read = () => {
     const at = order === 'top down' ? [...Array(rows).keys()] : [...Array(rows).keys()].reverse();
     const got = new Array(rows);
-    const start = performance.now();
-    for (const r of at) got[r] = wb.getValue(id, r, 1);
-    const took = performance.now() - start;
+    let calls = 0;
+    const compute = wb._compute.bind(wb);
+    wb._compute = (s, r, c) => { calls++; return compute(s, r, c); };
+    try {
+      for (const r of at) got[r] = wb.getValue(id, r, 1);
+    } finally {
+      delete wb._compute;
+    }
     expect(got).toEqual(sums);
-    return took;
+    // Two reads a row (the value and its total), not the square of the column.
+    expect(calls).toBeLessThan(rows * 4);
   };
-  expect(read()).toBeLessThan(8000);
+  read();
   wb.insertRows(id, 0, 1); // every formula moves down a row: everything is calculated again
   wb.deleteRows(id, 0, 1);
-  expect(read()).toBeLessThan(8000);
+  read();
 }, 120000);
 
 it('an error, text or a boolean in the column reads as SUM reads it', () => {

@@ -241,6 +241,8 @@ export async function listModels() {
     return models
 }
 
+export { createAgent, requestMessages, userContent, userText } from './agent.js'
+
 export async function ensureModelLoaded(modelId) {
     const models = await listModels()
     const found = models.find((m) => m.id === modelId)
