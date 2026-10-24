@@ -99,21 +99,32 @@ npm workspaces: `apps/*` and `packages/*`.
 
 ### AI integration points
 
-- Documents: `src/lib/puter.js` `aiChat` wraps `AI.chat`; used by the assistant pane,
-  language tools, grammar checks, smart lookup, and drawing. The pane's replies are
-  typed by the `TEXT:` / `ANSWER:` / `TABLE:` marker; a table reply (`|` or tab
-  separated rows, read by `tableRows` in `src/lib/assistant.js`) inserts through
-  `engine.model.insertTable` as one undoable change.
+Documents, PDF, and PM assistants run the shared agent loop in
+`packages/ai-client/src/agent.js` (`createAgent`): it streams, executes the tool calls,
+feeds results back, and asks before destructive steps. Each app owns its tool schemas
+and runner in a `*-tools` module; keep the two in step.
+
+- Documents: the assistant pane (`src/views/assistant-pane.js`) drives
+  `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
+  selection (asks approval), format, insert a table or page break, add a link. Each tool
+  call is one undo step. `src/lib/puter.js` also carries the language tools, grammar
+  checks, smart lookup, and drawing through `aiChat`; `assistantPrompt` /
+  `readReply` in `src/lib/assistant.js` remain for those JSON-shaped calls.
 - Spreadsheet: `src/lib/puter.js` `aiChat` / `aiChatStream`; used by the AI dialog,
   AI panel, translation, thesaurus, and `AI`/`TRANSLATE`/`DETECTLANGUAGE` sheet functions.
 - Presentation: `src/cloud.js` `aiChat` and `aiChatStream` (tool-event stream); used by
   prompt-to-deck, the assistant panel, and slide review.
-- PDF: `src/ai-panel.js` streams answers from extracted page text in the Ask AI sidebar
-  tab. Extracted text is capped; scanned documents require OCR first.
-- PM: `src/ui/checklist.js` calls `AI.jsonChat` to turn a task into checklist items.
+- PDF: `src/ai-panel.js` is an assistant over the open file, backed by
+  `src/ai-tools.js` and the command closure in `src/editor.js` (`info`, `readPages`,
+  `find`, `goTo`, `zoom`, `bookmark`). It reads at most 20 pages per call; scanned
+  documents require OCR first.
+- PM: `src/ui/assistant.js` opens the project assistant over `src/lib/ai-tools.js` and
+  the store (tasks, columns, checklist items, comments; delete asks approval).
+  `src/ui/checklist.js` still calls `AI.jsonChat` for task breakdown.
 
-When changing a prompt or its parsing, update the matching unit test. Tests mock
-`@fusion-office/ai-client`; live verification is separate in `scripts/verify-ai.mjs`.
+When changing a prompt, a tool schema, or its runner, update the matching unit test.
+Tests mock `@fusion-office/ai-client`; live verification is separate in
+`scripts/verify-ai.mjs`.
 
 ### Union shell
 
@@ -139,6 +150,9 @@ session, not an API key.
 
 ## Licensing
 
-- Root `LICENSE` is MIT and covers first-party code plus the MIT-derived apps.
+- Root `LICENSE` is Apache-2.0 and covers first-party code: `packages/storage`,
+  `packages/ai-client`, `services/office-api`, and the root tooling.
+- `apps/documents`, `apps/presentation`, `apps/pdf`, and `apps/pm` are MIT-derived from
+  HeyPuter/everything and each keeps its own `LICENSE` file.
 - `apps/spreadsheet/LICENSE` is AGPL-3.0-only. Do not relicense it, remove notices, or
-  publish the repository publicly without an explicit licensing decision.
+  fold it under the Apache root license; AGPL obligations apply to that app.

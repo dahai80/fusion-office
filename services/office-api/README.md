@@ -57,4 +57,5 @@ The service binds to the loopback interface only. It makes no outbound calls.
 
 ## Licensing
 
-MIT, same as the rest of fusion-office except `apps/spreadsheet` (AGPL-3.0-only).
+Apache-2.0, like the rest of the first-party code in fusion-office. The apps under
+`apps/` keep their own licenses (`apps/spreadsheet` is AGPL-3.0-only).

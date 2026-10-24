@@ -12,10 +12,10 @@
 | `apps/documents` | 文字处理，支持 `.docx` 打开保存、修订、批注、拼写检查 | MIT，迁移自 HeyPuter/everything |
 | `apps/spreadsheet` | 电子表格，支持公式、图表、透视表、`.xlsx` | AGPL-3.0-only，迁移自 HeyPuter/everything |
 | `apps/presentation` | 幻灯片编辑，支持 `.pptx` 和 AI 生成演示文稿 | MIT，迁移自 HeyPuter/everything |
-| `apps/pdf` | PDF 阅读、批注、表单填写、OCR、AI 问答 | MIT，迁移自 HeyPuter/everything |
+| `apps/pdf` | PDF 阅读、批注、表单填写、OCR、AI 助手 | MIT，迁移自 HeyPuter/everything |
 | `apps/pm` | 本地项目管理，包含任务、看板、时间线 | MIT，迁移自 HeyPuter/everything |
 | `packages/storage` | 本地优先文件存储：File System Access API、OPFS 回退、IndexedDB 索引 | 本项目 |
-| `packages/ai-client` | 面向 `fusion-gateway` 的 OpenAI 兼容客户端，支持流式、工具调用、JSON | 本项目 |
+| `packages/ai-client` | 面向 `fusion-gateway` 的 OpenAI 兼容客户端，支持流式、工具调用、JSON、共享 agent 循环 | 本项目 |
 
 每个应用都是纯静态 Vite 构建产物。没有服务端组件，没有账号系统，也不依赖云服务。
 文件保存在用户选择的目录或浏览器的源私有文件系统中。
@@ -44,6 +44,7 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   路径、大小、修改时间索引，用于列表展示。
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
+  同包的 `createAgent` 提供文档、PDF、项目三个助手共用的工具循环。
 - AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`。
   PDF 和项目 AI 入口会先检查 `isConfigured()` 并在缺少配置时明确说明，不会发送请求；
   其余应用则把网关错误显示在各自的界面中。
@@ -88,11 +89,19 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 
 各应用的 AI 入口：
 
-- 文档：助手面板（表格类回复可在光标处插入为真实、可撤销的表格）、语法检查、翻译、智能查找、图片提示。
+- 文档：助手面板通过工具操作当前文档：读取、查找、插入或替换选区、设置格式、插入表格
+  或分页符、添加链接。替换选区前会请求确认，每次修改都是一个撤销步骤。语法检查、翻译、
+  智能查找、图片提示保持不变。
 - 表格：公式生成与解释、数据问答、翻译，以及 `AI`、`TRANSLATE` 等表格函数。
 - 演示：提示词生成整套幻灯片、助手面板、幻灯片审阅。
-- PDF：侧栏 **Ask AI** 基于抽取的页面文本回答问题并总结全文；扫描件需要先做 OCR。
-- 项目：**Break down with AI** 通过 JSON 回复把任务拆成检查清单。
+- PDF：侧栏 **Ask AI** 是基于当前文件的助手：通过工具读取页面、查找文本、跳转页面、
+  调整缩放、添加书签（唯一的修改，可撤销）。扫描件需要先做 OCR。
+- 项目：看板标题栏的项目助手可读取并修改项目：新建、更新、移动、归档、删除任务，
+  添加检查清单项和评论，添加列。删除任务前会请求确认。任务上的
+  **Break down with AI** 仍通过 JSON 回复把任务拆成检查清单。
+
+文档、PDF、项目三个助手共用 `packages/ai-client/src/agent.js` 的循环：带上工具定义发送
+对话，执行模型请求的调用，把结果回传，并在限定轮数内结束。各应用自己维护工具定义与执行器。
 
 用真实已加载模型做端到端验证：
 
@@ -100,9 +109,9 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 FUSION_GATEWAY_KEY=<受限-key> node scripts/verify-ai.mjs
 ```
 
-脚本依次检查模型注册、普通对话、流式对话、工具事件流、PDF 提问结构、项目清单 JSON
-结构，以及文档、表格、演示、PDF 面板的真实适配器路径。加载浏览器模块时只使用 jsdom，
-不启动浏览器。任一步失败都会以非零状态退出。
+脚本依次检查模型注册、普通对话、流式对话、工具事件流、PDF 与项目 JSON 路径，以及文档、
+表格、演示、PDF 助手面板的真实适配器路径。加载浏览器模块时只使用 jsdom，不启动浏览器。
+任一步失败都会以非零状态退出。
 
 ## 联合 Web Shell 集成
 
@@ -155,6 +164,10 @@ npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
 npm run test:browser -w apps/pm
 ```
+
+每个应用都有一个 `assistant-tools` 浏览器用例，通过真实界面驱动助手的全部工具。
+用例在页面内用模拟网关应答模型的请求，因此不需要 API Key、网关或已加载模型。文档应用
+使用自带的开发桩；其余应用把网关的补全端点接到脚本化的流式事件上。
 
 文档能力服务有独立的 Python 测试套件：
 
@@ -217,15 +230,16 @@ dev/                  本地开发辅助和验证日志
 
 ## 许可证与来源
 
+- `packages/storage`、`packages/ai-client`、`services/office-api` 和根目录工具：
+  Apache-2.0，本项目原创。详见 `LICENSE`。
 - `apps/documents`、`apps/presentation`、`apps/pdf`、`apps/pm`：MIT，迁移自
-  [HeyPuter/everything](https://github.com/HeyPuter/everything)。
-- `packages/storage`、`packages/ai-client` 和根目录工具：MIT，本项目原创。
-- `apps/spreadsheet`：AGPL-3.0-only，迁移自 HeyPuter/everything。根目录 MIT 许可证
-  不覆盖该应用。分发包含它的组合二进制或托管服务会触发 AGPL 义务，因此仓库转为
-  公开前必须先做许可证决策。
+  [HeyPuter/everything](https://github.com/HeyPuter/everything)，各自目录下有
+  `LICENSE` 文件。
+- `apps/spreadsheet`：AGPL-3.0-only，迁移自 HeyPuter/everything，详见
+  `apps/spreadsheet/LICENSE`。根目录 Apache 许可证不覆盖该应用；分发包含它的
+  组合二进制或托管服务会就该应用触发 AGPL 义务。
 
-详见 `LICENSE` 和 `apps/spreadsheet/LICENSE`。上游问题应提交给上游，不要在本仓库
-维护分叉补丁。
+上游问题应提交给上游，不要在本仓库维护分叉补丁。
 
 ## 状态
 

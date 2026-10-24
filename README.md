@@ -11,10 +11,10 @@ union web shell through `fusion-gateway`.
 | `apps/documents` | Word processor with `.docx` open/save, track changes, comments, spellcheck | MIT, migrated from HeyPuter/everything |
 | `apps/spreadsheet` | Spreadsheet with formulas, charts, pivot tables, `.xlsx` | AGPL-3.0-only, migrated from HeyPuter/everything |
 | `apps/presentation` | Slide editor with `.pptx` support and AI deck generation | MIT, migrated from HeyPuter/everything |
-| `apps/pdf` | PDF viewer, annotation, form filling, OCR, AI Q&A | MIT, migrated from HeyPuter/everything |
+| `apps/pdf` | PDF viewer, annotation, form filling, OCR, AI assistant | MIT, migrated from HeyPuter/everything |
 | `apps/pm` | Local project management with tasks, boards, timeline | MIT, migrated from HeyPuter/everything |
 | `packages/storage` | Local-first file storage: File System Access API, OPFS fallback, IndexedDB index | First-party |
-| `packages/ai-client` | OpenAI-compatible client for `fusion-gateway` with streaming, tools, and JSON helpers | First-party |
+| `packages/ai-client` | OpenAI-compatible client for `fusion-gateway` with streaming, tools, JSON helpers, and the shared agent loop | First-party |
 
 Every application runs as a static Vite build. There is no server component, no account
 system, and no cloud dependency. Files live in a folder you pick or in the browser's
@@ -44,7 +44,8 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   best-effort IndexedDB index tracks path, size, and modification time for listings.
 - `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
-  embeds model logic.
+  embeds model logic. `createAgent` in the same package runs the tool loop shared by the
+  documents, PDF, and project assistants.
 - AI traffic is gated by the gateway API key. Browser builds read the key at build time
   from `VITE_FUSION_GATEWAY_KEY`. PDF and project AI surfaces check `isConfigured()` and
   explain what is missing before sending anything; the other apps surface the gateway's
@@ -94,14 +95,25 @@ ports, so a direct cross-origin call would fail the preflight and surface as
 
 AI surfaces by app:
 
-- Documents: assistant pane (which inserts a table reply as a real, undoable table at the
-  cursor), grammar checks, translation, smart lookup, and image prompts.
+- Documents: an assistant pane that works the open document through tools: read it, find
+  text, insert or replace text, format a selection, insert a table or a page break, and
+  add a link. Replacing the selection asks before it runs, and every change is a single
+  undo step. Grammar checks, translation, smart lookup, and image prompts remain.
 - Spreadsheet: formula generation and explanation, data questions, translation, and
   sheet functions such as `AI` and `TRANSLATE`.
 - Presentation: prompt-to-deck generation, assistant panel, and slide review.
-- PDF: the **Ask AI** sidebar tab answers questions from extracted page text and
-  summarizes the document. Scanned documents need OCR first.
-- Projects: **Break down with AI** turns a task into a checklist through a JSON reply.
+- PDF: the **Ask AI** sidebar tab is an assistant over the open file. It reads pages and
+  finds text through tools, moves to a page, changes the zoom, and adds a bookmark (the
+  one change, undoable). Scanned documents need OCR first.
+- Projects: a project assistant in the board header reads the project and changes it:
+  create, update, move, archive and delete tasks, add checklist items and comments, and
+  add columns. Deleting a task asks before it runs. **Break down with AI** on a task
+  still turns it into a checklist through a JSON reply.
+
+The three agentic surfaces share the loop in `packages/ai-client/src/agent.js`: it sends
+the conversation with the tool schemas, runs the calls the model asks for, feeds the
+results back, and stops after a bounded number of rounds. Each app owns its tools, which
+describe themselves for the step list and declare which calls change the file.
 
 Verify end-to-end connectivity with a real loaded model:
 
@@ -110,9 +122,9 @@ FUSION_GATEWAY_KEY=<scoped-key> node scripts/verify-ai.mjs
 ```
 
 The script checks model registration, plain chat, streaming chat, tool-event streaming,
-the PDF question shape, the project checklist JSON shape, and the real adapter paths in
-documents, spreadsheet, presentation, and the PDF panel. It uses jsdom only to load those
-browser modules and exits non-zero if any step fails.
+the PDF and project JSON paths, and the real adapter paths in documents, spreadsheet,
+presentation, and the PDF assistant panel. It uses jsdom only to load those browser
+modules and exits non-zero if any step fails.
 
 ## Union shell integration
 
@@ -173,6 +185,11 @@ npm run test:browser -w apps/pm
 Documents, spreadsheet, and pm use `PLAYWRIGHT_PORT` (defaults 5189, 5190, 5191) and
 launch the installed Chrome unless `PLAYWRIGHT_CHANNEL=chromium` selects Playwright's
 bundled build.
+
+Each app has an `assistant-tools` browser spec that drives every AI assistant tool
+through the real UI. The specs answer the model's requests from a mocked gateway in the
+page, so they need no API key, gateway, or loaded model. Documents uses its dev mock;
+the other apps route the gateway's completion endpoint to a scripted event stream.
 
 The document-capability service has its own Python suite:
 
@@ -239,16 +256,18 @@ at build time and from the browser environment at runtime.
 
 ## Licenses and provenance
 
+- `packages/storage`, `packages/ai-client`, `services/office-api`, and the root tooling:
+  Apache-2.0, first-party. See `LICENSE`.
 - `apps/documents`, `apps/presentation`, `apps/pdf`, and `apps/pm`: MIT, migrated from
-  [HeyPuter/everything](https://github.com/HeyPuter/everything).
-- `packages/storage`, `packages/ai-client`, and the root tooling: MIT, first-party.
-- `apps/spreadsheet`: AGPL-3.0-only, migrated from HeyPuter/everything. The root MIT
-  license does not cover this app. Distributing a combined binary or hosted service that
-  includes it triggers AGPL obligations, so a public release needs a licensing decision
-  before the repository changes visibility.
+  [HeyPuter/everything](https://github.com/HeyPuter/everything). See the `LICENSE` file
+  in each app directory.
+- `apps/spreadsheet`: AGPL-3.0-only, migrated from HeyPuter/everything. See
+  `apps/spreadsheet/LICENSE`. The root Apache license does not cover this app.
+  Distributing a combined binary or hosted service that includes it triggers AGPL
+  obligations for that app.
 
-See `LICENSE` and `apps/spreadsheet/LICENSE`. Upstream fixes belong upstream; report them
-to HeyPuter/everything instead of patching a divergent copy here.
+Upstream fixes belong upstream; report them to HeyPuter/everything instead of patching a
+divergent copy here.
 
 ## Status
 
