@@ -6,7 +6,7 @@ for (const view of ['editor', 'library'])
       test(`${view} initial ${stage} respects a newer ${newer}`, async ({ page }) => {
         const errors = [];
         page.on('pageerror', (error) => errors.push(error.message));
-        await page.route('https://js.puter.com/**', (route) =>
+        await page.route('**/puter-sdk.js', (route) =>
           route.fulfill({
             contentType: 'application/javascript',
             body: `
@@ -47,7 +47,7 @@ for (const view of ['editor', 'library'])
         else {
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
           const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-          await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+          await settings.getByRole('button', { name: 'Continue', exact: true }).click();
           await expect(settings).toHaveCount(0);
           if (newer === 'sign-out') {
             await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -75,18 +75,18 @@ for (const view of ['editor', 'library'])
           ).toHaveValue('report');
         } else
           await expect(
-            page.getByRole('button', { name: 'Save to Puter', exact: true }),
+            page.getByRole('button', { name: 'Save', exact: true }),
           ).toBeVisible();
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
         await expect(settings).toContainText(
-          newer === 'sign-out' ? 'Work locally' : 'Signed in as Bob',
+          newer === 'sign-out' ? 'Your PDFs are saved in the local workspace.' : 'Signed in as Bob',
         );
         await expect(settings).not.toContainText('Signed in as Alice');
         await expect(page.getByRole('dialog')).toHaveCount(1);
         await expect(
           settings.getByRole('button', {
-            name: newer === 'sign-out' ? 'Sign in with Puter' : 'Sign out',
+            name: newer === 'sign-out' ? 'Continue' : 'Sign out',
             exact: true,
           }),
         ).toBeVisible();

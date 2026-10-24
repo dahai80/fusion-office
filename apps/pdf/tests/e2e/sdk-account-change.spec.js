@@ -11,7 +11,7 @@ async function mockSDK(page, { protectedPdf = false, initialListError = false } 
         ).readFile(new URL('../fixtures/security/owner-only.pdf', import.meta.url))
       ).toString('base64')
     : Buffer.from(await doc.save()).toString('base64');
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.account={username:'Alice',uuid:'alice'};window.writes=[];window.listReads=0;window.profileReads=0;window.signInCalls=0;window.savePickers=0;
@@ -35,7 +35,7 @@ async function openCloud(page) {
   const bar = page.getByRole('menubar');
   if (await bar.isVisible()) await bar.getByRole('menuitem', { name: 'File', exact: true }).click();
   else await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Open from Puter…', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Open a PDF…', exact: true }).click();
   await expect(page).toHaveTitle('report.pdf · PDF Editor');
   await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
 }
@@ -90,7 +90,7 @@ for (const account of [
       return window.puter.onAuth(account);
     }, account);
     await page.getByRole('button', { name: /^Save(?: to Puter)?$/ }).click();
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     const write = await page.evaluate(() => window.writes.at(-1));
     expect(write.account).toBe(account.username);
     expect(write.options.overwrite).toBe(account.uuid === 'alice');
@@ -109,7 +109,7 @@ for (const newer of ['sign-out', 'other account'])
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page
         .getByRole('dialog', { name: 'Settings', exact: true })
-        .getByRole('button', { name: 'Sign in with Puter', exact: true })
+        .getByRole('button', { name: 'Continue', exact: true })
         .click();
       await expect(page.locator('.account-label')).toHaveText('Bob');
     }
@@ -142,7 +142,7 @@ test('a save waits for SDK account verification and does not overwrite the older
   await expect(save).toBeEnabled();
   expect(await page.evaluate(() => window.writes)).toEqual([]);
   await save.click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.writes.at(-1).options.overwrite)).toBe(false);
 });
 
@@ -197,7 +197,7 @@ for (const initiallySignedOut of [false, true])
       expect(await page.evaluate(() => window.writes)).toEqual([]);
       await save.click();
     }
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     const state = await page.evaluate(() => ({
       writes: window.writes,
       signIns: window.signInCalls,
@@ -273,7 +273,7 @@ for (const freshSignIn of [false, true])
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page
         .getByRole('dialog', { name: 'Settings', exact: true })
-        .getByRole('button', { name: 'Sign in with Puter', exact: true })
+        .getByRole('button', { name: 'Continue', exact: true })
         .click();
       await expect(page.locator('.account-label')).toHaveText('Bob');
     }
@@ -307,7 +307,7 @@ test('a stale callback during a save preserves the verified current destination'
   await expect(page.locator('.save-status')).toHaveText('Saving…');
   expect(await page.evaluate(() => window.writes)).toEqual([]);
   await page.evaluate(() => window.releaseProfile());
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.writes[0].options.overwrite)).toBe(true);
   expect(await page.evaluate(() => window.writes[0].account)).toBe('Bob');
 });
@@ -338,7 +338,7 @@ test('a folder save rechecks an SDK token changed during encryption', async ({ p
   const bar = page.getByRole('menubar');
   if (await bar.isVisible()) await bar.getByRole('menuitem', { name: 'File', exact: true }).click();
   else await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Save to another Puter folder…', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Save a copy as…', exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.releaseExport)).toBe('function');
   await page.evaluate(() => {
     window.account = { username: 'Bob', uuid: 'bob' };
@@ -382,7 +382,7 @@ for (const folder of [false, true])
         await bar.getByRole('menuitem', { name: 'File', exact: true }).click();
       else await page.getByRole('button', { name: 'Menu', exact: true }).click();
       await page
-        .getByRole('menuitem', { name: 'Save to another Puter folder…', exact: true })
+        .getByRole('menuitem', { name: 'Save a copy as…', exact: true })
         .click();
     } else await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect.poll(() => page.evaluate(() => typeof window.finishCloudSave)).toBe('function');
@@ -391,10 +391,10 @@ for (const folder of [false, true])
       window.puter.authToken = 'token:bob';
       window.finishCloudSave();
     });
-    await expect(page.getByRole('button', { name: 'Save to Puter', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
     await expect(page).toHaveTitle('report.pdf · PDF Editor');
-    await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     const write = await page.evaluate(() => window.writes.at(-1));
     expect(write.account).toBe('Bob');
     expect(write.path).toBe('PDF Editor/report.pdf');

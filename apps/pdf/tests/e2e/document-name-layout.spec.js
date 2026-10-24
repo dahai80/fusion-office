@@ -9,7 +9,7 @@ for (const width of [320, 360, 375, 390, 430, 768, 1280])
       page,
     }, testInfo) => {
       await page.setViewportSize({ width, height: 844 });
-      await page.route('https://js.puter.com/**', (route) => route.fulfill({ body: '' }));
+      await page.route('**/puter-sdk.js', (route) => route.fulfill({ body: '' }));
       await page.goto('/#library');
       let buffer;
       if (protectedPdf)
@@ -24,7 +24,7 @@ for (const width of [320, 360, 375, 390, 430, 768, 1280])
       await (await chooser).setFiles({ name: filename, mimeType: 'application/pdf', buffer });
       await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
       await expect(
-        page.getByRole('button', { name: 'Sign in to save', exact: true }),
+        page.getByRole('button', { name: 'Save', exact: true }),
       ).toBeVisible();
       const rename = page.getByRole('button', { name: `Rename ${filename}`, exact: true });
       await expect(rename).toHaveAttribute('title', filename);

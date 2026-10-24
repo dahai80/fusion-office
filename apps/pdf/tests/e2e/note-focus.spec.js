@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { addNote, listNotes } from '../../src/core/notes.js';
 
 async function prepare(page, text = 'Updated note') {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       body: `window.puter = {
       env: 'web',
@@ -80,7 +80,7 @@ for (const action of ['keyboard', 'close', 'download', 'save', 'tool'])
         let bytes;
         if (pending) bytes = await readFile(await (await pending).path());
         if (action === 'save' && !fails) {
-          await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+          await expect(page.locator('.save-status')).toHaveText('Saved');
           bytes = new Uint8Array(await page.evaluate(() => window.savedNotePdf));
         }
         await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');

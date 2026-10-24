@@ -1035,7 +1035,7 @@ function renderHome() {
                 "Save real PowerPoint files in your local workspace.",
               ),
             ),
-            button("Continue", "ArrowRight", () => login(), "secondary"),
+            button("Sign in", "ArrowRight", () => login(), "secondary"),
           ),
         el(
           "section",
@@ -3390,7 +3390,7 @@ function editorTopbar() {
           "aria-label": "Quick Access Toolbar",
         },
         quick(
-          "Save",
+          "Save presentation",
           "save",
           run(() => saveCloud()),
           {

@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 import { PDFDocument } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
-for (const action of ['Download', 'Save to Puter'])
+for (const action of ['Download', 'Save'])
   for (const moveFocus of [false, true])
     test(`${action} preserves keyboard focus after saving a form draft (move focus=${moveFocus})`, async ({
       page,
     }) => {
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           body: `window.puter = {
             env: 'web',
@@ -68,7 +68,7 @@ for (const action of ['Download', 'Save to Puter'])
       let bytes;
       if (pending) bytes = await readFile(await (await pending).path());
       else {
-        await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+        await expect(page.locator('.save-status')).toHaveText('Saved');
         bytes = new Uint8Array(await page.evaluate(() => window.savedOutput));
       }
       await expect(button).toBeEnabled();

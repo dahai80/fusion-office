@@ -8,7 +8,7 @@ for (const source of ['settings', 'cloud open'])
       }) => {
         const errors = [];
         page.on('pageerror', (error) => errors.push(error.message));
-        await page.route('https://js.puter.com/**', (route) =>
+        await page.route('**/puter-sdk.js', (route) =>
           route.fulfill({
             contentType: 'application/javascript',
             body: `window.signInCalls=0;window.openPickers=0;window.mockAccount=null;
@@ -33,11 +33,11 @@ for (const source of ['settings', 'cloud open'])
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
           await page
             .getByRole('dialog', { name: 'Settings', exact: true })
-            .getByRole('button', { name: 'Sign in with Puter', exact: true })
+            .getByRole('button', { name: 'Continue', exact: true })
             .click();
         } else {
-          await page.getByRole('button', { name: 'Open from Puter', exact: true }).click();
-          await expect(page.locator('.account-label')).toHaveText('Puter user');
+          await page.getByRole('button', { name: 'Open from the workspace', exact: true }).click();
+          await expect(page.locator('.account-label')).toHaveText('Workspace user');
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
         }
         const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
@@ -49,7 +49,7 @@ for (const source of ['settings', 'cloud open'])
         await expect(page.locator('.account-label')).toHaveText('Local workspace');
         if (retry) {
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+          await settings.getByRole('button', { name: 'Continue', exact: true }).click();
           await expect.poll(() => page.evaluate(() => window.signInCalls)).toBe(2);
           await expect(settings).toHaveCount(0);
           await expect(page.locator('.account-label')).toHaveText('Bob');
@@ -62,14 +62,14 @@ for (const source of ['settings', 'cloud open'])
         await expect(page.locator('#toast')).toBeHidden();
         expect(errors).toEqual([]);
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
-        await expect(settings).toContainText(retry ? 'Signed in as Bob' : 'Work locally');
+        await expect(settings).toContainText(retry ? 'Signed in as Bob' : 'Your PDFs are saved in the local workspace.');
       });
 
 for (const action of ['save', 'save as'])
   test(`sign-out retires authentication for a pending ${action}`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.writes=0;window.savePickers=0;window.mockAccount=null;
@@ -98,7 +98,7 @@ for (const action of ['save', 'save as'])
         await bar.getByRole('menuitem', { name: 'File', exact: true }).click();
       else await page.getByRole('button', { name: 'Menu', exact: true }).click();
       await page
-        .getByRole('menuitem', { name: 'Save to another Puter folder…', exact: true })
+        .getByRole('menuitem', { name: 'Save a copy as…', exact: true })
         .click();
     }
     await expect.poll(() => page.evaluate(() => typeof window.releaseOldProfile)).toBe('function');

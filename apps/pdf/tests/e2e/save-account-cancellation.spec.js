@@ -11,7 +11,7 @@ for (const stage of ['write', 'export'])
       const encoded = (
         await readFile(new URL('../fixtures/security/owner-only.pdf', import.meta.url))
       ).toString('base64');
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.account={username:'Alice'};window.writes=[];
@@ -35,7 +35,7 @@ for (const stage of ['write', 'export'])
         if (await bar.isVisible())
           await bar.getByRole('menuitem', { name: 'File', exact: true }).click();
         else await page.getByRole('button', { name: 'Menu', exact: true }).click();
-        await page.getByRole('menuitem', { name: 'Open from Puter…', exact: true }).click();
+        await page.getByRole('menuitem', { name: 'Open a PDF…', exact: true }).click();
         await expect(page).toHaveTitle('private.pdf · PDF Editor');
         await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
         await page.evaluate(async (outcome) => {
@@ -76,7 +76,7 @@ for (const stage of ['write', 'export'])
         page.getByRole('button', { name: 'Sign in to save', exact: true }),
       ).toBeEnabled();
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+      await settings.getByRole('button', { name: 'Continue', exact: true }).click();
       await expect(settings).toHaveCount(0);
       await save.click();
       await expect.poll(() => page.evaluate(() => typeof window.finishNewSave)).toBe('function');
@@ -90,7 +90,7 @@ for (const stage of ['write', 'export'])
       );
       expect(await page.locator('#toast').textContent()).not.toContain('Old save failed');
       await page.evaluate(() => window.finishNewSave());
-      await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+      await expect(page.locator('.save-status')).toHaveText('Saved');
       await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
       expect(errors).toEqual([]);
     });

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 const ERROR =
   'This export would exceed the 100 MB PDF limit. Reduce file size before saving or downloading.';
 async function setup(page, limit) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.exportWrites = 0; window.exportPickers = 0;
@@ -71,9 +71,9 @@ async function exportAction(page, action) {
   if (action === 'download')
     return page.getByRole('button', { name: 'Download', exact: true }).click();
   if (action === 'save')
-    return page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  if (action === 'copy') return menu(page, 'Save a copy to Puter');
-  if (action === 'picker') return menu(page, 'Save to another Puter folder…');
+    return page.getByRole('button', { name: 'Save', exact: true }).click();
+  if (action === 'copy') return menu(page, 'Save a copy');
+  if (action === 'picker') return menu(page, 'Save a copy as…');
   if (action === 'page') {
     if (!(await page.locator('#page-sidebar').isVisible()))
       await page.getByRole('button', { name: 'Toggle pages panel', exact: true }).click();

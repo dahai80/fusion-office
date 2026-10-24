@@ -13,7 +13,7 @@ async function plainSource() {
 }
 
 async function prepare(page, signedIn = false) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: signedIn
@@ -27,7 +27,7 @@ async function prepare(page, signedIn = false) {
   await page.goto('/');
   await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
   if (signedIn)
-    await expect(page.getByRole('button', { name: 'Save to Puter', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 }
 
 async function rotate(page) {
@@ -152,7 +152,7 @@ for (const phase of ['password', 'local leave', 'account leave'])
         await dialog.getByRole('button', { name: 'Open', exact: true }).click();
       } else {
         const dialog = page.getByRole('dialog', {
-          name: phase === 'account leave' ? 'Leave this PDF?' : 'Save before leaving?',
+          name: phase === 'account leave' ? 'Leave this PDF?' : 'Leave this PDF?',
           exact: true,
         });
         await expect(page.getByRole('dialog')).toHaveCount(1);
@@ -179,7 +179,7 @@ for (const phase of ['password', 'local leave', 'account leave'])
 for (const newer of ['file', 'library'])
   test(`a queued password prompt is cancelled by a newer ${newer}`, async ({ page }) => {
     const base64 = (await plainSource()).toString('base64');
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.puter = {

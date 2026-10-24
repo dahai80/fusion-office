@@ -10,7 +10,7 @@ const files = [
 test('last-modified order agrees with displayed dates across seconds and milliseconds', async ({
   page,
 }) => {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.puter = { env:'web', auth:{isSignedIn:()=>true,getUser:async()=>({username:'test-user'})}, fs:{readdir:async()=>${JSON.stringify(files)}}, ui:{onLaunchedWithItems:()=>{},onItemsOpened:()=>{}} };`,

@@ -154,6 +154,32 @@ npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
 ```
 
+The document-capability service has its own Python suite:
+
+```bash
+cd services/office-api
+python -m pytest tests -q
+./start.sh start          # 127.0.0.1:11520
+./start.sh stop
+```
+
+## Document-capability service
+
+`services/office-api` is a small FastAPI service that exposes file operations to
+other Fusion projects (first consumer: `dahai80/envipermit`). It implements the
+contract in issue #1:
+
+- `POST /v1/xlsx/parse` — multipart `file`; returns sheets, tables, flattened merged
+  cells, and `unparsed_regions` for blocks whose header cannot be inferred.
+- `POST /v1/docx/fill` — multipart `file` plus a `values` JSON object; fills
+  `{{placeholder}}` markers in paragraphs, table cells, headers and footers and returns
+  the filled binary with `X-Office-Doc-SHA256` and `X-Office-Unfilled`.
+- `GET /healthz`, `GET /readyz`.
+- Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
+  loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.
+
+See `services/office-api/README.md`.
+
 ## Project layout
 
 ```text

@@ -10,7 +10,7 @@ for (const width of [320, 360, 390, 430, 768, 1280])
         page,
       }, testInfo) => {
         await page.setViewportSize({ width, height: 844 });
-        await page.route('https://js.puter.com/**', (route) =>
+        await page.route('**/puter-sdk.js', (route) =>
           route.fulfill({
             contentType: 'application/javascript',
             body: account === 'signed in' ? signedIn : '',
@@ -28,10 +28,7 @@ for (const width of [320, 360, 390, 430, 768, 1280])
         });
         await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
         await expect(
-          page.getByRole('button', {
-            name: account === 'signed in' ? 'Save to Puter' : 'Sign in to save',
-            exact: true,
-          }),
+          page.getByRole('button', { name: 'Save', exact: true }),
         ).toBeVisible();
         if (dirty) await page.getByLabel('name (on page)', { exact: true }).fill('Updated draft');
         await expect(page.locator('.save-status')).toHaveText(

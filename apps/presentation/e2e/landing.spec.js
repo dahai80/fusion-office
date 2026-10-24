@@ -4,7 +4,7 @@ import { addText } from "./editor-commands.js";
 // Nobody has to sign in to work: the app opens into a new presentation, and
 // Puter's sign-in is asked for when a presentation is saved to the cloud.
 async function mockPuter(page, { signedIn = false } = {}) {
-  await page.route("https://js.puter.com/v2/", (route) =>
+  await page.route("/puter-sdk.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: `(()=>{let signedIn=${signedIn};const files={};window.__writes=[];window.__signIns=0;window.puter={env:'web',auth:{isSignedIn:async()=>signedIn,getUser:async()=>({username:'test-user',uuid:'test-user-id'}),signIn:async()=>{window.__signIns++;signedIn=true},signOut:async()=>{signedIn=false}},kv:new Proxy({},{get(){throw Error('KV is forbidden')}}),fs:{readdir:async()=>Object.values(files),write:async(path,blob,options)=>{const actual=path.startsWith('/')?path:'/test/'+path;window.__writes.push({path:actual,options,size:blob.size});files[actual]={path:actual,name:actual.split('/').pop(),modified:Date.now()/1000,bytes:blob};return files[actual];},read:async path=>files[path].bytes,rename:async(path,name)=>({path:path.slice(0,path.lastIndexOf('/')+1)+name}),delete:async path=>delete files[path]},ui:{onLaunchedWithItems:()=>{}}};})();`,
@@ -71,7 +71,7 @@ test("edits stay on this device until the save button signs the guest in", async
   await page
     .getByRole("button", { name: "Sign in to save", exact: true })
     .click();
-  await expect(page.locator("#save-status")).toHaveText("Saved to Puter");
+  await expect(page.locator("#save-status")).toHaveText("Saved");
   expect(await page.evaluate(() => window.__signIns)).toBe(1);
   expect(await page.evaluate(() => window.__writes.length)).toBe(1);
   await expect(page.locator(".editor-header .account-button")).toHaveText(

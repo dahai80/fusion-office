@@ -5,7 +5,7 @@
  * needs no changes at every call site.
  *
  *  auth      a single local user; no sign-in is needed
- *  env       always 'app': this is a local desktop-style edition
+ *  env       'app' for the local edition; a page SDK may name another one
  *  files     documents as real .docx files under /Documents
  *  pickers   the browser's open/save dialogs, imported into /Documents
  *  ai        chat through fusion-gateway on 127.0.0.1:11432
@@ -91,7 +91,7 @@ export function hasSDK() {
 }
 
 export function env() {
-  return testSdk()?.env || 'app';
+  return globalThis.puter?.env || 'app';
 }
 
 export function isApp() {

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 for (const outcome of ['success', 'failure', 'cancel'])
   test(`repeated sign-in requests share a pending ${outcome} and allow retry`, async ({ page }) => {
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.signInCalls=0;window.puter={env:'web',auth:{
@@ -18,7 +18,7 @@ for (const outcome of ['success', 'failure', 'cancel'])
     await page.goto('/#library');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-    const signIn = settings.getByRole('button', { name: 'Sign in with Puter', exact: true });
+    const signIn = settings.getByRole('button', { name: 'Continue', exact: true });
     await signIn.click();
     await expect.poll(() => page.evaluate(() => window.signInCalls)).toBe(1);
     // A second activation while the service is pending must not open another auth window.
@@ -39,7 +39,7 @@ for (const outcome of ['success', 'failure', 'cancel'])
 
 for (const source of ['settings', 'library'])
   test(`a cloud open shares a sign-in started from ${source}`, async ({ page }) => {
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.signInCalls=0;window.openPickers=0;window.puter={env:'web',auth:{
@@ -52,11 +52,11 @@ for (const source of ['settings', 'library'])
     if (source === 'settings') {
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-      await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+      await settings.getByRole('button', { name: 'Continue', exact: true }).click();
       await settings.getByRole('button', { name: 'Close dialog', exact: true }).click();
       await expect(settings).toHaveCount(0);
-    } else await page.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
-    await page.getByRole('button', { name: 'Open from Puter', exact: true }).click();
+    } else await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Open from the workspace', exact: true }).click();
     expect(await page.evaluate(() => window.signInCalls)).toBe(1);
     await page.evaluate(() => window.finishSignIn());
     await expect.poll(() => page.evaluate(() => window.openPickers)).toBe(1);

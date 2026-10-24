@@ -4,7 +4,7 @@ for (const legacy of [false, true]) {
   test(`draft listings avoid loading PPTX payloads with ${legacy ? "an existing" : "a new"} database`, async ({
     page,
   }) => {
-    await page.route("https://js.puter.com/v2/", (route) =>
+    await page.route("/puter-sdk.js", (route) =>
       route.fulfill({ body: "" }),
     );
     await page.route("**/src/main.js*", (route) =>
@@ -131,7 +131,7 @@ for (const legacy of [false, true]) {
 test("linking a first cloud save preserves local data and does not recreate or redirect drafts", async ({
   page,
 }) => {
-  await page.route("https://js.puter.com/v2/", (route) =>
+  await page.route("/puter-sdk.js", (route) =>
     route.fulfill({ body: "" }),
   );
   await page.route("**/src/main.js*", (route) =>
@@ -186,7 +186,7 @@ for (const operation of ["detach", "rename"]) {
   test(`${operation} cloud metadata preserves drafts and isolates accounts and paths`, async ({
     page,
   }) => {
-    await page.route("https://js.puter.com/v2/", (route) =>
+    await page.route("/puter-sdk.js", (route) =>
       route.fulfill({ body: "" }),
     );
     await page.route("**/src/main.js*", (route) =>
@@ -271,7 +271,7 @@ test("the library reports an older tab blocking the drafts database instead of l
   // An older build keeps the version 1 database open without closing on
   // versionchange, which blocks this build's schema upgrade.
   const older = await context.newPage();
-  await older.route("https://js.puter.com/v2/", (route) =>
+  await older.route("/puter-sdk.js", (route) =>
     route.fulfill({ body: "" }),
   );
   await older.route("**/src/main.js*", (route) =>
@@ -291,7 +291,7 @@ test("the library reports an older tab blocking the drafts database instead of l
         request.onerror = () => reject(request.error);
       }),
   );
-  await page.route("https://js.puter.com/v2/", (route) =>
+  await page.route("/puter-sdk.js", (route) =>
     route.fulfill({ body: "" }),
   );
   await page.goto("/#/home");

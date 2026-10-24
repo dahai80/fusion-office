@@ -66,7 +66,7 @@ for (const membership of [false, true]) {
   test(`hidden layer annotations have no active controls or comments (membership=${membership})`, async ({
     page,
   }) => {
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.puter = { env: 'web', auth: { isSignedIn: () => true, getUser: async () => ({username: 'test-user'}) }, fs: { readdir: async () => [] }, ui: { onLaunchedWithItems: () => {}, onItemsOpened: () => {} } };`,

@@ -5,7 +5,7 @@ for (const action of ['Rename', 'Duplicate', 'Delete'])
     test(`${action} completion ${movedFocus ? 'preserves newer keyboard focus' : 'restores focus after refreshing the library'}`, async ({
       page,
     }) => {
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `

@@ -12,7 +12,7 @@ for (const change of ['rename', 'replace', 'newer save', 'none'])
   test(`a folder save prepared before document ${change} opens only a current picker`, async ({
     page,
   }) => {
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         body: `window.folderPickers = [];
           window.puter = {
@@ -55,7 +55,7 @@ for (const change of ['rename', 'replace', 'newer save', 'none'])
         return bytes;
       };
     });
-    await fileMenu(page, 'Save to another Puter folder…');
+    await fileMenu(page, 'Save a copy as…');
     await expect.poll(() => page.evaluate(() => Boolean(window.releaseFolderSave))).toBe(true);
     if (change === 'rename') {
       await page.getByRole('button', { name: 'Rename original.pdf', exact: true }).click();
@@ -65,8 +65,8 @@ for (const change of ['rename', 'replace', 'newer save', 'none'])
       await fileMenu(page, 'New blank PDF');
       await expect(page.locator('.page-caption')).toHaveText('Page 1 of 1');
     } else if (change === 'newer save') {
-      await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-      await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(page.locator('.save-status')).toHaveText('Saved');
     }
     await page.evaluate(async () => {
       window.releaseFolderSave();

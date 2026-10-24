@@ -365,12 +365,17 @@ export function createSlideSorter(ctx) {
       if (!dragging) {
         if (apply && !modifier && chosen.has(part) && chosen.size > 1)
           select(part, {});
+        // The browser gives the mousedown target the focus after the
+        // selection rebuilt the grid, which leaves it on the body; take it
+        // back so the arrow keys keep working from the card.
+        if (apply) cards.get(part)?.focus({ preventScroll: true });
         return;
       }
       grid?.classList.remove("reordering");
       indicator?.remove();
       for (const c of cards.values()) c.classList.remove("dragging");
       if (apply && drop) moveSelection(drop);
+      if (apply) cards.get(part)?.focus({ preventScroll: true });
     };
     const up = () => finish(true);
     const cancel = () => finish(false);

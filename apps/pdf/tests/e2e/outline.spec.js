@@ -4,7 +4,7 @@ import { PDFDocument, PDFName, PDFHexString, PDFNull } from 'pdf-lib';
 
 const PUTER_MOCK = `window.puter = { env: 'web', auth: { isSignedIn: () => true, getUser: async () => ({username:'test-user'}), signIn: async () => {}, signOut: async () => {} }, fs: { readdir: async () => [], write: async () => ({}) }, ui: { onLaunchedWithItems: () => {}, onItemsOpened: () => {} } };`;
 async function mockPuter(page) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: PUTER_MOCK }),
   );
 }
@@ -419,8 +419,13 @@ test('the side panel tabs name their panels and answer Home and End', async ({ p
   // One landmark holds the three panels, and its name follows the tab that is open.
   await expect(page.locator('#page-sidebar')).toHaveAttribute('aria-label', 'Pages panel');
   await tabs.getByRole('tab', { name: 'Pages', exact: true }).focus();
-  // Attachments is the last tab for a PDF without layers or signatures.
+  // Ask AI is the last tab; Attachments sits just before it for a PDF without
+  // layers or signatures.
   await page.keyboard.press('End');
+  await expect(tabs.getByRole('tab', { name: 'Ask AI', exact: true })).toBeFocused();
+  await expect(page.locator('#sidebar-panel-ai')).toBeVisible();
+  await expect(page.locator('#page-sidebar')).toHaveAttribute('aria-label', 'Ask AI panel');
+  await page.keyboard.press('ArrowLeft');
   await expect(tabs.getByRole('tab', { name: 'Attachments', exact: true })).toBeFocused();
   await expect(page.locator('#sidebar-panel-attachments')).toBeVisible();
   await expect(page.locator('#page-sidebar')).toHaveAttribute('aria-label', 'Attachments panel');

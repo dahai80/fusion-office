@@ -1,7 +1,7 @@
 PDF Editor: third-party notices
 
 These licenses apply to their respective dependencies, not to the application as a whole.
-Puter.js is loaded from https://js.puter.com/v2/ and is subject to Puter terms.
+The page exposes an optional window.puter SDK hook: files stay local unless a host shell provides it.
 
 
 ========================================================================

@@ -10,7 +10,7 @@ for (const kind of ['image', 'shape'])
       test(`closing a ${pending ? 'pending' : 'unchanged'} ${kind} ${moved ? 'preserves newer focus' : 'restores object focus'}`, async ({
         page,
       }) => {
-        await page.route('https://js.puter.com/**', (route) => route.fulfill({ body: '' }));
+        await page.route('**/puter-sdk.js', (route) => route.fulfill({ body: '' }));
         await page.goto('/#library');
         const doc = await PDFDocument.create();
         const sheet = doc.addPage([400, 500]);

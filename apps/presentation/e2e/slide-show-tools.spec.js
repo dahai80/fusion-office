@@ -19,7 +19,7 @@ test.use({
 });
 
 async function story(page) {
-  await page.route("https://js.puter.com/v2/", (r) =>
+  await page.route("/puter-sdk.js", (r) =>
     r.fulfill({
       contentType: "application/javascript",
       body: 'window.puter={env:"web",auth:{isSignedIn:async()=>false,getUser:async()=>({username:"u"}),signIn:async()=>{},signOut:async()=>{}},fs:{readdir:async()=>[],write:async()=>({})},ui:{onLaunchedWithItems:()=>{}}};',

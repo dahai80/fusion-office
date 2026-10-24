@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TextDocument, paragraph, paragraphFormat, boundaries } from '../src/engine/model.js';
 import { emptyStyles } from '../src/engine/styles.js';
 import { JSDOM } from 'jsdom';
@@ -228,11 +228,18 @@ describe('tracked editing in a long document', () => {
     doc.revisionAuthor = 'Me'; return doc;
   };
   it('compares only the edited paragraphs when typing and deleting', () => {
-    const doc = large(), size = JSON.stringify(doc.paragraphs).length;
-    doc.select(doc.paragraphOffset(1000) + 5);
-    const cost = serialized(() => { doc.replace('x'); doc.select(doc.paragraphOffset(1000) + 2); doc.delete(1); doc.delete(1); });
-    expect(doc.revisions.map(r => r.type)).toEqual(['del', 'ins']);
-    expect(cost).toBeLessThan(size / 10);
+    // Revisions merge only within the same timestamp second; freeze the clock so a
+    // slow CI run cannot split the two deletes into separate revisions.
+    vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') });
+    try {
+      const doc = large(), size = JSON.stringify(doc.paragraphs).length;
+      doc.select(doc.paragraphOffset(1000) + 5);
+      const cost = serialized(() => { doc.replace('x'); doc.select(doc.paragraphOffset(1000) + 2); doc.delete(1); doc.delete(1); });
+      expect(doc.revisions.map(r => r.type)).toEqual(['del', 'ins']);
+      expect(cost).toBeLessThan(size / 10);
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('keeps tracked Replace All linear in the number of matches', () => {
     const doc = large(), size = JSON.stringify(doc.paragraphs).length;

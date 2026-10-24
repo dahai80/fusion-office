@@ -5,7 +5,7 @@ for (const action of ['Download', 'Rename', 'Delete', 'Duplicate'])
     test(`${action}'s late cloud failure respects ${newer}`, async ({ page }) => {
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.account={username:'Alice'};
@@ -43,7 +43,7 @@ for (const action of ['Download', 'Rename', 'Delete', 'Duplicate'])
         await expect(page.locator('.account-label')).toHaveText('Local workspace');
         if (newer === 'other account') {
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+          await settings.getByRole('button', { name: 'Continue', exact: true }).click();
           await expect(page.locator('.account-label')).toHaveText('Bob');
         }
       }

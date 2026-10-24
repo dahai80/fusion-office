@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 async function setup(page, { holdListing = false } = {}) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `
@@ -41,7 +41,7 @@ async function setup(page, { holdListing = false } = {}) {
 async function finishProfile(page, outcome) {
   await page.evaluate((fail) => window.finishProfile(fail), outcome === 'failure');
   await expect.poll(() => page.evaluate(() => window.profileSettled)).toBe(true);
-  const name = outcome === 'success' ? 'alice' : 'Puter user';
+  const name = outcome === 'success' ? 'alice' : 'Workspace user';
   await expect(page.locator('.account-label')).toHaveText(name);
   await expect(page.locator('.account-label')).toHaveAttribute('title', name);
 }
@@ -83,7 +83,7 @@ for (const outcome of ['success', 'failure']) {
       await expect(page.locator('.file-open')).toHaveText(['second.pdf']);
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toContainText(
-        `Signed in as ${outcome === 'success' ? 'alice' : 'Puter user'}`,
+        `Signed in as ${outcome === 'success' ? 'alice' : 'Workspace user'}`,
       );
       expect(errors).toEqual([]);
     });

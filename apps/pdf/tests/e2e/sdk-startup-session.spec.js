@@ -5,7 +5,7 @@ async function mockSDK(page, stage) {
   const doc = await PDFDocument.create();
   doc.addPage([410, 500]);
   const encoded = Buffer.from(await doc.save()).toString('base64');
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.account={username:'Alice',uuid:'alice'};window.writes=[];window.sessionReads=0;window.profileReads=0;
@@ -32,7 +32,7 @@ async function mockSDK(page, stage) {
 async function delayedSignIn(page, changeAccount = true) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-  await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+  await settings.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.finishSignInProfile)).toBe('function');
   await page.evaluate((changeAccount) => {
     if (changeAccount) {
@@ -79,14 +79,14 @@ for (const stage of ['session', 'profile']) {
       return window.puter.onAuth(window.account);
     });
     await page.getByRole('button', { name: /^Save(?: to Puter)?$/ }).click();
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     const write = await page.evaluate(() => window.writes.at(-1));
     expect(write.account).toBe('Bob');
     expect(write.options.overwrite).toBe(false);
     expect(write.options.dedupeName).toBe(true);
     await page.evaluate(() => window.finishInitialRead());
     await expect.poll(() => page.evaluate(() => window.finishInitialReadDone)).toBe(true);
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
   });
 }
 
@@ -103,13 +103,13 @@ for (const stage of ['session', 'profile'])
     await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
     await page.evaluate(() => window.puter.onAuth(window.account));
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     const write = await page.evaluate(() => window.writes.at(-1));
     expect(write.account).toBe('Bob');
     expect(write.options.overwrite).toBe(true);
     expect(write.options.dedupeName).toBe(false);
     await page.evaluate(() => window.finishInitialRead());
     await expect.poll(() => page.evaluate(() => window.finishInitialReadDone)).toBe(true);
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     expect(await page.evaluate(() => window.writes)).toHaveLength(1);
   });

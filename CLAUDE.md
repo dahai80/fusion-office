@@ -12,6 +12,10 @@ through `fusion-gateway` on `127.0.0.1:11432`.
 The code is migrated from HeyPuter/everything. Documents, presentation, pdf, and pm are
 MIT. Spreadsheet is AGPL-3.0-only and the root MIT license does not cover it.
 
+`services/office-api` is a Python FastAPI document-capability service (xlsx table
+parsing, docx template filling) consumed by other Fusion projects. It implements the
+contract in issue #1, binds to `127.0.0.1:11520`, and holds no business logic.
+
 ## Repository Rules
 
 `fusion-office/` is one of the `fusion-*` sub-projects in `/Users/dahai/fusion`. Root
@@ -44,6 +48,10 @@ npm run dev:documents             # also dev:spreadsheet, dev:presentation, dev:
 npm run verify:ai                 # live gateway + loaded model check
 npm run shell:serve               # register built apps with the union shell
 npm run shell:smoke               # register, request each module, unregister, exit
+
+cd services/office-api
+python -m pytest tests -q         # Python capability-service suite
+./start.sh start                  # 127.0.0.1:11520; also stop|status|log
 ```
 
 `verify:ai` needs `FUSION_GATEWAY_KEY`. `shell:serve` needs

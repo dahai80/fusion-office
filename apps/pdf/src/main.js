@@ -67,8 +67,8 @@ function sameAccount(first, second) {
   if (first.uuid && second.uuid) return first.uuid === second.uuid;
   // The desktop's provisional label resolves to its existing account, not a new session.
   return (
-    first.username === 'Local user' ||
-    second.username === 'Local user' ||
+    first.username === 'Workspace user' ||
+    second.username === 'Workspace user' ||
     first.username === second.username
   );
 }
@@ -138,7 +138,7 @@ function refreshSDKAccount(hint) {
     if (signedIn && !user) {
       // A confirmed session can be signed out while its profile is still loading.
       // Callback metadata may be stale, so only the verified profile supplies its name.
-      setAccount({ username: 'Local user' });
+      setAccount({ username: 'Workspace user' });
       version = accountGeneration;
     }
     return signedIn ? P.currentUser() : null;
@@ -192,7 +192,7 @@ async function ensureSignedIn({ signal = accountController.signal } = {}) {
       .then(async (account) => {
         await settleAccount(controller.signal);
         controller.signal.throwIfAborted();
-        if (!user) setAccount(account || { username: 'Local user' });
+        if (!user) setAccount(account || { username: 'Workspace user' });
         return user;
       })
       .finally(() => {
@@ -240,11 +240,11 @@ function settings() {
     accountSummary.textContent = user
       ? `Signed in as ${user.username}`
       : 'Your PDFs are saved in the local workspace.';
-    const nextAction = !user ? 'sign-in' : P.isApp() ? null : 'sign-out';
+    const nextAction = !user ? 'sign-in' : P.canSignOut() ? 'sign-out' : null;
     if (nextAction === accountAction) return;
     accountAction = nextAction;
     accountActions.replaceChildren();
-    accountActions.hidden = !!user && P.isApp();
+    accountActions.hidden = !!user && !P.canSignOut();
     if (user && !P.isApp())
       accountActions.append(
         button(
@@ -995,7 +995,7 @@ function showHome({ accountRefresh = false } = {}) {
               'quick-action',
             ),
             button('Pictures to PDF', 'Images', pickPictures, 'quick-action'),
-            button('Open a PDF', 'Cloud', pickCloud, 'quick-action'),
+            button('Open from the workspace', 'Cloud', pickCloud, 'quick-action'),
             button(
               'Try a sample PDF',
               'BookOpen',
@@ -1128,7 +1128,7 @@ const initPuter = async () => {
   P.onAuth(run(refreshSDKAccount));
   if (P.isApp()) {
     // The desktop already has a session. File and close events must not wait for its profile.
-    setAccount({ username: 'Local user' });
+    setAccount({ username: 'Workspace user' });
     const onItems = (items) => {
       items = Array.isArray(items) ? items : [items];
       if (items.length) run(() => openDesktopItems(items))();
@@ -1159,7 +1159,7 @@ const initPuter = async () => {
     const account = await P.currentUser();
     if (version !== accountGeneration) return;
     if (token !== P.sessionToken()) return refreshSDKAccount();
-    setAccount(account || { username: 'Local user' }, { profileOnly: P.isApp() });
+    setAccount(account || { username: 'Workspace user' }, { profileOnly: P.isApp() });
   } else {
     accountToken = token;
     sessionState = 'out';

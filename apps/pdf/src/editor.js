@@ -1031,6 +1031,7 @@ export function createEditor({
     layers.el,
     signaturesPanel.el,
     accessibilityReport.el,
+    aiPanel.el,
   );
   const canvas = el('canvas', { 'aria-hidden': 'true' });
   const textContainer = el('div', { class: 'textLayer' });
@@ -2201,7 +2202,7 @@ export function createEditor({
     saveStatus.title = saveStatus.textContent;
     saveButton.disabled = saving || busy;
     // Without a session the button says what saving needs first.
-    const saveLabel = 'Save';
+    const saveLabel = signedOut() ? 'Sign in to save' : 'Save';
     saveButton.querySelector('span').textContent = saveLabel;
     saveButton.setAttribute('aria-label', saveLabel);
     saveButton.title = withShortcut(saveLabel, 'Mod+S');

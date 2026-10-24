@@ -143,6 +143,31 @@ npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
 ```
 
+文档能力服务有独立的 Python 测试套件：
+
+```bash
+cd services/office-api
+python -m pytest tests -q
+./start.sh start          # 127.0.0.1:11520
+./start.sh stop
+```
+
+## 文档能力服务
+
+`services/office-api` 是一个 FastAPI 小服务，向其他 Fusion 项目提供文件能力（首个
+调用方：`dahai80/envipermit`），实现 issue #1 的契约：
+
+- `POST /v1/xlsx/parse` — `multipart` 字段 `file`；返回工作表、表格、展平后的合并
+  单元格，以及无法可靠识别表头而进入 `unparsed_regions` 的区块。
+- `POST /v1/docx/fill` — `multipart` 字段 `file` 加 `values` JSON；替换段落、表格
+  单元格、页眉页脚中的 `{{placeholder}}`，返回填充后的二进制，并带
+  `X-Office-Doc-SHA256` 与 `X-Office-Unfilled` 响应头。
+- `GET /healthz`、`GET /readyz`。
+- 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
+  外部请求。`/v1/docx/snapshot` 推迟到 v0.2。
+
+详见 `services/office-api/README.md`。
+
 ## 目录结构
 
 ```text

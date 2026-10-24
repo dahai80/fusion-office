@@ -9,7 +9,7 @@ for (const source of ['picker', 'desktop'])
       const doc = await PDFDocument.create();
       doc.addPage([200, 200]);
       const bytes = Buffer.from(await doc.save()).toString('base64');
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `
@@ -30,7 +30,7 @@ for (const source of ['picker', 'desktop'])
       await expect.poll(() => page.evaluate(() => typeof window.openItems)).toBe('function');
       const open = async () => {
         if (source === 'picker')
-          await page.getByRole('button', { name: 'Open from Puter', exact: true }).click();
+          await page.getByRole('button', { name: 'Open from the workspace', exact: true }).click();
         else await page.evaluate(() => window.openItems([window.cloudItem]));
       };
       await open();

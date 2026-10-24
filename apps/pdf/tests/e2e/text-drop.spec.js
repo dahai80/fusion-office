@@ -6,7 +6,7 @@ for (const ending of ['\r\n', '\r', '\n'])
   test(`external text drops normalize ${JSON.stringify(ending)} line endings and retain history`, async ({
     page,
   }) => {
-    await page.route('https://js.puter.com/**', (route) => route.fulfill({ body: '' }));
+    await page.route('**/puter-sdk.js', (route) => route.fulfill({ body: '' }));
     await page.goto('/#library');
     const doc = await PDFDocument.create();
     const sheet = doc.addPage([400, 400]);

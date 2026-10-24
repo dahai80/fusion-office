@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 async function setup(page, hold = false) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.cryptoWrites=0; window.cryptoPickers=0;
@@ -125,11 +125,11 @@ for (const action of ['download', 'save', 'folder'])
       await setup(page, true);
       await privatePdf(page, 200000);
       await protect(page);
-      if (action === 'folder') await menu(page, 'Save to another Puter folder…');
+      if (action === 'folder') await menu(page, 'Save a copy as…');
       else
         await page
           .getByRole('button', {
-            name: action === 'save' ? 'Save to Puter' : 'Download',
+            name: action === 'save' ? 'Save' : 'Download',
             exact: true,
           })
           .click();

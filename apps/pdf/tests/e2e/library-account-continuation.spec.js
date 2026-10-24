@@ -5,7 +5,7 @@ for (const stage of ['read', 'buffer'])
     test(`Duplicate's pending ${stage} respects ${newer}`, async ({ page }) => {
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.account={username:'Alice'};window.writes=[];window.libraryBuffers=0;
@@ -43,7 +43,7 @@ for (const stage of ['read', 'buffer'])
         await expect(page.locator('.account-label')).toHaveText('Local workspace');
         if (newer === 'other account') {
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
-          await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+          await settings.getByRole('button', { name: 'Continue', exact: true }).click();
           await expect(settings).toHaveCount(0);
           await expect(page.locator('.account-label')).toHaveText('Bob');
         }
@@ -75,7 +75,7 @@ for (const signedOut of [false, true])
   test(`a duplicate read failure ${signedOut ? 'is retired after sign-out' : 'still reports a current error'}`, async ({
     page,
   }) => {
-    await page.route('https://js.puter.com/**', (route) =>
+    await page.route('**/puter-sdk.js', (route) =>
       route.fulfill({
         contentType: 'application/javascript',
         body: `window.puter={env:'web',auth:{isSignedIn:()=>true,getUser:async()=>({username:'Alice'}),signOut:async()=>{}},

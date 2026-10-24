@@ -147,7 +147,7 @@ async function mockDrive(
   page,
   { env = "app", seed = {}, launch = null, path = "/" } = {},
 ) {
-  await page.route("https://js.puter.com/v2/", (route) =>
+  await page.route("/puter-sdk.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: `(${installPuter})(${JSON.stringify({ env, seed, launch })});`,
@@ -195,7 +195,7 @@ test("a presentation launched from the desktop opens directly, titled after the 
   );
   // Edits go back to the file where it lives.
   await addText(page);
-  await expect(status(page)).toHaveText("Saved to Puter");
+  await expect(status(page)).toHaveText("Saved");
   expect((await writes(page)).at(-1)).toMatchObject({
     path: "/test/Desktop/Quarterly.pptx",
     options: { overwrite: true },
@@ -208,7 +208,7 @@ test("a presentation launched from the desktop opens directly, titled after the 
       exact: true,
     }),
   });
-  await expect(row.locator(".file-location")).toHaveText("Puter · Desktop");
+  await expect(row.locator(".file-location")).toHaveText("Workspace · Desktop");
   await expect
     .poll(() => page.evaluate(() => window.__ui.titles.at(-1)))
     .toBe("Presentation");
@@ -273,14 +273,14 @@ test("a save that finds the file changed elsewhere asks before replacing it", as
   // Saving asks again; this time the person keeps their own version.
   await page.keyboard.press("Control+s");
   await dialog.getByRole("button", { name: "Replace with mine" }).click();
-  await expect(status(page)).toHaveText("Saved to Puter");
+  await expect(status(page)).toHaveText("Saved");
   expect(await writes(page)).toHaveLength(1);
   // Changed elsewhere again, and this time their version is opened instead.
   await page.evaluate(([p, b]) => window.__fs.change(p, b), [path, blank]);
   await addText(page);
   await dialog.getByRole("button", { name: "Open their version" }).click();
   await expect(page.locator("#slide-position")).toHaveText("Slide 1 of 1");
-  await expect(status(page)).toHaveText("Saved to Puter");
+  await expect(status(page)).toHaveText("Saved");
   expect(await writes(page)).toHaveLength(1);
   // The discarded edits leave no recovery draft behind.
   await page.getByRole("button", { name: "Back to presentations" }).click();
@@ -304,7 +304,7 @@ test("a file renamed elsewhere is followed by its id", async ({ page }) => {
     [`${APP_FOLDER}/Draft.pptx`, `${APP_FOLDER}/Final.pptx`],
   );
   await addText(page);
-  await expect(status(page)).toHaveText("Saved to Puter");
+  await expect(status(page)).toHaveText("Saved");
   await expect(title(page)).toHaveText("Final");
   expect((await writes(page)).map((w) => w.path)).toEqual([
     `${APP_FOLDER}/Final.pptx`,
@@ -336,7 +336,7 @@ test("a file deleted elsewhere offers to save the edits as a new file", async ({
   });
   await expect(status(page)).toHaveText("Moved or deleted");
   await dialog.getByRole("button", { name: "Save as a new file" }).click();
-  await expect(status(page)).toHaveText("Saved to Puter");
+  await expect(status(page)).toHaveText("Saved");
   expect((await writes(page)).at(-1)).toMatchObject({
     path: `${APP_FOLDER}/Doomed.pptx`,
     options: { overwrite: false, dedupeName: true },
@@ -384,7 +384,7 @@ test("a failing autosave says so in the status, and leaving asks first", async (
     };
   });
   await addText(page);
-  await expect(status(page)).toHaveText("Not saved to Puter · on this device");
+  await expect(status(page)).toHaveText("Not saved · on this device");
   await expect(status(page)).toHaveAttribute(
     "title",
     /Puter is out of space\./,
@@ -393,7 +393,7 @@ test("a failing autosave says so in the status, and leaving asks first", async (
   await expect(page.locator("#toast")).not.toBeVisible();
   await page.getByRole("button", { name: "Back to presentations" }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Your latest changes aren't saved to Puter",
+    name: "Your latest changes aren't saved",
   });
   await dialog.getByRole("button", { name: "Keep editing" }).click();
   await expect(title(page)).toHaveText("Flaky");
@@ -416,7 +416,7 @@ test("closing the Puter window asks about a presentation never saved", async ({
   await addText(page);
   await page.evaluate(() => window.__ui.close());
   const dialog = page.getByRole("dialog", {
-    name: "Save “Untitled presentation” to Puter before closing?",
+    name: "Save “Untitled presentation” to the workspace before closing?",
   });
   await dialog.getByRole("button", { name: "Cancel" }).click();
   expect(await page.evaluate(() => window.__ui.exited)).toBe(false);
@@ -489,7 +489,7 @@ test("inside Puter, exports and copies go through Puter's Save dialog", async ({
     .getByRole("menuitem", { name: "Download PowerPoint (.pptx)" })
     .click();
   await expect(page.locator("#toast")).toHaveText(
-    "Saved Untitled presentation.pptx to your Puter.",
+    "Saved Untitled presentation.pptx.",
   );
   // A copy goes where the dialog puts it, and becomes the open presentation.
   await addText(page);

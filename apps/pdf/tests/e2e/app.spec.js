@@ -1149,7 +1149,7 @@ async function mockPuter(
   page,
   { app = false, failSave = false, signedIn = true, deferList = false, launch = null } = {},
 ) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `
@@ -1275,17 +1275,17 @@ test('accepting an unchanged PDF name preserves its cloud save destination', asy
   await mockPuter(page);
   await page.goto('/#library');
   await sample(page);
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   for (const name of ['Getting started', 'Getting started.PDF', '  Getting started  ']) {
     await page.getByRole('button', { name: 'Rename Getting started.pdf', exact: true }).click();
     await page.getByLabel('File name', { exact: true }).fill(name);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   }
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.lastSave)).toMatchObject({
     path: 'PDF Editor/Getting started.pdf',
     options: { overwrite: true, dedupeName: false },
@@ -1470,7 +1470,7 @@ test('leaving a loading PDF allows another document to open without stale editor
     await expect(page.locator('.page-caption')).toHaveText('Page 1 of 1');
     await expect(page).toHaveTitle('Untitled.pdf · PDF Editor');
     await page.keyboard.press('ControlOrMeta+s');
-    await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+    await expect(page.locator('.save-status')).toHaveText('Saved');
     expect(await page.evaluate(() => window.lastSave.path)).toBe('PDF Editor/Untitled.pdf');
   } finally {
     releaseWorker();
@@ -1559,13 +1559,13 @@ test('a second touch cannot replace or finish an active drawing stroke', async (
 test('home sign-in refreshes the account and library', async ({ page }) => {
   await mockPuter(page, { signedIn: false });
   await page.goto('/#library');
-  await page.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.locator('.account-label')).toHaveText('test-user');
   await expect(page.getByRole('heading', { name: 'Your library starts here' })).toBeVisible();
 });
 
 test('a second click on a library action while it runs does not repeat it', async ({ page }) => {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `window.puter = { env: 'web', auth: { isSignedIn: () => true, getUser: async () => ({username:'test-user'}), signIn: async () => {}, signOut: async () => {} }, fs: { readdir: async () => [{ name: 'report.pdf', path: 'PDF Editor/report.pdf', size: 2048, modified: 1700000000 }], read: async () => { await new Promise((r) => setTimeout(r, 400)); return new Blob(['%PDF-1.4'], { type: 'application/pdf' }); }, write: async (path) => { window.writes = (window.writes || 0) + 1; return { path, name: path.split('/').pop() }; } }, ui: { onLaunchedWithItems: () => {}, onItemsOpened: () => {} } };`,
@@ -1591,10 +1591,10 @@ test('closing the Puter sign-in dialog is not reported as an error', async ({ pa
       Promise.reject({ error: 'auth_window_closed', msg: 'Authentication window was closed' });
     window.puter.ui.showOpenFilePicker = async () => null;
   });
-  await page.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.locator('.account-label')).toHaveText('Local workspace');
   await expect(page.locator('#toast')).toBeHidden();
-  await page.getByRole('button', { name: 'Open from Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Open from the workspace', exact: true }).click();
   await expect(page.locator('#toast')).toBeHidden();
   // The editor's Save button asks for the sign-in too; a closed dialog leaves things as they were.
   await sample(page);
@@ -1619,7 +1619,7 @@ test('finishing home sign-in preserves a PDF opened and edited while waiting', a
         window.finishSignIn = resolve;
       });
   });
-  await page.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await sample(page);
   await menu(page, 'Rotate clockwise');
   await expect(page.locator('.save-status')).toHaveText('Unsaved changes');
@@ -1684,7 +1684,7 @@ test('a delayed folder save cannot rename or mark a renamed working copy saved',
         window.finishFolderSave = resolve;
       });
   });
-  await menu(page, 'Save to another Puter folder…');
+  await menu(page, 'Save a copy as…');
   await page.getByRole('button', { name: 'Rename Getting started.pdf', exact: true }).click();
   await page.getByLabel('File name', { exact: true }).fill('New working copy');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -1696,8 +1696,8 @@ test('a delayed folder save cannot rename or mark a renamed working copy saved',
     page.getByRole('button', { name: 'Rename New working copy.pdf', exact: true }),
   ).toBeVisible();
   await expect(page.locator('.save-status')).toHaveText('Unsaved changes');
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.lastSave)).toMatchObject({
     path: 'PDF Editor/New working copy.pdf',
     options: { overwrite: false, dedupeName: true },
@@ -1714,12 +1714,12 @@ test('a delayed folder save cannot replace a newer cloud save destination', asyn
         window.finishFolderSave = resolve;
       });
   });
-  await menu(page, 'Save to another Puter folder…');
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await menu(page, 'Save a copy as…');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   await page.evaluate(() => window.finishFolderSave({ path: '/older/copy.pdf', name: 'copy.pdf' }));
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.lastSave)).toMatchObject({
     path: 'PDF Editor/Getting started.pdf',
     options: { overwrite: true, dedupeName: false },
@@ -1958,7 +1958,7 @@ test('nested leave confirmations have the correct accessible name', async ({ pag
 });
 
 test('local workspace works without Puter and supports themes', async ({ page }) => {
-  await page.route('https://js.puter.com/**', (r) => r.abort());
+  await page.route('**/puter-sdk.js', (r) => r.abort());
   await page.goto('/#library');
   await expect(page.getByRole('button', { name: 'New blank PDF' })).toBeVisible();
   await expect(page.locator('.account-label')).toHaveText('Local workspace');
@@ -2090,7 +2090,7 @@ test('save errors retain dirty state and Puter app has no logout', async ({ page
   await sample(page);
   await menu(page, 'Rotate clockwise');
   await expect(page.locator('.save-status')).toHaveText('Unsaved changes');
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Storage unavailable');
   await expect(page.locator('.save-status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -2106,8 +2106,8 @@ test('cloud save writes a PDF and search navigates to matching pages', async ({ 
   await mockPuter(page);
   await page.goto('/#library');
   await sample(page);
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.lastSave)).toMatchObject({
     path: 'PDF Editor/Getting started.pdf',
     options: { dedupeName: true, overwrite: false },
@@ -2177,8 +2177,8 @@ test('downloading edited cloud content does not claim the cloud copy is saved', 
   await mockPuter(page);
   await page.goto('/#library');
   await sample(page);
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   await menu(page, 'Rotate clockwise');
   await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
   const pending = page.waitForEvent('download');
@@ -2662,7 +2662,7 @@ test('cloud saves commit inline fields and keep later drafts unsaved while the w
       });
     };
   });
-  await page.getByRole('button', { name: 'Save to Puter', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.save-status')).toHaveText('Saving…');
   await expect.poll(() => page.evaluate(() => !!window.finishFormSave)).toBe(true);
   await field.fill('Later value');
@@ -4434,7 +4434,7 @@ test('opens into a blank PDF without an account and asks for the sign-in only to
   // Saving to the cloud asks for the sign-in first, then writes.
   await menu(page, 'Rotate clockwise');
   await saveButton.click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.lastSave.path)).toBe('PDF Editor/Untitled.pdf');
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();

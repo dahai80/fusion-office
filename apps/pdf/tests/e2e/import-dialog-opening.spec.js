@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
 async function prepare(page) {
-  await page.route('https://js.puter.com/**', (route) => route.fulfill({ body: '' }));
+  await page.route('**/puter-sdk.js', (route) => route.fulfill({ body: '' }));
   await page.goto('/');
   await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
 }

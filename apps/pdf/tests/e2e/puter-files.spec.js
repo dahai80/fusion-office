@@ -9,7 +9,7 @@ async function pdf(pages) {
 /** A Puter desktop with a small drive in memory, launched with `launch` (a path) or nothing. */
 async function desktop(page, { launch = '/test/Documents/report.pdf', token } = {}) {
   const bytes = await pdf(2);
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `
@@ -93,7 +93,7 @@ test('the desktop window is named after the PDF and marked while it has unsaved 
   await rotate(page);
   await expect.poll(() => lastTitle(page)).toBe('● report.pdf');
   await save(page);
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   await expect.poll(() => lastTitle(page)).toBe('report.pdf');
   expect(await writes(page)).toEqual([{ path: '/test/Documents/report.pdf', overwrite: true }]);
 });
@@ -123,12 +123,12 @@ test('a file saved elsewhere since it was opened is not overwritten unasked', as
   expect(await writes(page)).toEqual([]);
   await save(page);
   await dialog.getByRole('button', { name: 'Save as a new file', exact: true }).click();
-  await expect(page.locator('#toast')).toHaveText('Saved to Puter as report.pdf.');
+  await expect(page.locator('#toast')).toHaveText('Saved as report.pdf.');
   expect(await writes(page)).toEqual([{ path: 'PDF Editor/report.pdf', overwrite: false }]);
   // The PDF continues in the new file, which nobody else has changed.
   await rotate(page);
   await save(page);
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect((await writes(page)).at(-1)).toEqual({ path: 'PDF Editor/report.pdf', overwrite: true });
 });
 
@@ -141,7 +141,7 @@ test('replacing a file changed elsewhere overwrites it once asked', async ({ pag
     .getByRole('dialog', { name: 'This PDF changed elsewhere', exact: true })
     .getByRole('button', { name: 'Replace it', exact: true })
     .click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await writes(page)).toEqual([{ path: '/test/Documents/report.pdf', overwrite: true }]);
 });
 
@@ -158,7 +158,7 @@ test('a file moved elsewhere is followed, and a deleted one can be put back', as
     });
   });
   await save(page);
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await writes(page)).toEqual([{ path: '/test/Archive/final.pdf', overwrite: true }]);
   await expect.poll(() => lastTitle(page)).toBe('final.pdf');
   await rotate(page);
@@ -168,7 +168,7 @@ test('a file moved elsewhere is followed, and a deleted one can be put back', as
     .getByRole('dialog', { name: 'This PDF was moved or deleted', exact: true })
     .getByRole('button', { name: 'Put it back', exact: true })
     .click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect((await writes(page)).at(-1)).toEqual({ path: '/test/Archive/final.pdf', overwrite: true });
 });
 
@@ -180,7 +180,7 @@ test('a file that cannot be written keeps the changes as a new file', async ({ p
   const dialog = page.getByRole('dialog', { name: 'This PDF could not be saved', exact: true });
   await expect(dialog).toContainText('Permission denied');
   await dialog.getByRole('button', { name: 'Save as a new file', exact: true }).click();
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await writes(page)).toEqual([{ path: 'PDF Editor/report.pdf', overwrite: false }]);
 });
 
@@ -196,7 +196,7 @@ test('renaming a saved PDF renames its file instead of leaving a second copy', a
   ]);
   await expect.poll(() => lastTitle(page)).toBe('● summary.pdf');
   await save(page);
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await writes(page)).toEqual([{ path: '/test/Documents/summary.pdf', overwrite: true }]);
 });
 
@@ -232,7 +232,7 @@ test('renaming while the account is being checked still renames the file in plac
   ]);
   await rotate(page);
   await save(page);
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await writes(page)).toEqual([{ path: '/test/Documents/summary.pdf', overwrite: true }]);
 });
 

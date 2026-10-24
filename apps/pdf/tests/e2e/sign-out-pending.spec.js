@@ -5,7 +5,7 @@ for (const outcome of ['success', 'failure'])
     test(`repeated sign-out shares one pending ${outcome}${reopened ? ' across reopened Settings' : ''} and permits a later attempt`, async ({
       page,
     }) => {
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.account={username:'Alice'};window.signOutCalls=0;
@@ -43,7 +43,7 @@ for (const outcome of ['success', 'failure'])
           await expect(settings).toHaveCount(0);
           await page.getByRole('button', { name: 'Settings', exact: true }).click();
         }
-        await settings.getByRole('button', { name: 'Sign in with Puter', exact: true }).click();
+        await settings.getByRole('button', { name: 'Continue', exact: true }).click();
         await expect(page.locator('.account-label')).toHaveText('Bob');
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
       }

@@ -8,7 +8,7 @@ for (const action of ['keyboard', 'download', 'save', 'tool'])
       test(`text ${action} ${fails ? 'failure' : 'commit'} ${moved ? 'preserves newer focus' : 'restores expected focus'}`, async ({
         page,
       }) => {
-        await page.route('https://js.puter.com/**', (route) =>
+        await page.route('**/puter-sdk.js', (route) =>
           route.fulfill({
             body: `window.puter = {
             env:'web', auth:{isSignedIn:()=>true,getUser:async()=>({username:'test-user'})},
@@ -70,7 +70,7 @@ for (const action of ['keyboard', 'download', 'save', 'tool'])
         let bytes;
         if (pending) bytes = await readFile(await (await pending).path());
         if (action === 'save' && !fails) {
-          await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+          await expect(page.locator('.save-status')).toHaveText('Saved');
           bytes = new Uint8Array(await page.evaluate(() => window.savedTextPdf));
         }
         await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');

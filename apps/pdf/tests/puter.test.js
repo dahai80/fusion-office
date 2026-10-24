@@ -83,16 +83,16 @@ describe('local file storage', () => {
 describe('local session', () => {
     it('is always signed in and has a local user', async () => {
         expect(await P.isSignedIn()).toBe(true);
-        expect((await P.currentUser()).username).toBe('local');
+        expect((await P.currentUser()).username).toBe('Local workspace');
         expect(P.sessionToken()).toBeNull();
-        await expect(P.signIn()).resolves.toMatchObject({ username: 'local' });
+        await expect(P.signIn()).resolves.toMatchObject({ username: 'Local workspace' });
         await expect(P.signOut()).resolves.toBeUndefined();
     });
 
     it('hands the local user to the auth handler', () => {
         const handler = vi.fn();
         P.onAuth(handler);
-        expect(handler).toHaveBeenCalledWith(expect.objectContaining({ username: 'local' }));
+        expect(handler).toHaveBeenCalledWith(expect.objectContaining({ username: 'Local workspace' }));
     });
 });
 
@@ -185,12 +185,12 @@ describe('local files', () => {
         expect(P.inTrash('/u/Documents/Trash notes.pdf')).toBe(false);
     });
 
-    it('names the document title, and never takes over a window it could not close', () => {
-        vi.stubGlobal('document', { title: '' });
+    it('leaves the page title alone and never takes over a window it could not close', () => {
+        vi.stubGlobal('document', { title: 'PDF Editor' });
         expect(P.onWindowClose(() => {})).toBe(false);
         P.setWindowTitle('a.pdf');
-        expect(globalThis.document.title).toBe('a.pdf');
+        expect(globalThis.document.title).toBe('PDF Editor');
         P.setWindowTitle('a.pdf');
-        expect(globalThis.document.title).toBe('a.pdf');
+        expect(globalThis.document.title).toBe('PDF Editor');
     });
 });

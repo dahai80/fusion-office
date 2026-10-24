@@ -5,7 +5,7 @@ for (const action of ['Rename', 'Delete', 'Duplicate'])
     test(`${action}'s library dialog ${signedOut ? 'retires when its account ends' : 'still works within its account'}`, async ({
       page,
     }) => {
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.account={username:'Alice'};window.actions=[];
@@ -76,7 +76,7 @@ for (const action of ['Rename', 'Delete', 'Duplicate'])
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         await page
           .getByRole('dialog', { name: 'Settings', exact: true })
-          .getByRole('button', { name: 'Sign in with Puter', exact: true })
+          .getByRole('button', { name: 'Continue', exact: true })
           .click();
         await expect(page.locator('.account-label')).toHaveText('Bob');
         await expect(

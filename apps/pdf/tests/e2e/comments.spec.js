@@ -5,7 +5,7 @@ import { addHighlight, rectQuad } from '../../src/core/highlight.js';
 
 const PUTER_MOCK = `window.puter = { env: 'web', auth: { isSignedIn: () => true, getUser: async () => ({username:'test-user'}), signIn: async () => {}, signOut: async () => {} }, fs: { readdir: async () => [], write: async () => ({}) }, ui: { onLaunchedWithItems: () => {}, onItemsOpened: () => {} } };`;
 async function mockPuter(page) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: PUTER_MOCK }),
   );
 }
@@ -147,9 +147,15 @@ test('a PDF without comments says so, and the tabs cycle with the arrow keys', a
     'true',
   );
   await expect(page.getByText('No comments yet.')).toBeVisible();
-  // Attachments follows Comments in the rail; the next step wraps around to Pages.
+  // Attachments and Ask AI follow Comments in the rail; the next step wraps
+  // around to Pages.
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Attachments' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Ask AI' })).toHaveAttribute(
     'aria-selected',
     'true',
   );

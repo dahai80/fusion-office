@@ -61,7 +61,7 @@ for (const dirty of [false, true])
     }) => {
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      await page.route('https://js.puter.com/**', (route) =>
+      await page.route('**/puter-sdk.js', (route) =>
         route.fulfill({
           contentType: 'application/javascript',
           body: `window.puter={
@@ -72,7 +72,7 @@ for (const dirty of [false, true])
         }),
       );
       await page.goto('/');
-      await expect(page.getByRole('button', { name: 'Save to Puter', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
       await expect(page.locator('.editor')).toHaveAttribute('aria-busy', 'false');
       if (dirty) await rotate(page);
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -116,9 +116,11 @@ for (const dirty of [false, true])
         ).toBeVisible();
         if (newer === 'pending document') {
           await page.evaluate(() => window.releaseLatestRead());
+          // The sign-out has already finished, so the leave question now offers the
+          // workspace-free wording ("Save before leaving?") for the same discard choice.
           if (dirty)
             await page
-              .getByRole('dialog', { name: 'Save before leaving?', exact: true })
+              .getByRole('dialog', { name: /^(?:Leave this PDF|Save before leaving)\?$/ })
               .getByRole('button', { name: 'Leave without saving', exact: true })
               .click();
         }
@@ -141,10 +143,10 @@ for (const dirty of [false, true])
         }
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toContainText(
-          'Work locally',
+          'Your PDFs are saved in the local workspace.',
         );
         await expect(
-          page.getByRole('button', { name: 'Sign in with Puter', exact: true }),
+          page.getByRole('button', { name: 'Continue', exact: true }),
         ).toBeVisible();
       }
       expect(errors).toEqual([]);

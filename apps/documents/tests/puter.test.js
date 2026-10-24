@@ -129,11 +129,11 @@ describe('files', () => {
     expect(P.canSaveFiles()).toBe(false);
   });
 
-  it('defaults to the web environment without an SDK', () => {
+  it('stays in the local app environment without an SDK', () => {
     delete globalThis.puter;
     expect(P.hasSDK()).toBe(false);
-    expect(P.env()).toBe('web');
-    expect(P.isApp()).toBe(false);
+    expect(P.env()).toBe('app');
+    expect(P.isApp()).toBe(true);
   });
 });
 

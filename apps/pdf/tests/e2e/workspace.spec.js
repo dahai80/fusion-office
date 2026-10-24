@@ -7,7 +7,7 @@ import { inspectPaths, pathColorHex } from '../../src/core/path-edit.js';
 
 const PUTER_MOCK = `window.puter = { env: 'web', auth: { isSignedIn: () => true, getUser: async () => ({username:'test-user'}), signIn: async () => {}, signOut: async () => {} }, fs: { readdir: async () => [], write: async (path, blob, options) => { window.lastSave = {path, size:blob.size, options}; return {path, name:path.split('/').pop()}; } }, ui: { onLaunchedWithItems: () => {}, onItemsOpened: () => {} } };`;
 async function mockPuter(page) {
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: PUTER_MOCK }),
   );
 }
@@ -485,7 +485,7 @@ test('the editor exposes landmark roles and a focusable skip target', async ({ p
 test('the home screen renders before the Puter SDK has loaded', async ({ page }) => {
   let release;
   const held = new Promise((resolve) => (release = resolve));
-  await page.route('https://js.puter.com/**', async (route) => {
+  await page.route('**/puter-sdk.js', async (route) => {
     await held;
     await route.fulfill({ contentType: 'application/javascript', body: PUTER_MOCK });
   });
@@ -806,7 +806,7 @@ test('the library sorts file names naturally', async ({ page }) => {
     size: 1000 * (i + 1),
     modified: 1700000000 + i,
   }));
-  await page.route('https://js.puter.com/**', (route) =>
+  await page.route('**/puter-sdk.js', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: PUTER_MOCK.replace(
@@ -2082,9 +2082,9 @@ test('a second press while a save or a download is under way does not repeat it'
       button.click();
       button.click();
     }, label);
-  await press('Save to Puter');
-  await expect(page.locator('#toast')).toHaveText('Saved to Puter as test.pdf.');
-  await expect(page.locator('.save-status')).toHaveText('Saved to Puter');
+  await press('Save');
+  await expect(page.locator('#toast')).toHaveText('Saved as test.pdf.');
+  await expect(page.locator('.save-status')).toHaveText('Saved');
   expect(await page.evaluate(() => window.writes)).toEqual(['PDF Editor/test.pdf']);
   // The same for the download: one press, one file.
   const downloads = [];
