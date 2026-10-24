@@ -1,7 +1,11 @@
 {
   "id": "fusion-office-presentation",
-  "title": "Fusion Office Presentation",
-  "title_en": "Fusion Office Presentation",
+  "title": "Presentation",
+  "title_en": "Presentation",
+  "group": "fusion-office",
+  "group_title": "Fusion Office",
+  "group_title_en": "Fusion Office",
+  "sort": 3,
   "version": "1.0.0",
   "path": "/office/presentation",
   "icon": "Presentation",

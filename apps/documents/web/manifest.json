@@ -1,7 +1,11 @@
 {
   "id": "fusion-office-documents",
-  "title": "Fusion Office Documents",
-  "title_en": "Fusion Office Documents",
+  "title": "Documents",
+  "title_en": "Documents",
+  "group": "fusion-office",
+  "group_title": "Fusion Office",
+  "group_title_en": "Fusion Office",
+  "sort": 1,
   "version": "1.0.0",
   "path": "/office/documents",
   "icon": "FileText",

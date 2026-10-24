@@ -7,7 +7,7 @@ import { closeMenu } from './ui/menu.js';
 import { session } from './lib/session.js';
 import * as P from './lib/puter.js';
 import { Doc, needsUnloadWarning } from './lib/doc.js';
-import { errorView, signInView } from './views/gate.js';
+import { signInView } from './views/gate.js';
 import { homeView } from './views/home.js';
 import { editorView } from './views/editor.js';
 import { loadEngine } from './lib/engine.js';
@@ -349,10 +349,9 @@ async function openInvitation(link, requestedHash) {
  * Puter is asked for a sign-in at the first action that needs the cloud.
  */
 async function start() {
-  if (!P.hasSDK()) {
-    appRoot.replaceChildren(errorView('Could not start the workspace', 'The storage backend failed to load. Reload the page to try again.', () => location.reload()));
-    return;
-  }
+  // Tests import this module for parseHash with no page SDK; booting there would reach
+  // browser APIs jsdom does not implement. The local edition boots without one.
+  if (import.meta.env?.MODE === 'test' && !P.hasSDK()) return;
   P.onLaunchedWithItems((items) => {
     const first = items.find((it) => it?.path);
     if (!first) return;

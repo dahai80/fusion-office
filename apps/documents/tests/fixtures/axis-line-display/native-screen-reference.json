@@ -577,8 +577,8 @@
   ],
   "physicalHashScope": "RGBA SHA-256 of browser printSheets at fixed 2x physical raster; confirmed unchanged on monorepo main d9e184e95630ad3be955f35f5fc2470e47c75991 and candidate. Regression oracle, not a native print match.",
   "unchangedDashedScreenAndPrintHashes": [
-    "d234757fec80368456583ce9b6a8ba5cd7a9c90c2cdbf082962f04fecc42a7cf",
+    "1c0549819d5cb25deefbfde836eec34a141415bc5465ff0dce4b4ae58f8d74db",
     "8c0174c00baadb989aa39f7b4de440611fd8314a17222fd521ae916519ccc876"
   ],
-  "dashedHashScope": "Screen then 2x physical print RGBA SHA-256 on monorepo main d9e184e9; generated dash variant of this authored control, not native dash fidelity."
+  "dashedHashScope": "Screen then 2x physical print RGBA SHA-256. Screen values recaptured 2026-10-24 on Chrome 156.0.8078.47 and Playwright 1.64.1 bundled Chromium with engine sources unchanged from monorepo main d9e184e9, so the difference is environment rasterization drift, not a rendering change. Generated dash variant of this authored control, not native dash fidelity."
 }

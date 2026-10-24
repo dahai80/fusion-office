@@ -63,8 +63,10 @@ async function root() {
     try {
         return await fsaRoot()
     } catch (err) {
-        if (err && err.name === 'AbortError') throw err
-        log('storage', 'FSA unavailable, falling back to OPFS', String(err))
+        // A dismissed picker, or automation without a user gesture, must leave the app
+        // working: the local files it writes go to OPFS instead of a chosen directory.
+        if (err && err.name === 'AbortError') log('storage', 'FSA picker dismissed, falling back to OPFS')
+        else log('storage', 'FSA unavailable, falling back to OPFS', String(err))
         return await opfsRoot()
     }
 }

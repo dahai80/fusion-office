@@ -1,7 +1,11 @@
 {
   "id": "fusion-office-spreadsheet",
-  "title": "Fusion Office Spreadsheet",
-  "title_en": "Fusion Office Spreadsheet",
+  "title": "Spreadsheet",
+  "title_en": "Spreadsheet",
+  "group": "fusion-office",
+  "group_title": "Fusion Office",
+  "group_title_en": "Fusion Office",
+  "sort": 2,
   "version": "1.0.0",
   "path": "/office/spreadsheet",
   "icon": "Table2",

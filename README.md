@@ -39,8 +39,9 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
 - Each app is an independent Vite entry point. Vite uses a relative `base`, so the same
   build works standalone and behind the gateway's `/shell/<id>/` prefix.
 - `packages/storage` resolves a writable root once per session: the File System Access
-  API directory picker when available, otherwise OPFS. A best-effort IndexedDB index
-  tracks path, size, and modification time for listings.
+  API directory picker when available, otherwise OPFS. A dismissed picker, or a browser
+  that aborts it without a user gesture, falls back to OPFS so the app keeps working. A
+  best-effort IndexedDB index tracks path, size, and modification time for listings.
 - `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
   embeds model logic.
@@ -85,6 +86,12 @@ Copy `.env.example` to `.env.local` in the app directory (or export the variable
 shell) and put a gateway API key in `VITE_FUSION_GATEWAY_KEY`. Keys are compiled into the
 browser bundle, so use a scoped key, never the master key, and never commit `.env.local`.
 
+During `npm run dev`, `@fusion-office/ai-client` talks to `/__fusion_gateway` on the app's
+own origin, and each Vite config proxies that prefix to the gateway
+(`dev/gateway-proxy.mjs`). The gateway's CORS allowlist does not include arbitrary dev
+ports, so a direct cross-origin call would fail the preflight and surface as
+`Failed to fetch`. Production builds still call `VITE_FUSION_GATEWAY_URL` directly.
+
 AI surfaces by app:
 
 - Documents: assistant pane, grammar checks, translation, smart lookup, and image prompts.
@@ -111,6 +118,12 @@ browser modules and exits non-zero if any step fails.
 Each app ships `web/manifest.json` and registers with `fusion-gateway` at
 `POST /api/v1/shell/manifests`. The gateway proxies `/shell/<id>/` to the app's upstream
 static server and requires a shell session token, not an API key.
+
+The five manifests share `"group": "fusion-office"` with `group_title` `Fusion Office`,
+so the union shell renders one top-level menu with Documents, Spreadsheet, Presentation,
+PDF, and Projects beneath it in `sort` order 1 to 5. Module ids, paths, and entries stay
+unchanged wire contracts. The grouped menu appears in shells that support manifest schema
+v2 (`group`); older shells still list the modules flat.
 
 `scripts/shell-serve.mjs` starts a static server per built app, registers all five
 manifests, heartbeats them, and unregisters on exit:
@@ -144,15 +157,21 @@ npm test -w apps/pdf -- tests/ai-panel.test.js
 ```
 
 `npm install` runs `patch-package` for the presentation app and links shared test
-dependencies. Browser end-to-end suites exist in documents, presentation, and pdf and
-require Playwright browsers:
+dependencies. Browser end-to-end suites exist in all five apps and require Playwright
+browsers:
 
 ```bash
 npx playwright install
 npm run test:browser -w apps/documents
+npm run test:browser -w apps/spreadsheet
 npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
+npm run test:browser -w apps/pm
 ```
+
+Documents, spreadsheet, and pm use `PLAYWRIGHT_PORT` (defaults 5189, 5190, 5191) and
+launch the installed Chrome unless `PLAYWRIGHT_CHANNEL=chromium` selects Playwright's
+bundled build.
 
 The document-capability service has its own Python suite:
 
@@ -208,8 +227,8 @@ at build time and from the browser environment at runtime.
 
 - The first write prompts for a workspace directory through the File System Access API.
   The handle is remembered for the session.
-- When the directory picker is unavailable or declined for reasons other than cancellation,
-  storage falls back to OPFS under the page origin.
+- When the directory picker is unavailable, dismissed by the user, or aborted by the
+  browser without a user gesture, storage falls back to OPFS under the page origin.
 - File contents are real `.docx`, `.xlsx`, `.pptx`, `.pdf`, JSON, and image files. Nothing
   is stored in a proprietary database.
 - An IndexedDB store keeps a best-effort path/size/time index for listings. Loss of the

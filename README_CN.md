@@ -39,8 +39,9 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
 - 每个应用是独立的 Vite 入口。Vite 使用相对 `base`，因此同一份构建既能独立运行，
   也能挂在网关的 `/shell/<id>/` 前缀下。
 - `packages/storage` 每个会话只解析一次可写根目录：浏览器支持时使用 File System
-  Access API 目录选择器，否则使用 OPFS。IndexedDB 中维护尽力而为的路径、大小、
-  修改时间索引，用于列表展示。
+  Access API 目录选择器，否则使用 OPFS。用户关闭选择器，或浏览器在没有用户手势时
+  直接中止选择器，同样回退到 OPFS，应用不会因此不可用。IndexedDB 中维护尽力而为的
+  路径、大小、修改时间索引，用于列表展示。
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
 - AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`。
@@ -80,6 +81,11 @@ AI 调用统一走 `@fusion-office/ai-client`。启动开发服务器或构建�
 API Key 填入 `VITE_FUSION_GATEWAY_KEY`。Key 会被编译进浏览器产物，因此必须使用受限
 Key，禁止使用 master key，禁止提交 `.env.local`。
 
+`npm run dev` 期间，`@fusion-office/ai-client` 请求同源的 `/__fusion_gateway`，由各
+Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS 白名单不包含任意本地
+开发端口，直连会因预检被拒而表现为 `Failed to fetch`。生产构建仍直接访问
+`VITE_FUSION_GATEWAY_URL`。
+
 各应用的 AI 入口：
 
 - 文档：助手面板、语法检查、翻译、智能查找、图片提示。
@@ -103,6 +109,11 @@ FUSION_GATEWAY_KEY=<受限-key> node scripts/verify-ai.mjs
 每个应用自带 `web/manifest.json`，通过 `POST /api/v1/shell/manifests` 注册到
 `fusion-gateway`。网关把 `/shell/<id>/` 反向代理到应用的上游静态服务器，并要求
 Shell 会话令牌，而不是 API Key。
+
+五个清单共用 `"group": "fusion-office"`，组标题为 `Fusion Office`，联合 Shell 因此
+显示一个一级菜单，二级按 `sort` 1 到 5 排列：文档、表格、演示、PDF、项目。模块
+`id`、`path`、`entry` 保持不变，仍是稳定的接口契约。分组菜单需要支持清单 schema v2
+（`group`）的 Shell；旧版 Shell 仍按扁平列表展示。
 
 `scripts/shell-serve.mjs` 会为五个已构建应用各启动一个静态服务器、注册清单、定时
 心跳，并在退出时注销：
@@ -133,14 +144,16 @@ npm test -w apps/pdf
 npm test -w apps/pdf -- tests/ai-panel.test.js
 ```
 
-`npm install` 会为演示应用执行 `patch-package`，并链接共享测试依赖。文档、演示、
-PDF 另有浏览器端到端套件，需要安装 Playwright 浏览器：
+`npm install` 会为演示应用执行 `patch-package`，并链接共享测试依赖。五个应用都有
+浏览器端到端套件，需要安装 Playwright 浏览器：
 
 ```bash
 npx playwright install
 npm run test:browser -w apps/documents
+npm run test:browser -w apps/spreadsheet
 npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
+npm run test:browser -w apps/pm
 ```
 
 文档能力服务有独立的 Python 测试套件：
@@ -195,7 +208,8 @@ dev/                  本地开发辅助和验证日志
 ## 存储模型
 
 - 首次写入时通过 File System Access API 请求工作区目录，句柄在当前会话内复用。
-- 目录选择器不可用，或用户以非取消方式拒绝时，回退到页面源下的 OPFS。
+- 目录选择器不可用、用户关闭选择器，或浏览器在无用户手势时中止选择器，都会回退到
+  页面源下的 OPFS。
 - 文件内容是真实的 `.docx`、`.xlsx`、`.pptx`、`.pdf`、JSON 和图片文件，不写入专有数据库。
 - IndexedDB 只保存尽力而为的路径、大小、时间索引。索引丢失不会丢文件。
 - 测试只在 `import.meta.env.MODE === 'test'` 时使用桩对象 `globalThis.puter`。

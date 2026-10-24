@@ -2,8 +2,12 @@ import { log, error as logError } from './log.js'
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
 
+// Dev servers proxy the gateway under the app origin; the gateway's CORS
+// allowlist does not cover arbitrary localhost ports.
+const DEV_PROXY = env.DEV ? '/__fusion_gateway' : null
+
 const DEFAULTS = {
-    baseUrl: env.VITE_FUSION_GATEWAY_URL || 'http://127.0.0.1:11432',
+    baseUrl: env.VITE_FUSION_GATEWAY_URL || DEV_PROXY || 'http://127.0.0.1:11432',
     apiKey: env.VITE_FUSION_GATEWAY_KEY || '',
     defaultModel: env.VITE_FUSION_MODEL || 'mlx-community/Qwen3.5-9B-4bit',
     timeoutMs: 300000,

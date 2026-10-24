@@ -3,6 +3,7 @@ import { cpSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puterLocalhost from '../../dev/puter-localhost.mjs';
+import gatewayProxy from '../../dev/gateway-proxy.mjs';
 let workerDevelopmentUrl;
 
 const appRoot = resolve(fileURLToPath(new URL('.', import.meta.url)));
@@ -37,6 +38,7 @@ export default defineConfig({
   base: './',
   plugins: [
     puterLocalhost('pdf'),
+    gatewayProxy(),
     {
       // Keep the worker's module export: PDF.js imports WorkerMessageHandler on the main
       // thread when native workers are unavailable. Vite's ?worker bundles drop exports.

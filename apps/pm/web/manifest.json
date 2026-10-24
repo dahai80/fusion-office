@@ -1,7 +1,11 @@
 {
   "id": "fusion-office-pm",
-  "title": "Fusion Office Projects",
-  "title_en": "Fusion Office Projects",
+  "title": "Projects",
+  "title_en": "Projects",
+  "group": "fusion-office",
+  "group_title": "Fusion Office",
+  "group_title_en": "Fusion Office",
+  "sort": 5,
   "version": "1.0.0",
   "path": "/office/pm",
   "icon": "SquareKanban",

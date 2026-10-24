@@ -59,26 +59,33 @@ python -m pytest tests -q         # Python capability-service suite
 `FUSION_GATEWAY_MASTER_KEY`, which is used only to derive a short-lived shell session
 secret. Never hardcode or commit these values.
 
-Browser suites exist in documents, presentation, and pdf:
+Browser suites exist in all five apps:
 
 ```bash
 npx playwright install
 npm run test:browser -w apps/documents
+npm run test:browser -w apps/spreadsheet
 npm run test:e2e -w apps/presentation
 npm run test:e2e -w apps/pdf
+npm run test:browser -w apps/pm
 ```
+
+Documents, spreadsheet, and pm default to ports 5189, 5190, and 5191 (`PLAYWRIGHT_PORT`)
+and launch installed Chrome unless `PLAYWRIGHT_CHANNEL=chromium` is set.
 
 ## Architecture
 
 npm workspaces: `apps/*` and `packages/*`.
 
 - `packages/storage` owns local files. It resolves a writable root once per session:
-  File System Access API directory picker first, OPFS fallback, IndexedDB as a
-  best-effort listing index. Exports include `readFile`, `writeFile`, `readdir`,
+  File System Access API directory picker first, OPFS fallback (including a dismissed or
+  gesture-less aborted picker), IndexedDB as a best-effort listing index. Exports include `readFile`, `writeFile`, `readdir`,
   `deleteFile`, and KV helpers (`get`, `set`, `del`). Files remain real documents, not
   rows in a database.
 - `packages/ai-client` owns model access. It defaults to
-  `http://127.0.0.1:11432`, reads `VITE_FUSION_GATEWAY_URL`,
+  `http://127.0.0.1:11432` (in dev, the same-origin `/__fusion_gateway` proxy from
+  `dev/gateway-proxy.mjs`, because the gateway's CORS allowlist excludes dev ports),
+  reads `VITE_FUSION_GATEWAY_URL`,
   `VITE_FUSION_GATEWAY_KEY`, and `VITE_FUSION_MODEL` at build time, and exposes
   `chat`, `chatStream`, `chatStreamEvents`, `jsonChat`, `listModels`, and
   `ensureModelLoaded`. `isConfigured()` reports whether a key is present.
@@ -108,7 +115,9 @@ When changing a prompt or its parsing, update the matching unit test. Tests mock
 ### Union shell
 
 Each app has `web/manifest.json` with id `fusion-office-<app>`, path `/office/<app>`,
-and entry `/shell/fusion-office-<app>/`. `scripts/shell-serve.mjs` serves each `dist`
+and entry `/shell/fusion-office-<app>/`. All five carry `group` `fusion-office` with
+`group_title` `Fusion Office` and `sort` 1 to 5, so schema-v2 shells show one grouped
+menu; ids, paths, and entries stay unchanged. `scripts/shell-serve.mjs` serves each `dist`
 on an ephemeral port, registers manifests through the gateway admin API, heartbeats,
 and unregisters on exit. The gateway proxies `/shell/<id>/` and requires a signed shell
 session, not an API key.

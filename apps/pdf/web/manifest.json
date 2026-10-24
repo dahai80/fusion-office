@@ -1,7 +1,11 @@
 {
   "id": "fusion-office-pdf",
-  "title": "Fusion Office PDF",
-  "title_en": "Fusion Office PDF",
+  "title": "PDF",
+  "title_en": "PDF",
+  "group": "fusion-office",
+  "group_title": "Fusion Office",
+  "group_title_en": "Fusion Office",
+  "sort": 4,
   "version": "1.0.0",
   "path": "/office/pdf",
   "icon": "FileSearch",
