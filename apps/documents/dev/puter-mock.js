@@ -123,6 +123,10 @@
         // The Assistant pane: a draft or rewrite comes back as TEXT, anything else as an ANSWER.
         if (/writing assistant inside a word processor\. Below/.test(prompt)) {
           const request = /The person asks: (.*)/.exec(String(prompt))?.[1] || '';
+          if (/table|表格/i.test(request)) {
+            const reply = 'TABLE:\n| Word | Meaning |\n| apple | 苹果 |\n| bridge | 桥 |\n| cloud | 云 |';
+            return { message: { role: 'assistant', content: reply }, toString: () => reply };
+          }
           const reply = /draft|write|rewrite|shorten|translate/i.test(request)
             ? `TEXT:\nThis draft was written by the offline assistant for: ${request.replace(/[.?!]+$/, '')}.`
             : `ANSWER:\nThe offline assistant read ${String(prompt).length} characters and answers: ${request}`;

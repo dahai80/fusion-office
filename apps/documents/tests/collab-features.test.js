@@ -22,6 +22,20 @@ describe('assistant prompts and replies', () => {
     expect(readReply('No marker at all.').kind).toBe('answer');
     expect(() => readReply('TEXT:')).toThrow(/nothing/);
   });
+  it('asks for a table and reads one back as rows', () => {
+    expect(assistantPrompt({ request: 'Table of words', text: '', scope: 'document' })).toContain('reply with the line "TABLE:"');
+    const reply = readReply('TABLE:\n| Word | Meaning |\n| --- | --- |\n| apple | 苹果 |\n| bridge | 桥 |');
+    expect(reply.kind).toBe('table');
+    expect(reply.rows).toEqual([['Word', 'Meaning'], ['apple', '苹果'], ['bridge', '桥']]);
+    // A model that keeps the TEXT marker but writes a Markdown table still yields a table.
+    expect(readReply('TEXT:\nWord | Meaning\napple | 苹果').rows).toEqual([['Word', 'Meaning'], ['apple', '苹果']]);
+    // Tab-separated cells, full-width pipes, padding and emphasis are read too.
+    expect(readReply('TABLE:\n**Word**\tMeaning\napple\t苹果\nbridge').rows).toEqual([['Word', 'Meaning'], ['apple', '苹果'], ['bridge', '']]);
+    expect(readReply('TABLE:\n｜Word｜Meaning｜\n｜apple｜苹果｜').rows).toEqual([['Word', 'Meaning'], ['apple', '苹果']]);
+    expect(readReply('TABLE:\n| Word | Meaning |\n| apple | 苹果 |\n\nCheck these before use.').rows).toEqual([['Word', 'Meaning'], ['apple', '苹果']]);
+    expect(readReply('TABLE:\nOnly one column\napple').kind).toBe('text');
+    expect(() => readReply('TABLE:\n| a | b |\n| - | - |')).toThrow(/could not be read/);
+  });
   it('explains failures in plain words', () => {
     expect(assistantError(new Error('insufficient funds'))).toMatch(/unavailable/);
     expect(assistantError(new Error('Failed to fetch'))).toMatch(/connection/);

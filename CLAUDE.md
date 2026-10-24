@@ -100,7 +100,10 @@ npm workspaces: `apps/*` and `packages/*`.
 ### AI integration points
 
 - Documents: `src/lib/puter.js` `aiChat` wraps `AI.chat`; used by the assistant pane,
-  language tools, grammar checks, smart lookup, and drawing.
+  language tools, grammar checks, smart lookup, and drawing. The pane's replies are
+  typed by the `TEXT:` / `ANSWER:` / `TABLE:` marker; a table reply (`|` or tab
+  separated rows, read by `tableRows` in `src/lib/assistant.js`) inserts through
+  `engine.model.insertTable` as one undoable change.
 - Spreadsheet: `src/lib/puter.js` `aiChat` / `aiChatStream`; used by the AI dialog,
   AI panel, translation, thesaurus, and `AI`/`TRANSLATE`/`DETECTLANGUAGE` sheet functions.
 - Presentation: `src/cloud.js` `aiChat` and `aiChatStream` (tool-event stream); used by

@@ -16,6 +16,7 @@ import { aiActionById, askAi, answerParagraphs } from '../lib/ai.js';
 import { assistantPrompt, readReply, assistantError, SUGGESTIONS, MAX_ASSISTANT_CHARS } from '../lib/assistant.js';
 import { sidePane, hint } from './review-ui.js';
 import { commandIconEl } from '../ui/ribbon.js';
+import { tableCells } from '../engine/tables.js';
 
 const words = text => (String(text).trim().match(/\S+/gu) || []).length;
 const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -128,6 +129,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
   }
 
   function answerView(answer, p) {
+    if (answer.kind === 'table') return [tablePreview(answer.rows), actions(answer, p, false)];
     const body = el('div.as-answer', {}, ...answer.paragraphs.map(t => el('p', {}, t)));
     if (answer.kind !== 'text') return [body, actions(answer, p, false)];
     const replacing = p.scope === 'selection' && answer.mode !== 'append';
@@ -140,6 +142,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     const copy = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => navigator.clipboard?.writeText(answer.text).then(() => toast('Copied')).catch(() => error(new Error('The clipboard is not available.'))) }, 'Copy');
     const canEdit = () => { const engine = editor(); return !!engine && !pkg()?.readOnly && !engine.viewOnly; };
     const apply = (label, how) => el(`button.btn.btn-sm${how === 'replace' ? '.btn-primary' : '.btn-outline'}`, { type: 'button', disabled: !canEdit(), onclick: e => insert(answer, p, how, row, e.currentTarget) }, label);
+    if (answer.kind === 'table') { row.append(apply('Insert Table at Cursor', 'cursor'), copy); return row; }
     if (insertable) {
       if (p.scope === 'selection' && p.start !== undefined && answer.mode !== 'append') row.append(apply('Replace Selection', 'replace'), apply('Insert Below', 'below'));
       else if (p.scope === 'selection' && p.start !== undefined) row.append(apply('Insert After Selection', 'after'));
@@ -151,6 +154,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
 
   /** Apply a reply as one undoable change, where the person said. */
   function insert(answer, p, how, row, button) {
+    if (answer.kind === 'table') { insertTable(answer.rows, row, button); return; }
     const engine = editor(); if (!engine) return;
     engine.finishComposition();
     if (engine.session.path !== null) engine.editStory(null);
@@ -172,10 +176,52 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     });
     if (!ok) return;
     engine.focus();
+    done(row, button, how === 'replace' ? 'Replaced' : 'Inserted');
+  }
+
+  /** Insert a reply's rows as a real table at the caret, one undoable change. */
+  function insertTable(rows, row, button) {
+    const engine = editor(); if (!engine) return;
+    engine.finishComposition();
+    if (engine.session.path !== null) engine.editStory(null);
+    const columns = rows[0].length;
+    const ok = engine.execute(() => {
+      const m = engine.model;
+      const [start, end] = m.range;
+      if (start !== end) m.select(end);
+      if (!m.insertTable(rows.length, columns)) return false;
+      const cells = tableCells(m.tableContext.table);
+      rows.forEach((values, r) => values.forEach((text, c) => {
+        const cell = cells[r * columns + c];
+        if (!cell || !text) return;
+        m.selectCell(cell.id);
+        m.replace(text, { checkpoint: false });
+      }));
+      m.selectCell(cells[0].id);
+      return true;
+    });
+    if (!ok) return;
+    engine.focus();
+    done(row, button, 'Table inserted');
+  }
+
+  function done(row, button, message) {
     button.disabled = true;
+    const applied = el('span.as-applied', { role: 'status' }, message);
     const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { editor()?.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
-    const applied = el('span.as-applied', { role: 'status' }, how === 'replace' ? 'Replaced' : 'Inserted');
     row.replaceChildren(applied, undo);
+  }
+
+  /** A few rows of the reply's table, enough to recognise it before inserting. */
+  function tablePreview(rows) {
+    const head = el('tr', {}, ...rows[0].map(cell => el('th', {}, cell)));
+    const shown = rows.slice(1, 9);
+    const body = shown.map(values => el('tr', {}, ...values.map(cell => el('td', {}, cell))));
+    const more = rows.length - 1 - shown.length;
+    return el('div.as-table-preview', {},
+      el('p.as-kind', {}, `Table · ${plural(rows.length - 1, 'row')} · ${plural(rows[0].length, 'column')}`),
+      el('div.as-table-scroll', {}, el('table', {}, el('thead', {}, head), el('tbody', {}, ...body))),
+      more > 0 ? hint(`And ${plural(more, 'more row')}, inserted too.`) : null);
   }
 
   function toggle() { if (!available()) return; pane.toggle(); if (pane.isOpen) queueMicrotask(() => input.focus()); }

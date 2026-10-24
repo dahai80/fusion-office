@@ -94,7 +94,8 @@ ports, so a direct cross-origin call would fail the preflight and surface as
 
 AI surfaces by app:
 
-- Documents: assistant pane, grammar checks, translation, smart lookup, and image prompts.
+- Documents: assistant pane (which inserts a table reply as a real, undoable table at the
+  cursor), grammar checks, translation, smart lookup, and image prompts.
 - Spreadsheet: formula generation and explanation, data questions, translation, and
   sheet functions such as `AI` and `TRANSLATE`.
 - Presentation: prompt-to-deck generation, assistant panel, and slide review.
