@@ -7,6 +7,9 @@ import { dirname, extname, join, normalize } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const apps = ['documents', 'spreadsheet', 'presentation', 'pdf', 'pm'];
 const gateway = process.env.FUSION_GATEWAY_URL || 'http://127.0.0.1:11432';
+// Fixed ports so a supervisor can probe the service; registered in
+// architecture/port-registry.yaml as fusion-office(-<app>-shell) 11485-11489.
+const BASE_PORT = Number(process.env.FUSION_OFFICE_SHELL_PORT) || 11485;
 const adminKey = process.env.FUSION_GATEWAY_ADMIN_KEY;
 const masterKey = process.env.FUSION_GATEWAY_MASTER_KEY;
 const smoke = process.argv.includes('--smoke');
@@ -53,8 +56,8 @@ async function fileAt(dist, pathname) {
     }
 }
 
-function serve(dist) {
-    return new Promise((resolve) => {
+function serve(dist, port) {
+    return new Promise((resolve, reject) => {
         const server = createServer(async (req, res) => {
             const pathname = new URL(req.url, 'http://localhost').pathname;
             const found = await fileAt(dist, pathname === '/' ? '/index.html' : pathname);
@@ -76,7 +79,8 @@ function serve(dist) {
                 res.end('read failed');
             }
         });
-        server.listen(0, '127.0.0.1', () => resolve(server));
+        server.once('error', reject);
+        server.listen(port, '127.0.0.1', () => resolve(server));
     });
 }
 
@@ -151,6 +155,23 @@ async function main() {
     const started = [];
     let stopping = false;
 
+    // The smoke run registers and unregisters the SAME module ids a live
+    // instance holds, so it must run alone; a served answer on the documents
+    // port means one is up.
+    if (smoke) {
+        let occupied = false;
+        try {
+            await fetch(`http://127.0.0.1:${BASE_PORT}/`);
+            occupied = true;
+        } catch {
+            occupied = false;
+        }
+        if (occupied) {
+            console.error(`[shell-serve] --smoke needs port ${BASE_PORT} free; stop the running instance first (fusion-sv down fusion-office or ./start.sh stop)`);
+            process.exit(1);
+        }
+    }
+
     async function stop() {
         if (stopping) return;
         stopping = true;
@@ -172,10 +193,12 @@ async function main() {
             await stop();
             return;
         }
-        const server = await serve(dist);
-        const port = server.address().port;
+        // Fixed ports so the supervisor can probe; the one-shot smoke run
+        // must not clash with a live supervised instance, so it stays ephemeral.
+        const port = smoke ? 0 : BASE_PORT + apps.indexOf(app);
+        const server = await serve(dist, port);
         started.push({ app, manifest, server });
-        await register(manifest, `http://127.0.0.1:${port}`);
+        await register(manifest, `http://127.0.0.1:${server.address().port}`);
         log('serving', app, `http://127.0.0.1:${port}`, `via /shell/${manifest.id}/`);
     }
 

@@ -11,3 +11,6 @@ playwright-report/
 .env
 .env.local
 .env.*.local
+
+# runtime pid of the supervised shell host
+dev/*.pid

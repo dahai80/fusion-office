@@ -47,6 +47,7 @@ npm test -w apps/pdf -- tests/ai-panel.test.js
 npm run dev:documents             # also dev:spreadsheet, dev:presentation, dev:pdf, dev:pm
 npm run verify:ai                 # live gateway + loaded model check
 npm run shell:serve               # register built apps with the union shell
+./start.sh start                  # same, on fixed ports 11485-11489; stop|restart|status|log
 npm run shell:smoke               # register, request each module, unregister, exit
 
 cd services/office-api
@@ -135,8 +136,12 @@ Each app has `web/manifest.json` with id `fusion-office-<app>`, path `/office/<a
 and entry `/shell/fusion-office-<app>/`. All five carry `group` `fusion-office` with
 `group_title` `Fusion Office` and `sort` 1 to 5, so schema-v2 shells show one grouped
 menu; ids, paths, and entries stay unchanged. `scripts/shell-serve.mjs` serves each `dist`
-on an ephemeral port, registers manifests through the gateway admin API, heartbeats,
-and unregisters on exit. The gateway proxies `/shell/<id>/` and requires a signed shell
+on fixed ports 11485-11489 (registered in `architecture/port-registry.yaml`; entry
+`fusion-office` is the supervised one, the other four are `supervise: false`), registers
+manifests through the gateway admin API, heartbeats, and unregisters on exit. `start.sh`
+wraps it for fusion-supervisor: `fusion-sv up fusion-office` starts and crash-restarts
+it; the admin key resolves from the environment, `.env.local`, or the gateway config's
+`web_shell.admin_key`. The gateway proxies `/shell/<id>/` and requires a signed shell
 session, not an API key.
 
 ## Verification Expectations

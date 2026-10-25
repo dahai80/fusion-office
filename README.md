@@ -147,12 +147,25 @@ PDF, and Projects beneath it in `sort` order 1 to 5. Module ids, paths, and entr
 unchanged wire contracts. The grouped menu appears in shells that support manifest schema
 v2 (`group`); older shells still list the modules flat.
 
-`scripts/shell-serve.mjs` starts a static server per built app, registers all five
-manifests, heartbeats them, and unregisters on exit:
+`scripts/shell-serve.mjs` starts a static server per built app on fixed ports
+11485-11489 (registered in `architecture/port-registry.yaml`), registers all five
+manifests, heartbeats them, and unregisters on exit. `start.sh` wraps it with the
+fusion-supervisor lifecycle contract and resolves the admin key from the
+environment, `.env.local`, or the gateway config:
+
+```bash
+./start.sh start | stop | restart | status | log
+```
+
+Run directly (same fixed ports):
 
 ```bash
 FUSION_GATEWAY_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
 ```
+
+With fusion-supervisor running, `fusion-sv up fusion-office` starts and supervises
+it: crash auto-restart, health history, and the web console. `fusion-sv down
+fusion-office` stops it.
 
 For a one-shot route check, add `--smoke` and provide the master key used to derive the
 shell session secret:

@@ -131,12 +131,23 @@ Shell 会话令牌，而不是 API Key。
 `id`、`path`、`entry` 保持不变，仍是稳定的接口契约。分组菜单需要支持清单 schema v2
 （`group`）的 Shell；旧版 Shell 仍按扁平列表展示。
 
-`scripts/shell-serve.mjs` 会为五个已构建应用各启动一个静态服务器、注册清单、定时
-心跳，并在退出时注销：
+`scripts/shell-serve.mjs` 会为五个已构建应用各启动一个静态服务器，固定端口
+11485-11489（已登记 `architecture/port-registry.yaml`），注册清单、定时心跳，并在
+退出时注销。`start.sh` 按fusion-supervisor 生命周期协议封装，admin key 依次从环境
+变量、`.env.local`、网关配置解析：
+
+```bash
+./start.sh start | stop | restart | status | log
+```
+
+直接运行（同样固定端口）：
 
 ```bash
 FUSION_GATEWAY_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
 ```
+
+fusion-supervisor 在跑时，`fusion-sv up fusion-office` 即可托管：崩溃自动重启、健康
+历史、Web 控制台；`fusion-sv down fusion-office` 停止。
 
 一次性路由冒烟检查需要再加 master key，用于派生 Shell 会话密钥：
 
