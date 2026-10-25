@@ -32,6 +32,7 @@ const gateway = vi.hoisted(() => ({ events: [], error: null, calls: [] }));
 
 vi.mock("@fusion-office/ai-client", () => ({
   chat: vi.fn(),
+  createModelPicker: () => null,
   chatStreamEvents: vi.fn((options) => {
     gateway.calls.push(options);
     return (async function* () {

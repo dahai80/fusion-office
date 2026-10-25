@@ -32,7 +32,8 @@ export function openProjectAssistant(projectId) {
     const input = el('textarea', { class: 'input pm-as-input', rows: 3, placeholder: 'Ask about this project, or tell the assistant what to change…', 'aria-label': 'Message the assistant' });
     const send = el('button', { class: 'btn btn-primary pm-as-send', type: 'submit' }, 'Send');
     const newChat = el('button', { class: 'btn pm-as-new', type: 'button' }, 'New chat');
-    const form = el('form', { class: 'pm-as-form' }, input, el('div', { class: 'pm-as-bar' }, send, newChat));
+    const modelPicker = AI.createModelPicker();
+    const form = el('form', { class: 'pm-as-form' }, input, el('div', { class: 'pm-as-bar' }, send, newChat, ...(modelPicker ? [modelPicker] : [])));
     const root = el('div', { class: 'pm-assistant' }, log, status, form);
     const modal = openModal({ title: 'Project assistant', content: root, wide: true });
     let busy = false, turn = null, refuse = null;

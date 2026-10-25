@@ -5,6 +5,7 @@ const ai = vi.hoisted(() => ({ configured: true, replies: [], calls: [] }));
 vi.mock('@fusion-office/ai-client', async (importOriginal) => ({
     ...(await importOriginal()),
     isConfigured: () => ai.configured,
+    createModelPicker: () => null,
     chatStreamEvents: vi.fn(async function* (options) {
         ai.calls.push(options);
         for (const part of ai.replies.shift() || []) yield part;

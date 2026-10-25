@@ -89,6 +89,9 @@ npm workspaces: `apps/*` and `packages/*`.
   `VITE_FUSION_GATEWAY_KEY`, and `VITE_FUSION_MODEL` at build time, and exposes
   `chat`, `chatStream`, `chatStreamEvents`, `jsonChat`, `listModels`, and
   `ensureModelLoaded`. `isConfigured()` reports whether a key is present.
+  `createModelPicker()` builds the shared per-app model selector (gateway model list,
+  persisted choice); calls without an explicit `model` use the picked model, then the
+  build-time default.
 - Each app keeps the historical `puter.js` / `cloud.js` adapter name so call sites did
   not need to move. Those adapters now delegate to `@fusion-office/storage` and
   `@fusion-office/ai-client`. Do not reintroduce Puter globals.

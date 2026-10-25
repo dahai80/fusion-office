@@ -29,10 +29,12 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     const status = el('p', { class: 'panel-note muted ai-status', role: 'status' });
     const askButton = el('button', { class: 'btn primary panel-action', type: 'button' }, 'Ask');
     const summarizeButton = el('button', { class: 'btn panel-action', type: 'button' }, 'Summarize');
+    const modelPicker = AI.createModelPicker();
     const root = el(
         'div',
         { class: 'ai-panel' },
         el('p', { class: 'panel-note muted' }, 'The assistant reads the pages and can move to them. Answers come from the local AI service through fusion-gateway.'),
+        ...(modelPicker ? [modelPicker] : []),
         question,
         el('div', { class: 'ai-actions' }, askButton, summarizeButton),
         status,

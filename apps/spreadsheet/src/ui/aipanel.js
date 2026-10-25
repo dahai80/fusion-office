@@ -24,6 +24,7 @@ import { renderMarkdown } from './markdown.js';
 import * as P from '../lib/puter.js';
 import { trackEvent } from '../lib/analytics.js';
 import { createAgent, workbookSnapshot, suggestions, userText, APPROVAL_MODES, DEFAULT_APPROVAL } from '../core/aiagent.js';
+import { createModelPicker } from '@fusion-office/ai-client';
 import { runTool, describeCall, callTarget, changesWorkbook, qualified } from '../core/aitools.js';
 import { attachmentProblem, attachmentKind, attachmentsTooLarge, formatSize, ATTACH_ACCEPT, MAX_ATTACHMENTS } from '../core/aiattach.js';
 import { readAttachment } from './aiattachments.js';
@@ -169,9 +170,11 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
     el('span.ai-close-side', { html: icon('panelCollapse', 18), 'aria-hidden': 'true' }),
     el('span.ai-close-down', { html: icon('chevD', 18), 'aria-hidden': 'true' }));
   const title = el('h2.ai-title', { id: 'ai-panel-title' }, 'Assistant');
+  const modelPicker = createModelPicker();
   const head = el('header.ai-head', {},
     el('span.ai-head-mark', { html: icon('sparkle', 16, 2), 'aria-hidden': 'true' }),
     title,
+    ...(modelPicker ? [modelPicker] : []),
     newChatBtn, menuBtn, closeBtn);
 
   const log = el('div.ai-log', { role: 'log', 'aria-labelledby': 'ai-panel-title', tabIndex: -1 });

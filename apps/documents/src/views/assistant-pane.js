@@ -10,7 +10,7 @@
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { createAgent } from '@fusion-office/ai-client';
+import { createAgent, createModelPicker } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
@@ -41,6 +41,8 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
   pane.heading.prepend(el('span.as-mark', { 'aria-hidden': 'true' }, commandIconEl('assistant', 16)));
   const newChat = el('button.btn.btn-ghost.btn-sm.as-new', { type: 'button', onclick: () => newChatNow() }, 'New chat');
   pane.heading.after(newChat);
+  const modelPicker = createModelPicker();
+  if (modelPicker) newChat.after(modelPicker);
 
   const log = el('div.as-log', { role: 'log', 'aria-label': 'Conversation with the assistant', tabIndex: -1 });
   const empty = el('div.as-empty');

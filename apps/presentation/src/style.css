@@ -2793,6 +2793,16 @@ body:has(.presenter[open]) #toast {
   color: var(--accent);
   margin-right: 6px;
 }
+.ai-head .ai-model-picker {
+  max-width: 150px;
+  margin-left: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg, transparent);
+  color: inherit;
+  font-size: 12px;
+}
 .ai-title {
   flex: 1;
   min-width: 0;

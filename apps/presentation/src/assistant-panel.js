@@ -24,6 +24,7 @@ import {
   DEFAULT_APPROVAL,
 } from "./assistant.js";
 import { runTool, describeCall, changesDeck } from "./assistant-tools.js";
+import { createModelPicker } from "@fusion-office/ai-client";
 
 const SETTINGS_KEY = "presentation:assistant";
 export const MIN_WIDTH = 300;
@@ -158,6 +159,7 @@ export function createAssistantPanel(env) {
       status.textContent = text;
     });
   };
+  const modelPicker = createModelPicker();
   const head = el(
     "header",
     { class: "ai-head" },
@@ -167,6 +169,7 @@ export function createAssistantPanel(env) {
       icon("Sparkles", 16),
     ),
     el("h2", { class: "ai-title", id: "ai-panel-title" }, "Assistant"),
+    ...(modelPicker ? [modelPicker] : []),
     iconButton("New chat", "SquarePen", () => newChat()),
     iconButton(
       "Assistant settings",

@@ -1,4 +1,5 @@
 import { log, error as logError } from './log.js'
+import { getSelectedModel, createModelPicker as rawModelPicker } from './model-picker.js'
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
 
@@ -28,6 +29,18 @@ export function isConfigured() {
     return !!config.apiKey
 }
 
+// A call names a model, or falls back to what the person picked in the app's
+// model picker, or to the build-time default.
+function modelFor(opts) {
+    return opts.model || getSelectedModel() || config.defaultModel
+}
+
+export { getSelectedModel, setSelectedModel } from './model-picker.js'
+
+export function createModelPicker(options) {
+    return rawModelPicker(options, { isConfigured, listModels, getConfig, logError })
+}
+
 function headers() {
     const h = { 'Content-Type': 'application/json' }
     if (config.apiKey) h.Authorization = 'Bearer ' + config.apiKey
@@ -51,7 +64,7 @@ async function request(path, init, timeoutMs) {
 
 export async function chat(opts) {
     const body = {
-        model: opts.model || config.defaultModel,
+        model: modelFor(opts),
         messages: opts.messages,
         stream: false,
         temperature: opts.temperature,
@@ -69,7 +82,7 @@ const NEWLINE = String.fromCharCode(10)
 
 export async function chatStream(opts, onDelta) {
     const body = {
-        model: opts.model || config.defaultModel,
+        model: modelFor(opts),
         messages: opts.messages,
         stream: true,
         temperature: opts.temperature,
@@ -119,7 +132,7 @@ export async function chatStream(opts, onDelta) {
 
 export async function* chatStreamEvents(opts) {
     const body = {
-        model: opts.model || config.defaultModel,
+        model: modelFor(opts),
         messages: opts.messages,
         stream: true,
         temperature: opts.temperature,

@@ -1128,6 +1128,12 @@
 .ai-panel[hidden] {
   display: none;
 }
+.ai-panel .ai-model-picker {
+  width: 100%;
+  max-width: 240px;
+  display: block;
+  margin: 4px 0 6px;
+}
 .ai-panel .ai-question {
   width: 100%;
   resize: vertical;

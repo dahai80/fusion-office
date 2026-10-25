@@ -87,6 +87,13 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 开发端口，直连会因预检被拒而表现为 `Failed to fetch`。生产构建仍直接访问
 `VITE_FUSION_GATEWAY_URL`。
 
+### 选择模型
+
+每个助手面板都有模型下拉框，列出网关提供的模型（`GET /v1/models`，已加载的排在前面）。
+选中后按应用保存，未显式指定模型的所有调用都用它，刷新后仍然生效。提供哪些模型、每个
+API Key 允许用哪些，由网关侧决定（每个 key 的 `allowed_models`、fusion-gateway 的后端
+路由），不在本仓库配置。没有网关 Key 时下拉框不出现，使用 `VITE_FUSION_MODEL`。
+
 各应用的 AI 入口：
 
 - 文档：助手面板通过工具操作当前文档：读取、查找、插入或替换选区、设置格式、插入表格

@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
 vi.mock('@fusion-office/ai-client', async (importOriginal) => ({
     ...(await importOriginal()),
     isConfigured: () => state.configured,
+    createModelPicker: () => null,
     chatStreamEvents: vi.fn(async function* (options) {
         state.calls.push(options);
         for (const part of state.replies.shift() || []) yield part;

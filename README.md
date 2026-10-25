@@ -93,6 +93,15 @@ own origin, and each Vite config proxies that prefix to the gateway
 ports, so a direct cross-origin call would fail the preflight and surface as
 `Failed to fetch`. Production builds still call `VITE_FUSION_GATEWAY_URL` directly.
 
+### Choosing a model
+
+Each assistant panel shows a model picker that lists the models the gateway offers
+(`GET /v1/models`, loaded models first). Picking one stores it per app and every call
+that does not name a model uses it; the choice survives a reload. Which models appear —
+and which each API key may use — is decided on the gateway side (`allowed_models` per
+key, backend routing in `fusion-gateway`), not in this repository. Without a gateway key
+the picker is absent and `VITE_FUSION_MODEL` applies.
+
 AI surfaces by app:
 
 - Documents: an assistant pane that works the open document through tools: read it, find
