@@ -73,6 +73,27 @@ describe('assistant tools', () => {
     expect(describeCallFor(engine, 'insert_table', { rows }).label).toBe('Insert a 3 by 2 table');
   });
 
+  it('accepts a flat array of cell texts as one row', () => {
+    const engine = engineFor(['Before']);
+    const result = tool(engine, 'insert_table', { rows: ['品牌名', '国家', '代表车型'] });
+    expect(result.ok).toBe(true);
+    expect(result.content).toBe('Inserted a 1 by 3 table.');
+    expect(engine.model.tables.length).toBe(1);
+    expect(describeCallFor(engine, 'insert_table', { rows: ['a', 'b'] }).label).toBe('Insert a 1 by 2 table');
+    const mixed = tool(engineFor(['Before']), 'insert_table', { rows: [['品牌', '国家'], 'BYD'] });
+    expect(mixed.ok).toBe(true);
+    expect(mixed.content).toBe('Inserted a 2 by 2 table.');
+  });
+
+  it('refuses an empty table and tells the model to fill the cells', () => {
+    const engine = engineFor(['Before']);
+    const empty = tool(engine, 'insert_table', { rows: [[], [], [], []] });
+    expect(empty.ok).toBe(false);
+    expect(empty.content).toContain('every cell filled');
+    expect(tool(engine, 'insert_table', { rows: [] }).ok).toBe(false);
+    expect(engine.model.tables.length).toBe(0);
+  });
+
   it('inserts a page break and a link', () => {
     const engine = engineFor(['Link here']);
     engine.model.select(0, 4);

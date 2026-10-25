@@ -52,8 +52,8 @@ export const TOOLS = [
         style_name: str('Paragraph style name, e.g. "Heading 1" or "Normal".'),
         list: str('Make the paragraphs "bullet", "number" or "none".', { enum: ['bullet', 'number', 'none'] }),
     }),
-    fn('insert_table', 'Insert a table at the caret. The first row is used as the header. Each cell is plain text.', {
-        rows: { type: 'array', description: 'Rows of cell text.', items: { type: 'array', items: { type: 'string' } } },
+    fn('insert_table', 'Insert a table at the caret. The first row is the header. Fill every cell with the content the user asked for; never send empty rows or empty cells.', {
+        rows: { type: 'array', description: 'Rows of cell text, each row an array of non-empty strings, for example [["品牌","国家"],["BYD","中国"]]. The inner arrays are the rows.', items: { type: 'array', items: { type: 'string' } } },
     }, ['rows']),
     fn('insert_page_break', 'Insert a page break at the caret.'),
     fn('insert_link', 'Put a link around the selection, or insert the link text and link it. Links point to a web address (https://…) or a bookmark (#name).', {
@@ -114,8 +114,8 @@ function describeCall(model, name, args = {}) {
             return { label: `Format ${args.target === 'document' ? 'the document' : 'the selection'}${what.length ? `: ${what.join(', ')}` : ''}` };
         }
         case 'insert_table': {
-            const rows = Array.isArray(args.rows) ? args.rows.length : 0, columns = Array.isArray(args.rows?.[0]) ? args.rows[0].length : 0;
-            return { label: `Insert a ${rows} by ${columns} table` };
+            const rows = normalizeRows(args.rows);
+            return { label: `Insert a ${rows?.length ?? 0} by ${rows?.[0]?.length ?? 0} table` };
         }
         case 'insert_page_break': return { label: 'Insert a page break' };
         case 'insert_link': return { label: `Add a link to ${String(args.url ?? '').slice(0, 60)}` };
@@ -185,6 +185,14 @@ function insertTable(engine, rows) {
     return true;
 }
 
+// Models sometimes send a flat array of cell texts instead of an array of rows;
+// accept both, and wrap stray non-array rows, so a well-meant call still lands.
+function normalizeRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) return null;
+    if (!rows.some(row => Array.isArray(row))) return [rows.map(cell => String(cell ?? ''))];
+    return rows.map(row => (Array.isArray(row) ? row : [row]).map(cell => String(cell ?? '')));
+}
+
 /** Run one call; returns { ok, content, changed, target } for the model and the pane. */
 export function runTool(engine, name, args = {}) {
     const m = engine?.model;
@@ -240,9 +248,13 @@ export function runTool(engine, name, args = {}) {
             return { ok: true, changed, content: changed ? 'Formatted.' : 'The text already had that formatting.' };
         }
         case 'insert_table': {
-            if (!Array.isArray(args.rows) || !Array.isArray(args.rows[0])) return { ok: false, content: 'Error: rows must be an array of rows.' };
-            const ok = engine.execute(() => insertTable(engine, args.rows));
-            return { ok: !!ok, changed: !!ok, content: ok ? 'Inserted the table.' : 'The table was not inserted.' };
+            const rows = normalizeRows(args.rows);
+            if (!rows) return { ok: false, content: 'Error: rows must be an array of rows of cell text, for example [["品牌","国家"],["BYD","中国"]]. Call insert_table again with the header row first and every cell filled.' };
+            const columns = rows[0].length;
+            const hasText = rows.some(row => row.some(cell => cell.trim()));
+            if (columns < 1 || !hasText) return { ok: false, content: 'Error: the table has no cell text. Call insert_table again with the header row first and every cell filled with the content the user asked for, for example [["品牌","国家"],["BYD","中国"]].' };
+            const ok = engine.execute(() => insertTable(engine, rows));
+            return { ok: !!ok, changed: !!ok, content: ok ? `Inserted a ${rows.length} by ${columns} table.` : 'The table was not inserted.' };
         }
         case 'insert_page_break': {
             const ok = engine.execute(() => m.insertPageBreak());
@@ -267,6 +279,8 @@ How to work
 - "This", "here" or "the selected text" means the user's selection. The snapshot says whether anything is selected.
 - Keep the user's formatting and wording unless they ask for a change. Use format_text for styling and insert_text or replace_selection for words.
 - To build a table, put the header row first in insert_table. Keep cells short and plain text.
+- When the user asks for a table of things you know (brands, countries, steps, comparisons), pick sensible columns yourself, fill every cell, and insert it. Do not ask which rows and columns they want; make a reasonable table and tell them they can ask for changes.
+- Answer in the language the user writes in.
 - Prefer live edits over pasting a copy of the document into the chat. When the user asks a question, answer it in the chat instead of changing anything.
 - Everything you change can be undone. If a tool reports an error, adapt. If the user declines a change, don't try it another way; say what you would have done.
 - The document is read-only when the snapshot says so: explain what you would change rather than calling a tool.
