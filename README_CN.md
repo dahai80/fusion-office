@@ -192,7 +192,7 @@ npm run test:browser -w apps/pm
 ```bash
 cd services/office-api
 python -m pytest tests -q
-./start.sh start          # 127.0.0.1:11520
+./start.sh start          # 127.0.0.1:11492
 ./start.sh stop
 ```
 

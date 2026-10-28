@@ -7,7 +7,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import zipfile
 from typing import Annotated
 
@@ -15,6 +14,7 @@ import uvicorn
 from docx.opc.exceptions import PackageNotFoundError
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
+from fusion_core.config import get_env, service_port
 from openpyxl.utils.exceptions import InvalidFileException
 
 from . import __version__
@@ -22,12 +22,12 @@ from .docx import fill_document
 from .xlsx import parse_workbook
 
 logging.basicConfig(
-    level=os.environ.get("OFFICE_API_LOG_LEVEL", "INFO"),
+    level=get_env("FUSION_OFFICE_API_LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 log = logging.getLogger("office_api")
 
-MAX_BYTES = int(os.environ.get("OFFICE_API_MAX_BYTES", str(100 * 1024 * 1024)))
+MAX_BYTES = get_env("FUSION_OFFICE_API_MAX_BYTES", 100 * 1024 * 1024, cast=int)
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 app = FastAPI(title="fusion-office", version=__version__)
@@ -109,8 +109,19 @@ async def docx_fill(
     return Response(content=filled, media_type=DOCX_MIME, headers=headers)
 
 
+# Registered as fusion-office-api in architecture/port-registry.yaml (issue #3:
+# 11520 collided with ai-apparelmockup; never default onto another service's port).
+DEFAULT_PORT = 11492
+
+
 def run() -> None:
-    port = int(os.environ.get("OFFICE_API_PORT", "11520"))
+    port = service_port("office-api", default=DEFAULT_PORT)
+    try:
+        import setproctitle
+
+        setproctitle.setproctitle(f"fusion-office-api serve :{port}")
+    except Exception:
+        log.debug("setproctitle unavailable, process title stays default", exc_info=True)
     log.info("starting fusion-office-api on 127.0.0.1:%d", port)
     uvicorn.run(app, host="127.0.0.1", port=port)
 

@@ -14,7 +14,7 @@ MIT. Spreadsheet is AGPL-3.0-only and the root MIT license does not cover it.
 
 `services/office-api` is a Python FastAPI document-capability service (xlsx table
 parsing, docx template filling) consumed by other Fusion projects. It implements the
-contract in issue #1, binds to `127.0.0.1:11520`, and holds no business logic.
+contract in issue #1, binds to `127.0.0.1:11492`, and holds no business logic.
 
 ## Repository Rules
 
@@ -52,7 +52,7 @@ npm run shell:smoke               # register, request each module, unregister, e
 
 cd services/office-api
 python -m pytest tests -q         # Python capability-service suite
-./start.sh start                  # 127.0.0.1:11520; also stop|status|log
+./start.sh start                  # 127.0.0.1:11492; also stop|status|log
 ```
 
 `verify:ai` needs `FUSION_GATEWAY_KEY`. `shell:serve` needs

@@ -5,7 +5,9 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$here/../../.."
 venv="$root/.venv/bin/activate"
-port="${OFFICE_API_PORT:-11520}"
+# Registered in architecture/port-registry.yaml as fusion-office-api (issue #3).
+# Python resolves the same env var via fusion_core.config.service_port.
+PORT="${FUSION_OFFICE_API_PORT:-11492}"
 run_dir="$here/.run"
 log_dir="$here/dev"
 pid_file="$run_dir/office-api.pid"
@@ -25,12 +27,14 @@ start() {
     # shellcheck disable=SC1090
     source "$venv"
     cd "$here"
-    PYTHONPATH=src nohup python -m uvicorn office_api.main:app \
-        --host 127.0.0.1 --port "$port" >>"$log_file" 2>&1 &
+    # office_api.main.run resolves the port via fusion_core.config and sets
+    # the process title to fusion-office-api (issue #3); uvicorn CLI would skip both.
+    export FUSION_OFFICE_API_PORT="$PORT"
+    PYTHONPATH=src nohup python -m office_api.main >>"$log_file" 2>&1 &
     echo $! >"$pid_file"
     for _ in $(seq 1 50); do
-        if curl -fsS "http://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
-            echo "office-api listening on 127.0.0.1:$port (pid $(cat "$pid_file"))"
+        if curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
+            echo "office-api listening on 127.0.0.1:$PORT (pid $(cat "$pid_file"))"
             return 0
         fi
         sleep 0.2
@@ -52,7 +56,7 @@ stop() {
 
 status() {
     if running; then
-        echo "office-api running (pid $(cat "$pid_file")) on port $port"
+        echo "office-api running (pid $(cat "$pid_file")) on port $PORT"
     else
         echo "office-api stopped"
         return 1

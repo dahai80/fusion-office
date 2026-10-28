@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fusion-office-api"
-version = "0.1.0"
+version = "0.1.1"
 description = "Document-capability service for fusion-office: xlsx table parsing and docx template filling"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,6 +13,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "openpyxl>=3.1",
     "python-docx>=1.1",
+    "fusion-core",
+    "setproctitle>=1.3",
 ]
 
 [project.optional-dependencies]

@@ -27,7 +27,7 @@ Responses:
   `X-Office-Unfilled` (comma-separated names). Unknown placeholders become an
   empty string. Placeholders are `{{name}}` in paragraphs, table cells, headers
   and footers, including markers split across Word runs.
-- Files over `OFFICE_API_MAX_BYTES` (default 100 MB) get `413`. Malformed input
+- Files over `FUSION_OFFICE_API_MAX_BYTES` (default 100 MB) get `413`. Malformed input
   gets `422` with FastAPI's `{"detail": ...}` shape. The uploaded template is
   never modified.
 - `/v1/docx/snapshot` is deferred to v0.2; consumers ship preview-less.
@@ -40,20 +40,21 @@ source .venv/bin/activate
 cd fusion-office/services/office-api
 pip install -e ".[test]"
 
-./start.sh start          # 127.0.0.1:11520, log in dev/office-api.log
+./start.sh start          # 127.0.0.1:11492, log in dev/office-api.log
 ./start.sh status
 ./start.sh stop
 
 python -m pytest tests -q
 ```
 
-Environment:
+Environment (resolved through `fusion_core.config`, per `architecture/config-conventions.md`):
 
-- `OFFICE_API_PORT` (default `11520`)
-- `OFFICE_API_MAX_BYTES` (default `104857600`)
-- `OFFICE_API_LOG_LEVEL` (default `INFO`)
+- `FUSION_OFFICE_API_PORT` (default `11492`, registered as `fusion-office-api` in `architecture/port-registry.yaml`)
+- `FUSION_OFFICE_API_MAX_BYTES` (default `104857600`)
+- `FUSION_OFFICE_API_LOG_LEVEL` (default `INFO`)
 
 The service binds to the loopback interface only. It makes no outbound calls.
+The process titles itself `fusion-office-api serve :<port>` via `setproctitle`.
 
 ## Licensing
 
