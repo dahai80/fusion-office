@@ -56,7 +56,7 @@ python -m pytest tests -q         # Python capability-service suite
 ```
 
 `verify:ai` needs `FUSION_GATEWAY_KEY`. `shell:serve` needs
-`FUSION_GATEWAY_ADMIN_KEY`. `shell:smoke` additionally needs
+`FUSION_ADMIN_KEY`. `shell:smoke` additionally needs
 `FUSION_GATEWAY_MASTER_KEY`, which is used only to derive a short-lived shell session
 secret. Never hardcode or commit these values.
 
@@ -140,9 +140,11 @@ on fixed ports 11485-11489 (registered in `architecture/port-registry.yaml`; ent
 `fusion-office` is the supervised one, the other four are `supervise: false`), registers
 manifests through the gateway admin API, heartbeats, and unregisters on exit. `start.sh`
 wraps it for fusion-supervisor: `fusion-sv up fusion-office` starts and crash-restarts
-it; the admin key resolves from the environment, `.env.local`, or the gateway config's
-`web_shell.admin_key`. The gateway proxies `/shell/<id>/` and requires a signed shell
-session, not an API key.
+it; the admin key (`FUSION_ADMIN_KEY`) resolves from the environment, `.env.local`, or
+the gateway config's `web_shell.admin_key`. Before serving, `start` self-checks the
+`fusion-office` entry in `port-registry.yaml` and refuses an unregistered port
+(`FUSION_SKIP_REGISTRY_CHECK=1` bypasses). The gateway proxies `/shell/<id>/` and
+requires a signed shell session, not an API key.
 
 ## Verification Expectations
 

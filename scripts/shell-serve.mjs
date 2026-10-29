@@ -10,7 +10,7 @@ const gateway = process.env.FUSION_GATEWAY_URL || 'http://127.0.0.1:11432';
 // Fixed ports so a supervisor can probe the service; registered in
 // architecture/port-registry.yaml as fusion-office(-<app>-shell) 11485-11489.
 const BASE_PORT = Number(process.env.FUSION_OFFICE_SHELL_PORT) || 11485;
-const adminKey = process.env.FUSION_GATEWAY_ADMIN_KEY;
+const adminKey = process.env.FUSION_ADMIN_KEY;
 const masterKey = process.env.FUSION_GATEWAY_MASTER_KEY;
 const smoke = process.argv.includes('--smoke');
 
@@ -145,7 +145,7 @@ async function smokeOne(manifest, token) {
 
 async function main() {
     if (!adminKey) {
-        console.error('[shell-serve] FUSION_GATEWAY_ADMIN_KEY is required');
+        console.error('[shell-serve] FUSION_ADMIN_KEY is required');
         process.exit(1);
     }
     if (smoke && !masterKey) {

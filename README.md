@@ -157,10 +157,16 @@ environment, `.env.local`, or the gateway config:
 ./start.sh start | stop | restart | status | log
 ```
 
+Before serving, `start` verifies its `fusion-office` entry exists in
+`architecture/port-registry.yaml` (register-then-start self-check) and refuses an
+unregistered port. `FUSION_REGISTRY` points at another registry copy,
+`FUSION_SKIP_REGISTRY_CHECK=1` bypasses the check, and a missing registry file only
+warns (standalone deployments).
+
 Run directly (same fixed ports):
 
 ```bash
-FUSION_GATEWAY_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
+FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
 ```
 
 With fusion-supervisor running, `fusion-sv up fusion-office` starts and supervises
@@ -171,7 +177,7 @@ For a one-shot route check, add `--smoke` and provide the master key used to der
 shell session secret:
 
 ```bash
-FUSION_GATEWAY_ADMIN_KEY=<admin-key> \
+FUSION_ADMIN_KEY=<admin-key> \
 FUSION_GATEWAY_MASTER_KEY=<master-key> \
 node scripts/shell-serve.mjs --smoke
 ```

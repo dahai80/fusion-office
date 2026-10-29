@@ -140,10 +140,15 @@ Shell 会话令牌，而不是 API Key。
 ./start.sh start | stop | restart | status | log
 ```
 
+启动前会先做"先登记后启动"自检：确认 `architecture/port-registry.yaml` 存在
+`fusion-office` 条目，端口未登记则拒绝启动。`FUSION_REGISTRY` 可指向其他注册表
+副本，`FUSION_SKIP_REGISTRY_CHECK=1` 跳过检查，注册表文件缺失只告警（独立部署
+场景）。
+
 直接运行（同样固定端口）：
 
 ```bash
-FUSION_GATEWAY_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
+FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
 ```
 
 fusion-supervisor 在跑时，`fusion-sv up fusion-office` 即可托管：崩溃自动重启、健康
@@ -152,7 +157,7 @@ fusion-supervisor 在跑时，`fusion-sv up fusion-office` 即可托管：崩溃
 一次性路由冒烟检查需要再加 master key，用于派生 Shell 会话密钥：
 
 ```bash
-FUSION_GATEWAY_ADMIN_KEY=<admin-key> \
+FUSION_ADMIN_KEY=<admin-key> \
 FUSION_GATEWAY_MASTER_KEY=<master-key> \
 node scripts/shell-serve.mjs --smoke
 ```

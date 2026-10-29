@@ -5,7 +5,7 @@
 #   ./start.sh start|stop|restart|status|log
 #
 # The admin key comes from (first match wins):
-#   1. FUSION_GATEWAY_ADMIN_KEY in the environment
+#   1. FUSION_ADMIN_KEY in the environment
 #   2. .env.local next to this script
 #   3. web_shell.admin_key in fusion-gateway/config.yaml
 
@@ -23,20 +23,20 @@ log() { echo "[office-shell] $*"; }
 fail() { echo "[office-shell] ERROR: $*" >&2; exit 1; }
 
 resolve_admin_key() {
-    if [ -n "${FUSION_GATEWAY_ADMIN_KEY:-}" ]; then
-        echo "$FUSION_GATEWAY_ADMIN_KEY"
+    if [ -n "${FUSION_ADMIN_KEY:-}" ]; then
+        echo "$FUSION_ADMIN_KEY"
         return
     fi
     if [ -f "$SCRIPT_DIR/.env.local" ]; then
         local key
-        key="$(grep -E '^FUSION_GATEWAY_ADMIN_KEY=' "$SCRIPT_DIR/.env.local" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+        key="$(grep -E '^FUSION_ADMIN_KEY=' "$SCRIPT_DIR/.env.local" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
         if [ -n "$key" ]; then
             echo "$key"
             return
         fi
     fi
     if [ -f "$GATEWAY_CONFIG" ]; then
-        awk '/^web_shell:/{in_shell=1; next} in_shell && /^  admin_key:/{print $2; exit}' "$GATEWAY_CONFIG"
+        awk '/^web_shell:/{in_shell=1; next} in_shell && /^[[:space:]]+admin_key:/{print $2; exit}' "$GATEWAY_CONFIG"
         return
     fi
     echo ""
@@ -56,10 +56,22 @@ cmd_start() {
     [ "$missing" -eq 0 ] || fail "not all five apps are built"
     local key
     key="$(resolve_admin_key)"
-    [ -n "$key" ] || fail "no FUSION_GATEWAY_ADMIN_KEY (env, .env.local, or $GATEWAY_CONFIG)"
+    [ -n "$key" ] || fail "no FUSION_ADMIN_KEY (env, .env.local, or $GATEWAY_CONFIG)"
+    # Register-then-start self-check (issue #5): refuse an unregistered port
+    # at start time instead of letting CI catch it. FUSION_SKIP_REGISTRY_CHECK=1
+    # bypasses; a missing registry file only warns (standalone deployments).
+    local registry="${FUSION_REGISTRY:-$HOME/fusion/architecture/port-registry.yaml}"
+    if [ ! -f "$registry" ]; then
+        log "warn: port-registry.yaml not found at $registry — registry self-check skipped"
+    elif ! grep -A3 "^  fusion-office:" "$registry" 2>/dev/null | grep -q "port: $BASE_PORT$"; then
+        if [ "${FUSION_SKIP_REGISTRY_CHECK:-}" != "1" ]; then
+            fail "port $BASE_PORT for fusion-office not registered in $registry — refusing to start"
+        fi
+        log "warn: registry check bypassed (FUSION_SKIP_REGISTRY_CHECK=1)"
+    fi
     mkdir -p "$SCRIPT_DIR/dev"
     : > "$LOG_FILE"
-    FUSION_GATEWAY_ADMIN_KEY="$key" FUSION_OFFICE_SHELL_PORT="$BASE_PORT" \
+    FUSION_ADMIN_KEY="$key" FUSION_OFFICE_SHELL_PORT="$BASE_PORT" \
         nohup node scripts/shell-serve.mjs >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     log "started pid $(cat "$PID_FILE") on ports $BASE_PORT-$((BASE_PORT + 4)); log: $LOG_FILE"
