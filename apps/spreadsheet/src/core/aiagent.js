@@ -165,7 +165,7 @@ const attachmentsWeight = (m) => m.attachments.reduce((n, a) => n + attachmentWe
  * messages only, and only as many as one request takes, counted by what they take of the request;
  * an older message names its files instead.
  */
-export function requestMessages(messages, { system = SYSTEM_PROMPT, budget = HISTORY_BUDGET } = {}) {
+export function requestMessages(messages, { system = SYSTEM_PROMPT, budget = HISTORY_BUDGET, changelog = [] } = {}) {
   let lastUser = -1;
   for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'user') { lastUser = i; break; }
   // The user messages whose attachments are still sent: the latest few, newest first for as long as all their files
@@ -214,7 +214,11 @@ export function requestMessages(messages, { system = SYSTEM_PROMPT, budget = HIS
     total -= size(m) - size(cut);
     out[i] = cut;
   }
-  return [{ role: 'system', content: system }, ...out.slice(start).map((m) => { if (!('weight' in m)) return m; const { weight, ...sent } = m; return sent; })];
+  // Changes made earlier in the session ride right behind the instructions: what an evicted turn
+  // did is not lost with it, and the block only ever grows, so the cached prefix stays longest.
+  const head = [{ role: 'system', content: system }];
+  if (changelog.length) head.push({ role: 'system', content: `Changes made earlier in this session (oldest first):\n${changelog.map((line) => `- ${line}`).join('\n')}` });
+  return [head, ...out.slice(start).map((m) => { if (!('weight' in m)) return m; const { weight, ...sent } = m; return sent; })].flat();
 }
 
 /* ---------- The loop ---------- */
@@ -243,6 +247,7 @@ const newCallId = () => `call_${Date.now().toString(36)}_${(++callSeq).toString(
 export function createAgent({ chat, runTool, describe, approve, ready = null, snapshot = () => '', settings = () => ({}) }) {
   let messages = [];
   let running = null; // { stop(), stopped }
+  const changelog = []; // one line per change the assistant made, oldest first
 
   function needsApproval(name, info) {
     if (!changesWorkbook(name)) return false;
@@ -268,7 +273,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
         let text = '';
         let cut = false; // the reply ran into MAX_OUTPUT_TOKENS
         const calls = [];
-        const iterable = chat(requestMessages(transcript), { model: AI_MODEL, tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS });
+        const iterable = chat(requestMessages(transcript, { changelog }), { model: AI_MODEL, tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS });
         const iter = iterable[Symbol.asyncIterator]();
         for (;;) {
           const next = await Promise.race([iter.next(), stopSignal]);
@@ -357,6 +362,10 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
                 step.status = result.ok ? 'done' : 'error';
                 step.changed = !!result.changed;
                 step.target = result.target || null;
+                if (step.changed) {
+                    changelog.push(`${step.label || step.name}${step.target ? ` (${step.target})` : ''}`);
+                    if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                }
                 if (!result.ok) step.error = String(result.content).replace(/^Error:\s*/, '');
                 content = String(result.content ?? '');
               }
@@ -411,7 +420,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     },
     stop() { running?.stop(); },
     // The chat starts over at once: the exchange under way is stopped and let go, so a message can be sent straight away.
-    reset() { running?.stop(); running = null; messages = []; },
+    reset() { running?.stop(); running = null; messages = []; changelog.length = 0; },
   };
 }
 

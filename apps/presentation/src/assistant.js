@@ -170,7 +170,7 @@ export function userText(content) {
  */
 export function requestMessages(
   messages,
-  { system = SYSTEM_PROMPT, budget = HISTORY_BUDGET } = {},
+  { system = SYSTEM_PROMPT, budget = HISTORY_BUDGET, changelog = [] } = {},
 ) {
   let lastUser = -1;
   for (let i = messages.length - 1; i >= 0; i--)
@@ -208,7 +208,18 @@ export function requestMessages(
     for (let i = start; i < next; i++) total -= size(out[i]);
     start = next;
   }
-  return [{ role: "system", content: system }, ...out.slice(start)];
+  // Changes made earlier in the session ride right behind the instructions:
+  // what an evicted turn did is not lost with it, and the block only ever
+  // grows, so the cached prefix stays longest.
+  const head = [{ role: "system", content: system }];
+  if (changelog.length)
+    head.push({
+      role: "system",
+      content: `Changes made earlier in this session (oldest first):\n${changelog
+        .map((line) => `- ${line}`)
+        .join("\n")}`,
+    });
+  return [...head, ...out.slice(start)];
 }
 
 /* ---------- The loop ---------- */
@@ -249,6 +260,7 @@ export function createAgent({
 }) {
   let messages = [];
   let running = null;
+  const changelog = []; // one line per change the assistant made, oldest first
 
   function needsApproval(name, info) {
     if (!changesDeck(name)) return false;
@@ -288,7 +300,7 @@ export function createAgent({
         if (round) emit({ type: "round" });
         let text = "";
         const calls = [];
-        const iterable = chat(requestMessages(transcript), {
+        const iterable = chat(requestMessages(transcript, { changelog }), {
           model: AI_MODEL,
           tools: TOOLS,
         });
@@ -412,6 +424,13 @@ export function createAgent({
                 step.changed = !!result.changed;
                 step.target = result.target || null;
                 step.history = result.history || [];
+                if (step.changed) {
+                  changelog.push(
+                    `${step.label || step.name}${step.target ? ` (${step.target})` : ""}`,
+                  );
+                  if (changelog.length > 100)
+                    changelog.splice(0, changelog.length - 100);
+                }
                 if (!result.ok)
                   step.error = String(result.content).replace(/^Error:\s*/, "");
                 content = String(result.content ?? "");
@@ -470,6 +489,7 @@ export function createAgent({
       running?.stop();
       running = null;
       messages = [];
+      changelog.length = 0;
     },
   };
 }

@@ -158,8 +158,12 @@ export function runTool(store, projectId, name, args = {}) {
             case 'list_tasks': {
                 const column = args.column ? findColumn(doc, args.column) : null;
                 const limit = Math.min(300, Math.max(1, Math.trunc(Number(args.limit) || 100)));
-                const tasks = doc.tasks.filter(t => !column || t.columnId === column.id).slice(0, limit);
-                return { ok: true, content: tasks.length ? tasks.map(t => taskLine(t, doc)).join('\n') : 'No tasks match.' };
+                const matching = doc.tasks.filter(t => !column || t.columnId === column.id);
+                const tasks = matching.slice(0, limit);
+                if (!tasks.length) return { ok: true, content: 'No tasks match.' };
+                const hidden = matching.length - tasks.length;
+                return { ok: true, content: tasks.map(t => taskLine(t, doc)).join('\n')
+                    + (hidden > 0 ? `\n[${hidden} more tasks not shown; call again with limit: ${Math.min(300, limit + hidden)} or filter by column.]` : '') };
             }
             case 'create_task': {
                 const title = String(args.title ?? '').trim();

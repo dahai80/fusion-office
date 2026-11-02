@@ -61,11 +61,16 @@ export function checklistSection({ projectId, task }) {
     aiButton.disabled = true;
     aiStatus.textContent = 'Thinking…';
     try {
+      // A long description is cut rather than sent whole; the model is told so.
+      const MAX_BREAKDOWN_CHARS = 8000;
+      const description = String(task.description || '');
       const prompt = [
         'Break the following task into 3 to 7 short checklist items.',
         'Reply with JSON only: {"items":["...","..."]}.',
         `Task: ${task.title}`,
-        task.description ? `Details: ${task.description}` : '',
+        description
+          ? `Details: ${description.slice(0, MAX_BREAKDOWN_CHARS)}${description.length > MAX_BREAKDOWN_CHARS ? `\n[Description truncated to the first ${MAX_BREAKDOWN_CHARS} of ${description.length} characters.]` : ''}`
+          : '',
       ].join('\n');
       const reply = await AI.jsonChat({
         messages: [

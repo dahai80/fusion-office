@@ -716,13 +716,18 @@ function getPresentation(pres, args, env) {
   const size = slideSize(pres);
   const all = slides(pres);
   const t = THEMES[env.theme()] || THEMES.studio;
+  // The overview lists at most 100 slides; the rest are reachable with read_slide.
+  const listed = all.slice(0, 100);
   const lines = [
     `${plural(all.length, "slide")}, each ${inches(size.width)} × ${inches(size.height)} in.`,
     `Palette "${env.theme()}": background ${t.bg}, text ${t.ink}, accent ${t.accent}, muted ${t.muted}, panel ${t.panel}.`,
     `The user is on slide ${env.slideIndex() + 1}.`,
     "Slides:",
-    ...all.map((s, i) => slideSummary(pres, s, i)),
+    ...listed.map((s, i) => slideSummary(pres, s, i)),
   ];
+  if (all.length > listed.length) {
+    lines.push(`[${all.length - listed.length} more slides not listed; read them with read_slide.]`);
+  }
   return lines.join("\n");
 }
 

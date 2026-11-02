@@ -36,6 +36,17 @@ describe('project assistant tools', () => {
         expect(call('list_tasks', { column: 'Done' }).content).toBe('No tasks match.');
     });
 
+    it('says how many tasks the list cap left out', () => {
+        for (let i = 0; i < 12; i++) call('create_task', { title: `Task ${i + 1}` });
+        const listed = call('list_tasks', { limit: 10 });
+        expect(listed.content).toContain('Task 10');
+        expect(listed.content).not.toContain('Task 11');
+        expect(listed.content).toContain('[2 more tasks not shown');
+        expect(listed.content).toContain('limit: 12');
+        const all = call('list_tasks', { limit: 12 });
+        expect(all.content).not.toContain('not shown');
+    });
+
     it('creates a task in a named column with labels and members', () => {
         doc().labels.push({ id: 'label-1', name: 'Docs', color: '#888888' });
         const result = call('create_task', { title: 'Draft', column: 'In progress', labels: ['Docs'], assignees: ['nadia'] });

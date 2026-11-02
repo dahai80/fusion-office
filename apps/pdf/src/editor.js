@@ -809,11 +809,13 @@ export function createEditor({
       const last = Math.min(pdf.numPages, first + Math.min(20, Math.max(1, Math.trunc(Number(count) || 5))) - 1);
       const parts = [];
       let used = 0;
+      let stoppedAt = null;
       for (let index = first; index <= last && used < 14000; index++) {
         try {
           const text = await aiPageText(index);
           if (!text) { parts.push(`[Page ${index}] (no text on this page)`); continue; }
           const part = `[Page ${index}] ${text}`;
+          if (used + part.length > 14000 && index > first) { stoppedAt = index; break; }
           parts.push(part);
           used += part.length;
         } catch (error) {
@@ -821,7 +823,11 @@ export function createEditor({
           parts.push(`[Page ${index}] (could not be read)`);
         }
       }
-      return { ok: true, content: parts.join('\n\n').slice(0, 14000) };
+      // The cap lands between pages, never mid-page; the model is told how to get the rest.
+      if (stoppedAt) {
+        parts.push(`[Read up to page ${stoppedAt - 1} of ${last}; the 14,000-character read cap was reached. Call read_pages again with from: ${stoppedAt} to continue.]`);
+      }
+      return { ok: true, content: parts.join('\n\n') };
     },
     find: async (query, matchCase) => {
       if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };

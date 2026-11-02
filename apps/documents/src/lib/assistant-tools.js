@@ -200,12 +200,23 @@ export function runTool(engine, name, args = {}) {
     switch (name) {
         case 'get_document_info': {
             const styles = m.paragraphStyles.map(style => style.name).filter(Boolean);
-            const outline = m.outline.map(entry => ({ level: entry.level, text: entry.text }));
-            return { ok: true, content: JSON.stringify({ paragraphs: m.paragraphs.length, tables: m.tables.length, selection: m.text.slice(...m.range).slice(0, 500), outline, styles }) };
+            const outline = m.outline.slice(0, 30).map(entry => ({ level: entry.level, text: entry.text }));
+            return { ok: true, content: JSON.stringify({
+                paragraphs: m.paragraphs.length,
+                tables: m.tables.length,
+                selection: m.text.slice(...m.range).slice(0, 500),
+                outline,
+                ...(m.outline.length > 30 ? { outline_total: m.outline.length } : {}),
+                styles,
+            }) };
         }
         case 'read_document': {
             if (args.scope === 'selection' && m.range[0] !== m.range[1]) {
-                return { ok: true, content: m.text.slice(...m.range) };
+                const selection = m.text.slice(...m.range);
+                if (selection.length > MAX_READ) {
+                    return { ok: false, content: `Error: the selection is ${selection.length} characters and at most ${MAX_READ} can be read at a time. Narrow the selection, or read the document in ranges with start and count.` };
+                }
+                return { ok: true, content: selection };
             }
             const from = Math.max(0, Math.trunc(Number(args.start) || 0));
             const count = Math.min(500, Math.max(1, Math.trunc(Number(args.count) || 200)));

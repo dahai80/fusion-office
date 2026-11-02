@@ -124,6 +124,25 @@ the conversation with the tool schemas, runs the calls the model asks for, feeds
 results back, and stops after a bounded number of rounds. Each app owns its tools, which
 describe themselves for the step list and declare which calls change the file.
 
+### Long-context discipline
+
+All assistants follow the same four rules so long sessions stay fast and cheap on the
+local model:
+
+1. The document never travels whole. The first user message carries a short snapshot
+   summary (counts, outline, selection); the assistant reads regions on demand through
+   capped tools (`read_document` ranges, spreadsheet `read_range`, PDF `read_pages`,
+   `list_tasks`, presentation `read_slide`).
+2. The system prompt is always the first message, and the leading part of the
+   conversation stays stable so the model's prompt prefix cache keeps hitting.
+3. Every read tool caps what it returns and, when it must cut, says what it cut and how
+   to continue (for example, the 20,000-character selection cap, the 14,000-character
+   PDF page cap, the 300-task list cap, and the 100-slide listing cap).
+4. Old tool results and evicted turns are replaced by a rolling change log. Each change
+   a tool reports becomes one line (`- Set the cell (Sheet1!B2)`), kept newest-bounded
+   to 100 entries and injected right behind the system prompt, so the assistant remembers
+   what it did without replaying raw history.
+
 Verify end-to-end connectivity with a real loaded model:
 
 ```bash

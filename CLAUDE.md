@@ -130,6 +130,17 @@ When changing a prompt, a tool schema, or its runner, update the matching unit t
 Tests mock `@fusion-office/ai-client`; live verification is separate in
 `scripts/verify-ai.mjs`.
 
+Long-context discipline (all five apps, issue #7): the system prompt is always the
+first message and the conversation head stays stable for the gateway's prompt prefix
+cache; snapshots are summaries, never whole files, and content is read on demand through
+capped tools (`read_document` 20,000-char selection cap, PDF 14,000-char page cap,
+spreadsheet `read_range`, pm `list_tasks` 300-task cap with a `[N more tasks not shown]`
+marker, presentation 100-slide listing cap); and each agent core keeps a rolling change
+log (`requestMessages(..., { changelog })`) that injects `- Label (target)` lines right
+behind the system prompt instead of replaying evicted history. When adding a read tool,
+give it a cap and an actionable over-cap error; when adding a changing tool, the agent
+cores pick it up through the tool result's `changed`/`target` fields.
+
 ### Deep-link hand-off
 
 Other Fusion modules (first caller: fusion-design) open generated content through the

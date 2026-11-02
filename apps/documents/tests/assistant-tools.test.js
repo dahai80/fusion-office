@@ -41,6 +41,29 @@ describe('assistant tools', () => {
     expect(tool(engine, 'find_text', { query: 'BETA', match_case: true }).content).toBe('No paragraph contains "BETA".');
   });
 
+  it('refuses to send an over-long selection to the model and says what to do', () => {
+    const engine = engineFor(['x'.repeat(20001)]);
+    engine.model.select(0, 20001);
+    const refused = tool(engine, 'read_document', { scope: 'selection' });
+    expect(refused.ok).toBe(false);
+    expect(refused.content).toContain('20001 characters');
+    expect(refused.content).toContain('at most 20000');
+    expect(refused.content).toContain('start and count');
+    const small = engineFor(['y'.repeat(19999)]);
+    small.model.select(0, 19999);
+    expect(tool(small, 'read_document', { scope: 'selection' }).ok).toBe(true);
+  });
+
+  it('caps the outline the info tool returns and counts the rest', () => {
+    const lines = Array.from({ length: 35 }, (_, i) => paragraph(`Heading ${i + 1}`, { format: { outlineLevel: 0 } }));
+    const engine = { model: new TextDocument(lines), execute(action) { return action() === undefined ? true : action; }, viewOnly: false, readOnly: false };
+    const info = tool(engine, 'get_document_info');
+    const parsed = JSON.parse(info.content);
+    expect(parsed.outline).toHaveLength(30);
+    expect(parsed.outline_total).toBe(35);
+    expect(parsed.outline[0].text).toBe('Heading 1');
+  });
+
   it('inserts text and replaces only a real selection', () => {
     const engine = engineFor(['Hello world']);
     expect(tool(engine, 'replace_selection', { text: 'x' })).toMatchObject({ ok: false });

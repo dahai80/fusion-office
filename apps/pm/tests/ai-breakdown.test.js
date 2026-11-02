@@ -68,6 +68,16 @@ describe('AI task breakdown', () => {
         expect(section.querySelector('.ai-status').textContent).toBe('2 steps added.');
     });
 
+    it('cuts an over-long description and says so in the prompt', async () => {
+        const section = mount({ id: 't1', title: 'Big task', description: 'd'.repeat(9000), checklist: [] });
+        aiButton(section).click();
+        await flush();
+        const prompt = ai.calls[0].messages.at(-1).content;
+        expect(prompt).toContain('d'.repeat(100));
+        expect(prompt).not.toContain('d'.repeat(8001));
+        expect(prompt).toContain('[Description truncated to the first 8000 of 9000 characters.]');
+    });
+
     it('says when AI is not configured', async () => {
         ai.configured = false;
         const section = mount();

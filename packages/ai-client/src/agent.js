@@ -34,7 +34,7 @@ export function userText(content, { close = DEFAULT_CLOSE } = {}) {
  * snapshots and long tool results, and past the budget the oldest turns go.
  * The latest turn always stays whole.
  */
-export function requestMessages(messages, { system = '', budget = DEFAULT_BUDGET } = {}) {
+export function requestMessages(messages, { system = '', budget = DEFAULT_BUDGET, changelog = [] } = {}) {
     let lastUser = -1;
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'user') { lastUser = i; break; }
     const out = messages.map((m, i) => {
@@ -55,7 +55,12 @@ export function requestMessages(messages, { system = '', budget = DEFAULT_BUDGET
         for (let i = start; i < next; i++) total -= size(out[i]);
         start = next;
     }
-    return [{ role: 'system', content: system }, ...out.slice(start)];
+    // Changes made earlier in the session ride right behind the instructions:
+    // what an evicted turn did is not lost with it, and the block only ever
+    // grows, so the cached prefix stays longest.
+    const head = [{ role: 'system', content: system }];
+    if (changelog.length) head.push({ role: 'system', content: `Changes made earlier in this session (oldest first):\n${changelog.map((line) => `- ${line}`).join('\n')}` });
+    return [...head, ...out.slice(start)];
 }
 
 /**
@@ -76,6 +81,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
     const names = new Set(tools.map(tool => tool.function?.name).filter(Boolean));
     let messages = [];
     let running = null;
+    const changelog = []; // one line per change the assistant made, oldest first
     let seq = 0;
     const newId = () => `call_${Date.now().toString(36)}_${(++seq).toString(36)}`;
 
@@ -99,7 +105,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 if (round) emit({ type: 'round' });
                 let said = '';
                 const calls = [];
-                const stream = chat(requestMessages(transcript, { system }), { model, tools, maxTokens: maxOutputTokens });
+                const stream = chat(requestMessages(transcript, { system, changelog }), { model, tools, maxTokens: maxOutputTokens });
                 const iter = stream[Symbol.asyncIterator]();
                 for (;;) {
                     const next = await Promise.race([iter.next(), stopped]);
@@ -149,6 +155,10 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                             if (value.changed) step.changed = true;
                             if (value.target !== undefined) step.target = value.target;
                             if (value.error) step.error = value.error;
+                            if (step.changed) {
+                                changelog.push(`${step.label || step.name}${step.target !== undefined && step.target !== null ? ` (${step.target})` : ''}`);
+                                if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                            }
                             content = value.content ?? (value.ok === false ? 'Error: the tool failed.' : 'Done.');
                         } catch (err) {
                             step.status = 'error';
@@ -176,6 +186,6 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
             return exchange(String(text ?? ''), onEvent);
         },
         stop() { running?.stop(); },
-        reset() { messages = []; running?.stop(); },
+        reset() { messages = []; changelog.length = 0; running?.stop(); },
     };
 }
