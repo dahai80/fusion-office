@@ -15,6 +15,7 @@ import { templateById } from './lib/templates.js';
 import { importFiles, nothingImportable } from './lib/importfiles.js';
 import { imageFilesFrom } from './lib/images.js';
 import { customTemplatePath } from './lib/customtemplates.js';
+import { parseDeepLinkImport } from './lib/deeplink.js';
 import { parseLink } from './collab/protocol.js';
 
 const appRoot = document.getElementById('app');
@@ -297,6 +298,16 @@ async function route({ newDocument = false } = {}) {
       }
       const t = template ? templateById(template) : null;
       if (template && !t) toast('That template does not exist', { icon: 'alert' });
+      // A deep link from another Fusion module (issue #6) starts the document
+      // with content already in it; a template named alongside is ignored.
+      let prefill = null;
+      try { prefill = parseDeepLinkImport(requestedHash); }
+      catch (e) { console.error(e); toast(e.message, { icon: 'alert', duration: 8000 }); }
+      if (prefill) {
+        if (prefill.source) console.info('[documents] deep-link import from', prefill.source);
+        openEditor(Doc.fromTextImport(prefill.name, prefill.payload));
+        return;
+      }
       openEditor(Doc.blank(t ? { template: t.id, name: t.name } : {}));
       return;
     }

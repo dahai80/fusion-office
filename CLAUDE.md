@@ -130,6 +130,17 @@ When changing a prompt, a tool schema, or its runner, update the matching unit t
 Tests mock `@fusion-office/ai-client`; live verification is separate in
 `scripts/verify-ai.mjs`.
 
+### Deep-link hand-off
+
+Other Fusion modules (first caller: fusion-design) open generated content through the
+app URLs. Documents: `#/new?title=<name>&body=<urlencoded>&format=html|markdown|text&source=<module>`
+creates a document through the file-import path (1,000,000-character cap; `format`
+defaults to markdown; `name` = `title`; `source` is log-only). Presentation:
+`#/home?prompt=<urlencoded>&source=<module>` prefills the describe-your-presentation
+box (4,000-character cap) and does not auto-run generation. Payloads ride in the URL
+fragment; parsing lives in `apps/documents/src/lib/deeplink.js` and
+`apps/presentation/src/start/deeplink.js`.
+
 ### Union shell
 
 Each app has `web/manifest.json` with id `fusion-office-<app>`, path `/office/<app>`,

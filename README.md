@@ -187,6 +187,38 @@ short-lived session, verifies the HTML app root and one hashed asset, then unreg
 everything and exits. Both keys stay in environment variables and are never written to
 the repository.
 
+### Deep-link hand-off from other Fusion modules
+
+Another Fusion module (fusion-design is the first caller) opens a generated document or
+deck through the app's own URL. The payload rides in the URL fragment, so nothing is sent
+to any server and the apps stay static; the hand-off applies when the app opens, and
+saving keeps following the app's normal flow (the workspace picker, then the file).
+
+Documents — open a new document with content already in it (issue #6):
+
+```text
+#/new?title=<name>&body=<urlencoded content>&format=html|markdown|text&source=<module>
+```
+
+- `format` defaults to `markdown`; `md`, `txt`, and `plain` are accepted aliases.
+- `name` is a synonym for `title`. `source` is recorded in the browser log only.
+- The content takes the same import path as a dropped Markdown, HTML, or text file.
+  Up to 1,000,000 characters; a larger body is refused with an actionable message.
+  Bigger artifacts should travel as files.
+- A `#/new/<template>` template alongside a `body` is ignored.
+
+Presentation — open the library with the describe-your-presentation box prefilled:
+
+```text
+#/home?prompt=<urlencoded>&source=<module>
+```
+
+The prompt is prepared, not run: writing the deck stays a user action, because it spends
+model calls. The prompt is capped at the box's 4,000 characters.
+
+Both apps ignore deep links whose parameters are absent, and unknown parameters never
+change behavior.
+
 ## Build and test
 
 ```bash

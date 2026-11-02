@@ -110,6 +110,7 @@ import {
   libraryFilter,
 } from "./start/start-screen.js";
 import { generateDeck, themeDeck } from "./start/deck-from-prompt.js";
+import { parseHomePrompt } from "./start/deeplink.js";
 import { createThemeTools, themeStartPicture } from "./themes/design-tab.js";
 import { createBackgroundPane } from "./themes/format-background.js";
 import { lucide } from "./draw/draw-icons.js";
@@ -233,6 +234,11 @@ const MENU_BUTTON = { "aria-haspopup": "menu", "aria-expanded": "false" };
 // Nobody has to sign in to work: the app opens into a new presentation, and
 // the library has a URL of its own so a reload or a link can land there.
 const LIBRARY_HASH = "#/home";
+// A deep link from another Fusion module (issue #6) opens the library with
+// the describe box filled: #/home?prompt=<urlencoded>&source=<module>.
+const libraryRequested = () =>
+  location.hash === LIBRARY_HASH ||
+  location.hash.startsWith(LIBRARY_HASH + "?");
 // (`history` is the undo history in this module; the browser's is on window.)
 function showLibraryUrl() {
   if (location.hash !== LIBRARY_HASH)
@@ -917,6 +923,14 @@ async function loadLibrary(req = ++homeRequest, requestOwner = owner()) {
   loading = false;
   renderFileList();
 }
+// The deep-link prompt is consumed where the box is built; the module that
+// asked for the hand-off is logged once, on the screen it opens with.
+function promptFromDeepLink() {
+  const deepLink = parseHomePrompt();
+  if (deepLink?.source)
+    console.info("[presentation] deep-link prompt from", deepLink.source);
+  return deepLink;
+}
 function renderHome() {
   dismissMenuWithin(app);
   canvasObserver?.disconnect();
@@ -992,6 +1006,7 @@ function renderHome() {
           available: () => cloud.canAI(),
           create: (description, options) =>
             deckFromPrompt(description, options),
+          value: promptFromDeepLink()?.prompt || "",
         }),
         el(
           "section",
@@ -16167,7 +16182,7 @@ window.addEventListener(
   "hashchange",
   run(async () => {
     if (signingOut) return;
-    if (location.hash === LIBRARY_HASH) {
+    if (libraryRequested()) {
       if (view === "home") return;
       if (await leaveEditor()) await home();
       else showEditorUrl();
@@ -16347,7 +16362,7 @@ cloud.onWindowClose(closeWindow);
 const initialAccountRequest = accountRequest;
 const initialAccount = cloud.user();
 if (launchItems) await openLaunched(launchItems).catch(fail);
-else if (location.hash === LIBRARY_HASH) renderHome();
+else if (libraryRequested()) renderHome();
 else
   await newDeck("blank", "studio", null, { pristine: true }).catch((error) => {
     fail(error);

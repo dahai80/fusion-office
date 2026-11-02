@@ -53,7 +53,13 @@ export function homeRail(sections, current = "home") {
  * and resolves once the deck is open (or throws). `available()` says whether
  * the AI can be reached.
  */
-export function promptBox({ themes, theme, create, available }) {
+export function promptBox({
+  themes,
+  theme,
+  create,
+  available,
+  value = "",
+}) {
   const field = el("textarea", {
     class: "home-prompt-input",
     rows: 2,
@@ -62,6 +68,7 @@ export function promptBox({ themes, theme, create, available }) {
       "Describe your presentation: what it is about, who it is for, and anything it must cover",
     "aria-label": "Describe your presentation",
   });
+  if (value) field.value = value;
   const slides = el(
     "select",
     { class: "home-prompt-select", "aria-label": "Number of slides" },
