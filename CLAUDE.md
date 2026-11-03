@@ -113,18 +113,31 @@ and runner in a `*-tools` module; keep the two in step.
   selection (asks approval), format, insert a table or page break, add a link. Each tool
   call is one undo step. `src/lib/puter.js` also carries the language tools, grammar
   checks, smart lookup, and drawing through `aiChat`; `assistantPrompt` /
-  `readReply` in `src/lib/assistant.js` remain for those JSON-shaped calls.
+  `readReply` in `src/lib/assistant.js` remain for those JSON-shaped calls. One-shot
+  AI features live in `src/lib/thesaurus-ai.js` (thesaurus pane, static WordNet
+  fallback), `src/lib/alt-text-ai.js` (alt-text suggestion), and
+  `src/lib/summarize-ai.js` (Tools → Summarize with AI pane, 20,000-char cap).
 - Spreadsheet: `src/lib/puter.js` `aiChat` / `aiChatStream`; used by the AI dialog,
-  AI panel, translation, thesaurus, and `AI`/`TRANSLATE`/`DETECTLANGUAGE` sheet functions.
+  AI panel, translation, thesaurus, and `AI`/`TRANSLATE`/`DETECTLANGUAGE` sheet
+  functions. `src/ui/error-smarttag.js` has an Explain-with-AI action (formula, error
+  code, ~20 sampled cells) and `src/ui/chartdialog.js` a Suggest-with-AI action
+  (50-cell sample, reply constrained to the supported chart types).
 - Presentation: `src/cloud.js` `aiChat` and `aiChatStream` (tool-event stream); used by
-  prompt-to-deck, the assistant panel, and slide review.
+  prompt-to-deck, the assistant panel, and slide review. `src/notes-ai.js` adds
+  Generate-with-AI buttons in the speaker-notes pane (per slide and all slides,
+  8,000-char batch cap, writes through the same mutateSlide path as the notes box).
 - PDF: `src/ai-panel.js` is an assistant over the open file, backed by
   `src/ai-tools.js` and the command closure in `src/editor.js` (`info`, `readPages`,
   `find`, `goTo`, `zoom`, `bookmark`). It reads at most 20 pages per call; scanned
-  documents require OCR first.
+  documents require OCR first. The panel also has one-shot quick actions: Summarize
+  document (bounded through the same caps, 60-page/40,000-char input cap) and
+  Translate page (remembers the last language).
 - PM: `src/ui/assistant.js` opens the project assistant over `src/lib/ai-tools.js` and
   the store (tasks, columns, checklist items, comments; delete asks approval).
   `src/ui/checklist.js` still calls `AI.jsonChat` for task breakdown.
+  `src/ui/brief.js` has an AI standup action (overdue/near-due risks folded into the
+  summary, 8,000-char payload cap) and `src/ui/quickadd.js` parses typed lines with the
+  model when configured, falling back to the mechanical parse on any invalid reply.
 
 When changing a prompt, a tool schema, or its runner, update the matching unit test.
 Tests mock `@fusion-office/ai-client`; live verification is separate in

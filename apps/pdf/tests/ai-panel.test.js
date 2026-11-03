@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
     configured: true,
     calls: [],
     replies: [],
+    chats: [],
+    chatReplies: [],
     fail: null,
 }));
 
@@ -13,6 +15,11 @@ vi.mock('@fusion-office/ai-client', async (importOriginal) => ({
     ...(await importOriginal()),
     isConfigured: () => state.configured,
     createModelPicker: () => null,
+    chat: vi.fn(async (options) => {
+        state.chats.push(options);
+        if (state.fail) throw state.fail;
+        return state.chatReplies.shift() || '';
+    }),
     chatStreamEvents: vi.fn(async function* (options) {
         state.calls.push(options);
         for (const part of state.replies.shift() || []) yield part;
@@ -43,6 +50,8 @@ beforeEach(() => {
     state.configured = true;
     state.calls = [];
     state.replies = [];
+    state.chats = [];
+    state.chatReplies = [];
     state.fail = null;
 });
 
@@ -127,5 +136,58 @@ describe('PDF AI panel', () => {
         panel.el.querySelector('.btn.primary').click();
         await flush();
         expect(panel.el.querySelector('.ai-status').textContent).toContain('VITE_FUSION_GATEWAY_KEY');
+    });
+
+    it('summarizes the document in bounded chunks and shows the result', async () => {
+        state.chatReplies = ['What: a quarterly report.\nKey points:\n- Revenue grew [Page 1].'];
+        const c = commands();
+        c.info = vi.fn(() => ({ pages: 100, page: 1, zoom: 100, bookmarks: false }));
+        c.readPages = vi.fn(async (from) => ({ ok: true, content: `[Page ${from}] ${'x'.repeat(14000)}` }));
+        const { panel } = mount(c);
+        [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Summarize document').click();
+        await flush();
+        await flush();
+        expect(c.readPages).toHaveBeenCalledTimes(3);
+        expect(c.readPages).toHaveBeenCalledWith(1, 20);
+        expect(c.readPages).toHaveBeenCalledWith(21, 20);
+        expect(c.readPages).toHaveBeenCalledWith(41, 20);
+        expect(state.chats).toHaveLength(1);
+        const user = state.chats[0].messages.find((m) => m.role === 'user');
+        const documentText = user.content.split('Document text:\n')[1];
+        expect(documentText.length).toBeLessThanOrEqual(40000);
+        expect(user.content).toContain('Only part of it fits');
+        expect(panel.el.querySelector('.ai-answer-text').textContent).toContain('Key points');
+        expect(panel.el.querySelector('.ai-status').textContent).toBe('');
+    });
+
+    it('translates the current page and remembers the language', async () => {
+        state.chatReplies = ['Der Umsatz wuchs um 12 Prozent.'];
+        const { panel, commands: c } = mount();
+        const input = panel.el.querySelector('.ai-translate-language');
+        input.value = 'German';
+        [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Translate page').click();
+        await flush();
+        await flush();
+        expect(c.readPages).toHaveBeenCalledWith(1, 1);
+        expect(state.chats[0].messages.find((m) => m.role === 'user').content).toContain('into German');
+        expect(panel.el.querySelector('.ai-answer-text').textContent).toBe('Der Umsatz wuchs um 12 Prozent.');
+        input.value = '';
+        state.chatReplies = ['Noch einmal.'];
+        [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Translate page').click();
+        await flush();
+        await flush();
+        expect(state.chats[1].messages.find((m) => m.role === 'user').content).toContain('into German');
+        expect(panel.el.querySelector('.ai-answer-text').textContent).toBe('Noch einmal.');
+    });
+
+    it('shows a gateway failure from the one-shot actions inline', async () => {
+        state.fail = new Error('fetch failed');
+        const { panel } = mount();
+        [...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Summarize document').click();
+        await flush();
+        await flush();
+        expect(panel.el.querySelector('.ai-status').textContent).toContain('could not be reached');
+        expect(panel.el.querySelector('.ai-answer-text').textContent).toBe('');
+        expect([...panel.el.querySelectorAll('button')].find((b) => b.textContent === 'Summarize document').disabled).toBe(false);
     });
 });

@@ -2,12 +2,13 @@ import { el, clear } from '../lib/dom.js';
 import { icon } from './icons.js';
 import { store, LABEL_COLORS } from '../lib/store.js';
 import { parseQuickAdd, QUICK_ADD_HINTS } from '../lib/quickadd.js';
-import { fieldId } from '../lib/util.js';
-import { fmtShort, fmtLong } from '../lib/dates.js';
+import { fieldId, debounce } from '../lib/util.js';
+import { fmtShort, fmtLong, isValidISO, todayISO } from '../lib/dates.js';
 import { openModal } from './modal.js';
 import { toast } from './toast.js';
 import { openTaskSheet } from './tasksheet.js';
 import { avatar } from './bits.js';
+import * as AI from '@fusion-office/ai-client';
 
 /**
  * Quick add: the shared parsing UI (live chips under a composer) and the
@@ -70,6 +71,12 @@ export function quickAddChips({ doc, onChange }) {
     node,
     parse,
     reset() { ignore.clear(); clear(node); },
+    /** Show tokens from an outside parse (the AI path) with the same chips. */
+    show(tokens) {
+      clear(node);
+      if (tokens.length) node.append(...tokens.map(chipFor));
+      node.hidden = !tokens.length;
+    },
     /** Redraw for `text`, and hand back the parse it is showing. */
     update(text) {
       const parsed = parse(text);
@@ -169,7 +176,7 @@ export function openQuickAdd({ projectId = null } = {}) {
     'aria-label': 'Task title, with optional date, priority, label, and assignee',
     autocomplete: 'off',
     maxLength: 300,
-    oninput: () => refresh(),
+    oninput: () => { refresh(); scheduleAiParse(); },
     onkeydown: (e) => {
       if (e.isComposing) return;
       if (e.key === 'Enter') { e.preventDefault(); submit(); }
@@ -180,8 +187,68 @@ export function openQuickAdd({ projectId = null } = {}) {
   const recent = el('div.qa-recent');
   const addBtn = el('button.btn.btn-primary', { type: 'button', disabled: true, onclick: () => submit() }, 'Add task');
 
+  // Natural-language parse from the gateway. The mechanical chips stay live
+  // and instant; when the AI answers, its tokens replace them, and submit
+  // prefers the AI parse only for the line it was computed from. Anything
+  // else — not configured, a rejected reply, a gateway failure — leaves the
+  // mechanical parse untouched.
+  let aiParse = null;
+  let aiSeq = 0;
+  const scheduleAiParse = debounce(runAiParse, 500);
+
+  function aiTokens(parsed) {
+    return parsed.dueDate
+      ? [{ kind: 'due', raw: parsed.dueDate, value: parsed.dueDate, label: parsed.dueDate }]
+      : [];
+  }
+
+  function acceptAiParse(reply, text) {
+    const title = String(reply?.title ?? '').trim();
+    if (!title) return null;
+    const wanted = String(reply?.column ?? '').trim().toLowerCase();
+    const column = doc.columns.find((c) => c.name.toLowerCase() === wanted);
+    if (!column) return null;
+    let due = reply?.due_date;
+    if (due != null) {
+      due = String(due).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || !isValidISO(due)) return null;
+    } else {
+      due = null;
+    }
+    return { source: text, title: title.slice(0, 200), columnId: column.id, dueDate: due };
+  }
+
+  async function runAiParse() {
+    if (!doc || !AI.isConfigured()) return;
+    const text = input.value.trim();
+    if (!text) { aiParse = null; return; }
+    const seq = ++aiSeq;
+    try {
+      const reply = await AI.jsonChat({
+        messages: [
+          { role: 'system', content: 'You turn one line of natural language into a task. Reply with JSON only.' },
+          { role: 'user', content: [
+            'Turn the line below into a task.',
+            'Reply with JSON only: {"title":"...","column":"<one of the column names below>","due_date":"YYYY-MM-DD" or null}.',
+            `Columns: ${doc.columns.map((c) => c.name).join(', ')}.`,
+            `Today is ${todayISO()}.`,
+            `Line: ${text}`,
+          ].join('\n') },
+        ],
+      });
+      if (seq !== aiSeq || input.value.trim() !== text) return;
+      aiParse = acceptAiParse(reply, text);
+      if (aiParse) chips.show(aiTokens(aiParse));
+      else console.warn('[pm] quick add AI parse rejected, keeping the mechanical one');
+    } catch (error) {
+      if (seq === aiSeq) aiParse = null;
+      console.warn('[pm] quick add AI parse failed, keeping the mechanical one', error);
+    }
+  }
+
   function refresh() {
     const parsed = chips.update(input.value);
+    if (aiParse && input.value.trim() !== aiParse.source) aiParse = null;
     addBtn.disabled = !parsed.title.trim();
     return parsed;
   }
@@ -230,15 +297,25 @@ export function openQuickAdd({ projectId = null } = {}) {
 
   function submit() {
     if (!doc) return;
-    const parsed = refresh();
+    let parsed = refresh();
     if (!parsed.title.trim()) { input.focus(); return; }
-    const columnId = columnSelect.value || doc.columns[0]?.id;
+    let columnId = columnSelect.value || doc.columns[0]?.id;
     if (!columnId) return;
+    if (aiParse && input.value.trim() === aiParse.source) {
+      parsed.title = aiParse.title;
+      parsed.dueDate = aiParse.dueDate;
+      columnId = aiParse.columnId;
+      columnSelect.value = aiParse.columnId;
+      chips.show(aiTokens(aiParse));
+      console.log('[pm] quick add used the AI parse:', aiParse.title);
+    }
     const task = applyQuickAdd(current, columnId, parsed);
     rememberQuickAddTarget(current, columnId);
     added = [...added, { projectId: current, taskId: task.id, title: task.title }];
     input.value = '';
     chips.reset();
+    aiParse = null;
+    aiSeq += 1;
     refresh();
     renderRecent();
     // Enter adds and stays put: capture is usually more than one thought.

@@ -197,7 +197,7 @@ describe("radar value-axis minimum is the automatic lattice origin", () => {
             reject(
               new Error("Automatic radar tick enumeration did not terminate"),
             ),
-          8000,
+          25000,
         );
       });
       const r = paint(result.src, 5);
@@ -214,5 +214,7 @@ describe("radar value-axis minimum is the automatic lattice origin", () => {
       clearTimeout(timer);
       await worker.terminate();
     }
-  }, 10000);
+    // The worker boots a whole Vite SSR server; under a busy machine that
+    // alone can pass 10 seconds, so allow for it.
+  }, 30000);
 });

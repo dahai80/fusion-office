@@ -3,6 +3,9 @@ import { icon } from './icons.js';
 import { store, docBrief } from '../lib/store.js';
 import { debounce } from '../lib/util.js';
 import { markdownFragment } from './markdown.js';
+import { doneColumnIds } from '../lib/board.js';
+import { todayISO, diffDays } from '../lib/dates.js';
+import * as AI from '@fusion-office/ai-client';
 
 /**
  * The project brief: what the project is for, what "done" means, where the
@@ -41,6 +44,11 @@ function rememberExpanded(projectId, open) {
 
 const PLACEHOLDER = 'What is this project for? What does done mean? '
   + 'Where do the spec and the files live? Markdown is supported';
+
+/** The project data sent to the standup call is cut, never sent whole. */
+const MAX_STANDUP_CHARS = 8000;
+
+const SOON_DAYS = 3;
 
 /** briefPanel({ projectId }) → node with .destroy() */
 export function briefPanel({ projectId }) {
@@ -113,8 +121,117 @@ export function briefPanel({ projectId }) {
     editBtn
   );
 
+  let standupShown = false;
+
+  const standupBtn = el('button.btn.btn-ghost.btn-sm.brief-standup-btn', {
+    type: 'button',
+    html: icon('sparkle', 14, 2.2),
+    title: 'Summarize this project with the local AI',
+    onclick: () => runStandup(),
+  }, ' AI standup');
+
+  const standupStatus = el('p.form-hint.brief-standup-status', { role: 'status' });
+  const standupOut = el('div.md.brief-standup');
+  const standupRow = el('div.row.brief-standup-row', {}, standupBtn);
+
+  function standupLine(task, column, doneOn) {
+    const bits = [task.title];
+    if (column?.name) bits.push(column.name);
+    if (task.dueDate) bits.push(`due ${task.dueDate}`);
+    if (doneOn) bits.push(`done ${doneOn}`);
+    return `- ${bits.join(' | ')}`;
+  }
+
+  /** Due/overdue/completed tasks, capped, with a note when tasks were cut. */
+  function standupPayload() {
+    const doc = store.getDoc(projectId);
+    const doneIds = doneColumnIds(doc);
+    const today = todayISO();
+    const columns = new Map(doc.columns.map((c) => [c.id, c]));
+    const groups = { overdue: [], today: [], soon: [], open: [], done: [] };
+    for (const task of doc.tasks) {
+      if (doneIds.has(task.columnId)) { groups.done.push([task, columns.get(task.columnId)]); continue; }
+      const left = task.dueDate ? diffDays(today, task.dueDate) : null;
+      if (left !== null && left < 0) groups.overdue.push([task, columns.get(task.columnId)]);
+      else if (left === 0) groups.today.push([task, columns.get(task.columnId)]);
+      else if (left !== null && left <= SOON_DAYS) groups.soon.push([task, columns.get(task.columnId)]);
+      else groups.open.push([task, columns.get(task.columnId)]);
+    }
+    const labels = {
+      overdue: 'Overdue', today: 'Due today', soon: `Due within ${SOON_DAYS} days`,
+      open: 'Open', done: 'Completed',
+    };
+    let body = `Project: ${doc.name}\nToday: ${today}`;
+    let shown = 0;
+    let total = 0;
+    let used = body.length;
+    for (const [key, rows] of Object.entries(groups)) {
+      total += rows.length;
+      used += labels[key].length + 2;
+      const lines = [];
+      for (const [task, column] of rows) {
+        const doneOn = key === 'done' && task.doneAt
+          ? new Date(task.doneAt).toISOString().slice(0, 10) : null;
+        const line = standupLine(task, column, doneOn);
+        if (used + line.length + 1 > MAX_STANDUP_CHARS) break;
+        lines.push(line);
+        used += line.length + 1;
+      }
+      if (!lines.length) continue;
+      shown += lines.length;
+      body += `\n\n${labels[key]}:\n${lines.join('\n')}`;
+    }
+    const omitted = total - shown;
+    if (omitted > 0) {
+      body += `\n\n[Truncated: ${omitted} of ${total} tasks omitted to keep this under ${MAX_STANDUP_CHARS} characters.]`;
+    }
+    return body;
+  }
+
+  async function runStandup() {
+    if (standupBtn.disabled) return;
+    if (!AI.isConfigured()) {
+      standupStatus.textContent = 'AI is not configured. Set VITE_FUSION_GATEWAY_KEY for the gateway.';
+      return;
+    }
+    standupBtn.disabled = true;
+    standupStatus.textContent = 'Thinking…';
+    try {
+      const reply = await AI.jsonChat({
+        messages: [
+          { role: 'system', content: 'You write concise project standups. Reply with JSON only.' },
+          { role: 'user', content: [
+            'Write a short standup for this project.',
+            'Cover three things: what was done recently, what is due today, and blockers or risks.',
+            'Call out the overdue and soon-due tasks as risks, by name.',
+            'Write it in the same language the task titles use. Markdown, at most 120 words.',
+            'Reply with JSON only: {"standup":"..."}',
+            '',
+            standupPayload(),
+          ].join('\n') },
+        ],
+      });
+      const standup = String(reply?.standup ?? '').trim();
+      if (!standup) {
+        standupStatus.textContent = 'The assistant returned no summary. Try again.';
+        return;
+      }
+      standupShown = true;
+      clear(standupOut);
+      standupOut.append(markdownFragment(standup));
+      standupStatus.textContent = '';
+      console.log('[pm] ai standup rendered for project', projectId);
+    } catch (error) {
+      console.warn('[pm] ai standup failed', error);
+      standupStatus.textContent = 'The assistant could not answer. Check that fusion-gateway is running.';
+    } finally {
+      standupBtn.disabled = false;
+      render();
+    }
+  }
+
   const root = el('section.brief', { 'aria-label': 'Project overview' },
-    addBtn, head, body, moreBtn, input, hint);
+    addBtn, head, body, moreBtn, input, hint, standupRow, standupStatus, standupOut);
 
   /**
    * Whether the two-line clamp hides anything — the only thing that justifies
@@ -212,6 +329,9 @@ export function briefPanel({ projectId }) {
       if (brief) body.append(markdownFragment(brief));
       body.classList.toggle('collapsed', !expanded);
     }
+    standupRow.hidden = editing;
+    standupStatus.hidden = editing;
+    standupOut.hidden = editing || !standupShown;
     syncMore();
   }
 

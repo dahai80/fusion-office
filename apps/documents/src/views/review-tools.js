@@ -12,7 +12,7 @@ import { createEditorPane } from './editor-pane.js';
 import { createThesaurusPane } from './thesaurus-pane.js';
 import { openWordCount } from './word-count.js';
 import { createAccessibilityPane } from './accessibility-pane.js';
-import { openLanguageDialog, createTranslatePane, TRANSLATION_LANGUAGE, DETECT_LANGUAGE } from './language-tools.js';
+import { openLanguageDialog, createTranslatePane, createSummarizePane, TRANSLATION_LANGUAGE, DETECT_LANGUAGE } from './language-tools.js';
 import { createCommentsPane } from './comments-pane.js';
 import { createRestrictEditing } from './restrict-editing.js';
 import { openCompareDialog } from './compare-dialog.js';
@@ -25,6 +25,7 @@ export function createReviewTools({ editor, pkg, error, author, review, proofing
   const thesaurus = createThesaurusPane({ editor, pkg, error });
   const accessibility = createAccessibilityPane({ editor, pkg, error, onState: onChange });
   const translator = createTranslatePane({ editor, pkg, error, openDocument, documentName });
+  const summarize = createSummarizePane({ editor, pkg, error });
   const people = () => {
     const engine = editor(); if (!engine) return [];
     const body = engine.session.body;
@@ -119,6 +120,7 @@ export function createReviewTools({ editor, pkg, error, author, review, proofing
     proofingLanguage() { const engine = editor(); const tag = engine?.model.runFormatting?.fontLanguage || pkg()?.reviewSettings?.defaultLanguage || 'en-US'; return { tag, name: languageName(tag), open: languageDialog }; },
     translateSelection: () => translator.open(),
     translateDocument: () => translator.open(),
+    summarize: () => { if (editor()) summarize.open(); },
     translateItems: () => [
       { label: 'Translate Selection', onSelect: () => translator.open() },
       { label: 'Translate Document', onSelect: () => translator.open() },
@@ -178,6 +180,7 @@ export function createReviewTools({ editor, pkg, error, author, review, proofing
       { label: 'Spelling and Grammar', icon: 'spelling', items: commands.spellingItems() },
       { label: 'Thesaurus…', icon: 'thesaurus', shortcut: 'Shift+F7', disabled: !has, onSelect: commands.thesaurus },
       { label: 'Translate', icon: 'translate', disabled: !has, items: commands.translateItems() },
+      { label: 'Summarize with AI…', icon: 'outline', disabled: !has, onSelect: commands.summarize },
       { label: 'Language…', icon: 'language', disabled: !ready(), onSelect: languageDialog },
       { separator: true },
       { label: 'Word Count…', icon: 'wordCount', shortcut: `${MOD_KEY}+Shift+G`, disabled: !has, onSelect: commands.wordCount },
@@ -245,7 +248,7 @@ export function createReviewTools({ editor, pkg, error, author, review, proofing
 
   return {
     commands, extendTab, extendMenu, contextMenuItems, people, fileItems,
-    panes: [editorPane.pane.node, thesaurus.pane.node, accessibility.pane.node, translator.pane.node, commentsPane.pane.node, restrict.pane.node],
+    panes: [editorPane.pane.node, thesaurus.pane.node, accessibility.pane.node, translator.pane.node, summarize.pane.node, commentsPane.pane.node, restrict.pane.node],
     /** Tints the comment layer adds to its own: editable regions under protection. */
     tints: () => restrict.tints(),
     attach(engine) {
@@ -264,7 +267,7 @@ export function createReviewTools({ editor, pkg, error, author, review, proofing
     selectionChanged() { editorPane.selectionChanged(); translator.selectionChanged(); },
     get trackingLocked() { return restrict.trackingLocked; },
     get protectionEnforced() { return restrict.enforced; },
-    destroy() { keyAbort.abort(); for (const part of [editorPane, thesaurus, accessibility, translator, commentsPane, restrict]) part.destroy(); },
+    destroy() { keyAbort.abort(); for (const part of [editorPane, thesaurus, accessibility, translator, summarize, commentsPane, restrict]) part.destroy(); },
   };
 }
 

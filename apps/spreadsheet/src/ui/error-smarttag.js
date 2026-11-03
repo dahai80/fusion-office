@@ -9,10 +9,14 @@ import { icon } from './icons.js';
 import { openMenu } from './menu.js';
 import { openModal } from './modal.js';
 import { errorCheckAt, textToNumber, ERROR_RULES, errorCheckingOptions, setErrorCheckingOptions } from '../core/error-checking.js';
-import { shiftFormula } from '../core/refs.js';
+import { shiftFormula, mapFormulaRefs } from '../core/refs.js';
+import { cellName, cutText } from '../core/cell.js';
 import { savePref, syncPref } from '../lib/user-prefs.js';
+import * as P from '../lib/puter.js';
 
 const PREF = 'error-checking';
+// The cells quoted with an AI error explanation, taken from the ranges the formula references.
+const AI_EXPLAIN_CELLS = 20;
 
 /** Keep the Error Checking choices for the person: in this browser and with their account (see lib/user-prefs.js). */
 export function saveErrorChecking(options) {
@@ -64,6 +68,58 @@ export function createErrorSmartTag(ctx) {
     }
   };
 
+  // The cells a formula names, values as shown, up to AI_EXPLAIN_CELLS of them: the context an
+  // explanation of the error quotes. Whole-row and whole-column references are passed over.
+  function sampleReferencedCells(sheetId, formula) {
+    if (formula == null) return [];
+    const cells = [];
+    mapFormulaRefs(formula, (ref) => {
+      if (ref.sheet || ref.kind === 'rows' || ref.kind === 'cols') return ref;
+      for (let rr = ref.r1; rr <= ref.r2 && cells.length < AI_EXPLAIN_CELLS; rr++) {
+        for (let cc = ref.c1; cc <= ref.c2 && cells.length < AI_EXPLAIN_CELLS; cc++) {
+          const text = rr >= 0 && cc >= 0 ? ctx.wb.getDisplay(sheetId, rr, cc) : '';
+          if (text) cells.push(`${cellName(rr, cc)}="${cutText(text, 40)}"`);
+        }
+      }
+      return ref;
+    });
+    return cells;
+  }
+
+  // One-shot AI explanation of the error in the tagged cell, shown in a popup beside the tag
+  // while it loads. A failure is said there in words, and logged, never silent.
+  function explainWithAI(sheetId, r, c, check) {
+    const { wb } = ctx;
+    const cell = wb.getCell(sheetId, r, c);
+    const formula = cell?.f != null ? cell.f : null;
+    const cells = sampleReferencedCells(sheetId, formula);
+    const prompt = [
+      'You explain spreadsheet errors to a non-expert in one short paragraph of plain language: what this error means here and the likely fix. No headings, no code fences, no bullet lists.',
+      '',
+      `Sheet: "${wb.sheet(sheetId).name}". Cell with the problem: ${cellName(r, c)}.`,
+      formula != null ? `Formula: =${formula}` : `Cell value: ${cutText(String(cell?.v ?? ''), 200)}`,
+      `Error: ${check.title}${check.error ? ` (${check.error})` : ''}`,
+      cells.length ? `Cells the formula references: ${cells.join(', ')}.` : '',
+    ].filter(Boolean).join('\n');
+    const status = el('p.menu-hint', { role: 'status' }, 'Asking the assistant…');
+    const answer = el('p.error-smarttag-ai-answer', { role: 'status', hidden: true });
+    const failure = el('p.menu-hint.error-smarttag-ai-failure', { role: 'alert', hidden: true });
+    openMenu({
+      anchor: button, label: 'AI explanation of this error', minWidth: 280,
+      items: [{ custom: el('div.error-smarttag-ai', {}, status, answer, failure) }],
+    });
+    P.aiChat(prompt, { feature: 'explain-error' }).then((reply) => {
+      status.hidden = true;
+      answer.textContent = String(reply).trim();
+      answer.hidden = false;
+    }).catch((err) => {
+      console.error('AI error explanation failed', err);
+      status.hidden = true;
+      failure.textContent = `Could not ask the AI: ${err?.message || 'unknown error'}`;
+      failure.hidden = false;
+    });
+  }
+
   function openTagMenu() {
     if (!found) return;
     const { sheetId, r, c, check } = found;
@@ -72,6 +128,9 @@ export function createErrorSmartTag(ctx) {
       items: [
         { header: check.title },
         ...fixes(check, sheetId, r, c),
+        P.canAI()
+          ? { label: 'Explain with AI', icon: 'sparkle', onSelect: () => explainWithAI(sheetId, r, c, check) }
+          : { label: 'Explain with AI', icon: 'sparkle', disabled: true, hint: 'AI is not available here' },
         { label: 'Ignore Error', onSelect: () => ctx.wb.ignoreErrors(sheetId, [{ r1: r, c1: c, r2: r, c2: c }], check.key) },
         { label: 'Edit in Formula Bar', onSelect: () => ctx.focusFormulaBar?.() },
         { separator: true },

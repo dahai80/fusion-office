@@ -11,6 +11,12 @@ import { renderChartSvg, seriesColor } from './chartsvg.js';
 import { CHART_DESCRIPTION_MAX_LENGTH, CHART_TYPES, chartData, chartTitles, defaultChart, normalizeChart } from '../core/charts.js';
 import { parseRange, rangeName } from '../core/cell.js';
 import { changeSubtypePatch } from '../core/chart-subtypes.js';
+import { describeRange } from '../core/aiformula.js';
+import * as P from '../lib/puter.js';
+
+// The sample of the data range a chart suggestion quotes: 10 rows by 5 columns, 50 cells at most.
+const SUGGEST_ROWS = 10;
+const SUGGEST_COLS = 5;
 
 const TYPE_ICONS = { column: 'chartColumn', bar: 'chartBar', line: 'chartLine', area: 'chartArea', pie: 'chartPie', donut: 'chartPie', scatter: 'chartScatter', combo: 'chartCombo', histogram: 'chartHistogram', waterfall: 'chartWaterfall', radar: 'chartRadar', bubble: 'chartBubble',
   treemap: 'chartTreemap', sunburst: 'chartSunburst', boxWhisker: 'chartBoxWhisker', funnel: 'chartFunnel', stock: 'chartStockOhlc', surface: 'chartSurface' };
@@ -289,6 +295,72 @@ export function openChartDialog(ctx, { chart = null, range = null, type = null }
   for (const input of [titleInput, descriptionInput, xTitleInput, yTitleInput, y2TitleInput]) input.addEventListener('input', refreshSoon);
   for (const input of [seriesSel, headersSel, stackedBox, stack100Box, trendBox, axis2Box, legendSel, labelsBox, gridBox, smoothBox, hiddenBox]) input.addEventListener('change', refresh);
 
+  // One-shot AI suggestion for the chart: a proposal applied to the form's own fields, which the
+  // person reviews and changes before Insert, exactly as a choice made by hand would be.
+  const aiStatus = el('p.field-hint.chart-ai-status', { role: 'status', hidden: true });
+  const aiError = el('p.chart-ai-error', { role: 'alert', hidden: true });
+  const suggestBtn = el('button.btn.btn-ghost.btn-sm.chart-ai-suggest', { type: 'button', hidden: !P.canAI(), onclick: () => suggestChart() },
+    el('span', { html: icon('sparkle', 14) }), 'Suggest with AI');
+  let aiBusy = false;
+
+  // The JSON object in the model's reply, checked against what the dialog supports; null when there is none.
+  function parseChartProposal(reply) {
+    const match = /\{[\s\S]*\}/.exec(String(reply ?? '').replace(/```[a-z]*\n?/gi, ''));
+    let obj;
+    try { obj = match ? JSON.parse(match[0]) : null; } catch { return null; }
+    if (!CHART_TYPES.some(([key]) => key === obj?.chartType)) return null;
+    return {
+      chartType: obj.chartType,
+      seriesOrientation: ['rows', 'cols', 'auto'].includes(obj?.seriesOrientation) ? obj.seriesOrientation : 'auto',
+      title: String(obj?.title ?? '').trim().slice(0, 200),
+      reason: String(obj?.reason ?? '').trim(),
+    };
+  }
+
+  async function suggestChart() {
+    if (aiBusy) return;
+    aiBusy = true;
+    suggestBtn.disabled = true;
+    aiStatus.hidden = false;
+    aiStatus.textContent = 'Asking the assistant…';
+    aiError.hidden = true;
+    const range = draft.range;
+    const rows = Math.min(range.r2 - range.r1 + 1, SUGGEST_ROWS);
+    const cols = Math.min(range.c2 - range.c1 + 1, SUGGEST_COLS);
+    const prompt = [
+      'You suggest one chart for spreadsheet data. Reply with only a JSON object and nothing else, no code fences:',
+      `{"chartType": one of ${CHART_TYPES.map(([key, label]) => `${key} (${label})`).join(', ')}, "seriesOrientation": "rows", "cols" or "auto", "title": a short chart title, "reason": one sentence why this chart fits the data}`,
+      '',
+      `Sheet: "${sheet.name}". Data range: ${rangeName(range)}. Only the first ${rows} rows and ${cols} columns are shown (a sample of the range; row numbers first, columns tab-separated).`,
+      '',
+      describeRange(wb, sheetId, range, { maxRows: rows, maxCols: cols }),
+    ].join('\n');
+    try {
+      const proposal = parseChartProposal(await P.aiChat(prompt, { feature: 'suggest-chart' }));
+      if (!proposal) {
+        aiStatus.hidden = true;
+        aiError.hidden = false;
+        aiError.textContent = 'The reply was not a chart suggestion. Try again.';
+        return;
+      }
+      draft.type = proposal.chartType;
+      restyle();
+      syncTypes();
+      seriesSel.value = proposal.seriesOrientation;
+      titleInput.value = proposal.title;
+      refresh();
+      aiStatus.textContent = proposal.reason || 'Suggestion applied. Review it, then choose Insert.';
+    } catch (err) {
+      console.error('AI chart suggestion failed', err);
+      aiStatus.hidden = true;
+      aiError.hidden = false;
+      aiError.textContent = `Could not ask the AI: ${err?.message || 'unknown error'}`;
+    } finally {
+      aiBusy = false;
+      suggestBtn.disabled = false;
+    }
+  }
+
   const submit = (e) => {
     e?.preventDefault();
     if (!canChange()) return;
@@ -349,6 +421,9 @@ export function openChartDialog(ctx, { chart = null, range = null, type = null }
           el('div.field', {}, el('span.field-label', {}, 'Options'), el('div.check-group', {}, labelsField, gridField, smoothField, hiddenField))),
         el('div.row', {}, stackedField),
         el('div.field', {}, el('span.field-label', {}, 'Colors'), colorsRow)),
+      // The AI suggestion sits at the end of the fields, after the form's own error, which stays the
+      // dialog's first alert for screen readers and for whatever reads the dialog in order.
+      el('div.chart-ai-row', {}, suggestBtn, aiStatus, aiError),
       el('div.chart-form-preview', {}, el('span.field-label', {}, 'Preview'), preview)),
     el('div.row.row-end', {},
       chart && el('button.btn.btn-danger', { type: 'button', onclick: () => { if (!canChange()) return; wb.deleteChart(sheetId, chart.id); modal.close(); ctx.grid.focus(); } }, 'Delete chart'),

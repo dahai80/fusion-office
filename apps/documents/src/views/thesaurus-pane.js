@@ -1,12 +1,15 @@
 /**
- * The Thesaurus pane: synonyms and antonyms for the selected word from the bundled WordNet-derived
- * data (loaded on first use), with Insert, Copy and look-up-again. Insert replaces the word the pane
- * was opened on, matching its capitalization, as one undo step.
+ * The Thesaurus pane: synonyms and antonyms for the selected word from the local AI service when it
+ * is available, otherwise from the bundled WordNet-derived data (loaded on first use), with Insert,
+ * Copy and look-up-again. Insert replaces the word the pane was opened on, matching its
+ * capitalization, as one undo step.
  */
 import { el, listItem } from '../ui/dom.js';
 import { openMenu } from '../ui/menu.js';
 import { toast } from '../ui/toast.js';
+import * as P from '../lib/puter.js';
 import { loadThesaurus, lookupWord, matchCase } from '../lib/thesaurus.js';
+import { lookupSenses } from '../lib/thesaurus-ai.js';
 import { sidePane, hint } from './review-ui.js';
 
 const POS_LABEL = { noun: 'noun', verb: 'verb', adjective: 'adjective', adverb: 'adverb' };
@@ -29,7 +32,7 @@ export function createThesaurusPane({ editor, pkg, error }) {
   const back = el('button.icon-btn.rv-back', { type: 'button', 'aria-label': 'Back', title: 'Back', disabled: true, onclick: () => { const previous = history.pop(); if (previous) show(previous, { remember: false }); } }, '‹');
   const form = el('form.rv-lookup', { onsubmit: e => { e.preventDefault(); show(input.value); } }, back, input, el('button.btn.btn-primary.btn-sm', { type: 'submit' }, 'Look up'));
   const results = el('div.rv-thesaurus', { 'aria-live': 'polite' });
-  const footer = hint('Synonyms come from WordNet 3.1 (Princeton University), used under its license. Insert replaces the selected word.');
+  const footer = hint('Synonyms come from the local AI service when it is available, otherwise from WordNet 3.1 (Princeton University), used under its license. Insert replaces the selected word.');
   pane.body.append(form, results, footer);
 
   /** Pick the word to work on from the selection or the caret. */
@@ -43,6 +46,13 @@ export function createThesaurusPane({ editor, pkg, error }) {
     return target;
   }
 
+  /** The senses in the bundled data, in the shape lookupSenses resolves. */
+  async function offlineSenses(word) {
+    data ??= await loadThesaurus();
+    const found = lookupWord(data, word);
+    return { senses: found?.senses || [], lemma: found?.lemma || null };
+  }
+
   async function show(word, { remember = true } = {}) {
     word = String(word || '').trim();
     input.value = word;
@@ -51,14 +61,15 @@ export function createThesaurusPane({ editor, pkg, error }) {
     back.disabled = !history.length;
     results.dataset.word = word;
     results.replaceChildren(el('p.rv-status', {}, 'Looking up…'));
-    try { data ??= await loadThesaurus(); } catch (e) { results.replaceChildren(el('p.rv-status', {}, e.message)); return; }
+    let found;
+    try { found = await lookupSenses(word, { chat: P.aiAvailable() ? prompt => P.aiChat(prompt) : null, offline: offlineSenses }); }
+    catch (e) { results.replaceChildren(el('p.rv-status', {}, e.message)); return; }
     if (results.dataset.word !== word) return;
-    const found = lookupWord(data, word);
-    if (!found) { results.replaceChildren(el('p.rv-empty', {}, `No results for “${word}”.`), hint('Check the spelling, or try a simpler form of the word.')); return; }
+    if (!found.senses.length) { results.replaceChildren(el('p.rv-empty', {}, `No results for “${word}”.`), hint('Check the spelling, or try a simpler form of the word.')); return; }
     results.replaceChildren(...[
-      found.lemma.toLowerCase() !== word.toLowerCase() ? el('p.rv-status', {}, `Showing results for “${found.lemma}”.`) : null,
+      found.lemma && found.lemma.toLowerCase() !== word.toLowerCase() ? el('p.rv-status', {}, `Showing results for “${found.lemma}”.`) : null,
       ...found.senses.map(sense => el('section.rv-sense', {},
-        el('h3.rv-sense-head', {}, el('span.rv-pos', {}, POS_LABEL[sense.pos] || sense.pos), sense.lemma ? el('span.rv-pos', {}, `(${sense.lemma})`) : null, sense.gloss ? el('span.rv-gloss', {}, sense.gloss) : null),
+        el('h3.rv-sense-head', {}, sense.pos ? el('span.rv-pos', {}, POS_LABEL[sense.pos] || sense.pos) : null, sense.lemma ? el('span.rv-pos', {}, `(${sense.lemma})`) : null, sense.gloss ? el('span.rv-gloss', {}, sense.gloss) : null),
         sense.synonyms.length ? el('div.rv-words', { role: 'list', 'aria-label': 'Synonyms' }, ...sense.synonyms.map(w => chip(w))) : null,
         sense.antonyms.length ? el('div.rv-antonyms', {}, el('span.rv-label', {}, 'Antonyms'), el('div.rv-words', { role: 'list', 'aria-label': 'Antonyms' }, ...sense.antonyms.map(w => chip(w, true)))) : null)),
     ].filter(Boolean));

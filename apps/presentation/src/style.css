@@ -1461,6 +1461,33 @@ select {
 .notes-area textarea::placeholder {
   color: var(--muted);
 }
+.notes-ai-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.notes-ai-bar .btn {
+  min-height: 26px;
+  padding: 4px 10px;
+  gap: 6px;
+  font-size: 11px;
+}
+.notes-ai-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.notes-ai-status[data-kind="error"] {
+  color: var(--danger);
+}
+.notes-ai-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
 .inspector {
   width: 246px;
   min-width: 246px;

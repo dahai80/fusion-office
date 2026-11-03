@@ -7,7 +7,9 @@ import { el } from '../ui/dom.js';
 import { openModal } from '../ui/modal.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
+import { answerParagraphs } from '../lib/ai.js';
 import { translateParagraphs } from '../lib/proofing-ai.js';
+import { SUMMARIZE_CHAR_CAP, summarizeDocument } from '../lib/summarize-ai.js';
 import { LANGUAGES, languageName, englishLanguageName, sidePane, button, hint, preference } from './review-ui.js';
 
 export const DETECT_LANGUAGE = preference('documents:detect-language', true);
@@ -141,6 +143,65 @@ export function createTranslatePane({ editor, pkg, error, openDocument, document
     pane,
     open() { pane.open(); describe(); },
     selectionChanged() { if (pane.isOpen && !busy) describe(); },
+    destroy() { busy?.abort(); pane.destroy(); },
+  };
+}
+
+/**
+ * The Summary pane: the whole document summarized by the local AI in one request (first
+ * SUMMARIZE_CHAR_CAP characters when it is longer). The answer is shown for review; Insert at Top
+ * puts it in as the first paragraph, one undo step.
+ */
+export function createSummarizePane({ editor, pkg, error }) {
+  let busy = null, result = null;
+  const pane = sidePane({ title: 'Summary', label: 'Summary pane', className: 'rv-summary-pane', onClose: () => { busy?.abort(); editor()?.focus(); } });
+  const source = el('p.rv-translate-source');
+  const status = el('p.rv-status', { role: 'status' });
+  const output = el('div.rv-translation', { 'aria-live': 'polite' });
+  const insert = button('Insert at Top', () => insertResult(), { primary: true, disabled: true });
+  const copy = button('Copy', () => { if (result) navigator.clipboard?.writeText(result).then(() => toast('Summary copied')).catch(error); }, { disabled: true });
+  const summarize = button('Summarize', () => run(), { primary: true });
+  pane.body.append(
+    source, el('div.rv-actions', {}, summarize), status, output, el('div.rv-actions', {}, insert, copy),
+    hint(`Summarize sends the document text (up to ${SUMMARIZE_CHAR_CAP.toLocaleString()} characters) to the local AI service. Insert at Top adds the summary as the first paragraph of the document.`));
+
+  function describe() {
+    const engine = editor();
+    source.textContent = engine ? `Document: ${(engine.session.body.text || '').slice(0, 120)}…` : '';
+    summarize.disabled = !engine || !P.aiAvailable() || !!busy;
+    insert.disabled = !result || !!pkg()?.readOnly;
+    copy.disabled = !result;
+    if (!P.aiAvailable()) status.textContent = 'Summarizing needs the local AI service. Check that fusion-gateway is running.';
+  }
+  async function run() {
+    const engine = editor(); if (!engine || !P.aiAvailable()) return;
+    busy?.abort(); busy = new AbortController();
+    const signal = busy.signal;
+    status.textContent = 'Summarizing…'; output.replaceChildren(); result = null; describe();
+    try {
+      const summary = await summarizeDocument(engine.session.body.text, { chat: prompt => P.aiChat(prompt), signal });
+      if (signal.aborted) return;
+      result = summary;
+      output.replaceChildren(...answerParagraphs(summary).map(text => el('p', {}, text)));
+      status.textContent = 'Summary ready.';
+      insert.disabled = !!pkg()?.readOnly; copy.disabled = false;
+    } catch (e) { if (!signal.aborted) status.textContent = e.message; }
+    finally { if (busy?.signal === signal) busy = null; describe(); }
+  }
+  function insertResult() {
+    const engine = editor(); if (!engine || !result) return;
+    engine.finishComposition();
+    if (engine.session.path !== null) engine.editStory(null);
+    if (engine.execute(() => { engine.model.select(0, 0); engine.model.replace(result + '\n'); })) {
+      result = null; output.replaceChildren();
+      status.textContent = 'Summary inserted at the top of the document.';
+      describe();
+    }
+    engine.focus();
+  }
+  return {
+    pane,
+    open() { pane.open(); describe(); },
     destroy() { busy?.abort(); pane.destroy(); },
   };
 }

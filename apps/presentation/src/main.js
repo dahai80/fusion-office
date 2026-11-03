@@ -123,6 +123,7 @@ import { createInsertFeatures } from "./insert/index.js";
 import { createShowFeatures } from "./show/index.js";
 import { createAnimationTools } from "./animations/editor.js";
 import { createViews, readingBar, placeReadingDialog } from "./views/index.js";
+import { createNotesAI } from "./notes-ai.js";
 import "./chrome/chrome.css";
 import { NO_CHANGE } from "./assistant-tools.js";
 import { AI_MODEL } from "./assistant.js";
@@ -3306,6 +3307,7 @@ function renderEditor() {
                 { for: "speaker-notes", class: "sr-only" },
                 "Speaker notes",
               ),
+              notesAI.bar(),
               el("textarea", {
                 id: "speaker-notes",
                 placeholder: "Click to add notes",
@@ -3773,6 +3775,21 @@ const review = createReview({
   commitText: () => commitText(),
   settled: () => settled(),
   fail: (e) => fail(e),
+});
+// One-shot speaker-notes generation beside the notes box. Notes are written
+// through mutateSlide, the same edit path the assistant's set_notes tool
+// takes, so undo and history stay consistent.
+const notesAI = createNotesAI({
+  all: () => P.getSlides(doc.pres),
+  current: () => (masterView.active ? null : slide()),
+  number: (s) => P.getSlides(doc.pres).indexOf(s) + 1,
+  description: (s) => slideDescription(s, doc.pres),
+  write: (target, value, coalesce) =>
+    mutateSlide(
+      target,
+      (t) => P.setSlideNotes(t, value),
+      coalesce ? { coalesce } : undefined,
+    ),
 });
 // The text's colour and the colour behind it, for the contrast check.
 function reviewTextColors(shape) {

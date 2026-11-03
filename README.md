@@ -107,17 +107,32 @@ AI surfaces by app:
 - Documents: an assistant pane that works the open document through tools: read it, find
   text, insert or replace text, format a selection, insert a table or a page break, and
   add a link. Replacing the selection asks before it runs, and every change is a single
-  undo step. Grammar checks, translation, smart lookup, and image prompts remain.
+  undo step. Grammar checks, translation, smart lookup, and image prompts remain. The
+  thesaurus pane asks the model for senses and synonyms (the static WordNet list stays
+  as the offline fallback), the alt-text pane can suggest a description from the image
+  context, and Tools → Summarize with AI opens a summary pane with a one-click
+  insert-at-top (20,000-character input cap).
 - Spreadsheet: formula generation and explanation, data questions, translation, and
-  sheet functions such as `AI` and `TRANSLATE`.
-- Presentation: prompt-to-deck generation, assistant panel, and slide review.
+  sheet functions such as `AI` and `TRANSLATE`. The error smart tag can ask the model
+  to explain a failing formula (`#DIV/0!` and friends, with sampled cells), and the
+  chart dialog can propose a chart type, orientation, and title from a sample of the
+  selected range before you confirm the insert.
+- Presentation: prompt-to-deck generation, assistant panel, and slide review. The
+  speaker-notes pane has Generate-with-AI buttons for the current slide and for all
+  slides (batched with an 8,000-character payload cap, written through the same
+  edit/undo path as the notes box).
 - PDF: the **Ask AI** sidebar tab is an assistant over the open file. It reads pages and
   finds text through tools, moves to a page, changes the zoom, and adds a bookmark (the
-  one change, undoable). Scanned documents need OCR first.
+  one change, undoable). Two quick actions round it out: **Summarize document** (bounded
+  read through the same page caps, structured summary with page references) and
+  **Translate page** (remembers the last target language). Scanned documents need OCR first.
 - Projects: a project assistant in the board header reads the project and changes it:
   create, update, move, archive and delete tasks, add checklist items and comments, and
   add columns. Deleting a task asks before it runs. **Break down with AI** on a task
-  still turns it into a checklist through a JSON reply.
+  still turns it into a checklist through a JSON reply. The brief panel can generate an
+  **AI standup** (done recently, due today, overdue and near-due risks) from the project
+  state, and quick add parses a typed line with the model when configured — title,
+  column, and due date — falling back to the mechanical parse otherwise.
 
 The three agentic surfaces share the loop in `packages/ai-client/src/agent.js`: it sends
 the conversation with the tool schemas, runs the calls the model asks for, feeds the

@@ -462,6 +462,11 @@ export function canUseAi() {
   return true;
 }
 
+/** A call can go out when the dev harness offers one or the gateway key is set (AI.isConfigured). */
+export function aiAvailable() {
+  return !!(globalThis.puter?.ai?.chat) || AI.isConfigured();
+}
+
 function aiMessages(prompt, options) {
   if (typeof options === 'string' && options.startsWith('data:image/')) {
     return [{
