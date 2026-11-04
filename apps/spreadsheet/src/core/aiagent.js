@@ -18,7 +18,7 @@ import { attachmentsIntro, attachmentsGone, attachmentWeight, attachmentsFit, se
 /** The model the assistant runs on, served by fusion-gateway. */
 export const AI_MODEL =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FUSION_MODEL) ||
-  'mlx-community/Qwen3.5-9B-4bit';
+  'mlx-community/Qwen3.8-27B-8bit';
 
 /** When the assistant asks before changing the workbook: before every change, before one that takes away data, or never. */
 export const APPROVAL_MODES = [

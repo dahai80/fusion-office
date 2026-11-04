@@ -47,8 +47,8 @@ describe('AI assistant loop', () => {
     expect(out.error).toBeUndefined();
     expect(wb.getValue(id, 3, 0)).toBe(10);
     expect(requests).toHaveLength(2);
-    expect(requests[0].options.model).toBe('mlx-community/Qwen3.5-9B-4bit');
-    expect(AI_MODEL).toBe('mlx-community/Qwen3.5-9B-4bit');
+    expect(requests[0].options.model).toBe('mlx-community/Qwen3.8-27B-8bit');
+    expect(AI_MODEL).toBe('mlx-community/Qwen3.8-27B-8bit');
     expect(requests[0].messages[0]).toEqual({ role: 'system', content: SYSTEM_PROMPT });
     expect(requests[0].messages[1].content).toContain('Today is 2026-09-27');
     expect(requests[0].messages[1].content).toContain('Selected: Sheet1!A1:A3');

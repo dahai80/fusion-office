@@ -25,7 +25,7 @@ import { TOOLS, TOOL_NAMES, changesDeck } from "./assistant-tools.js";
 /** The model the assistant runs on, served by fusion-gateway. */
 export const AI_MODEL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_FUSION_MODEL) ||
-  "mlx-community/Qwen3.5-9B-4bit";
+  "mlx-community/Qwen3.8-27B-8bit";
 /** When the assistant asks before changing the deck. */
 export const APPROVAL_MODES = [
   { id: "always", label: "Ask before every change" },

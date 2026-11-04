@@ -76,7 +76,7 @@ AI 调用统一走 `@fusion-office/ai-client`。启动开发服务器或构建�
 | --- | --- | --- |
 | `VITE_FUSION_GATEWAY_URL` | `http://127.0.0.1:11432` | 网关地址 |
 | `VITE_FUSION_GATEWAY_KEY` | 空 | 以 `Authorization: Bearer` 发送的 API Key |
-| `VITE_FUSION_MODEL` | `mlx-community/Qwen3.5-9B-4bit` | 默认对话模型 |
+| `VITE_FUSION_MODEL` | `mlx-community/Qwen3.8-27B-8bit` | 默认对话模型 |
 
 将 `.env.example` 复制为应用目录下的 `.env.local`（或在 Shell 中导出变量），把网关
 API Key 填入 `VITE_FUSION_GATEWAY_KEY`。Key 会被编译进浏览器产物，因此必须使用受限

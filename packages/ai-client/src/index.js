@@ -11,7 +11,7 @@ const DEV_PROXY = env.DEV ? '/__fusion_gateway' : null
 const DEFAULTS = {
     baseUrl: env.VITE_FUSION_GATEWAY_URL || DEV_PROXY || 'http://127.0.0.1:11432',
     apiKey: env.VITE_FUSION_GATEWAY_KEY || '',
-    defaultModel: env.VITE_FUSION_MODEL || 'mlx-community/Qwen3.5-9B-4bit',
+    defaultModel: env.VITE_FUSION_MODEL || 'mlx-community/Qwen3.8-27B-8bit',
     timeoutMs: 300000,
 }
 
