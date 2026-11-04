@@ -97,10 +97,15 @@ ports, so a direct cross-origin call would fail the preflight and surface as
 
 Each assistant panel shows a model picker that lists the models the gateway offers
 (`GET /v1/models`, loaded models first). Picking one stores it per app and every call
-that does not name a model uses it; the choice survives a reload. Which models appear —
-and which each API key may use — is decided on the gateway side (`allowed_models` per
-key, backend routing in `fusion-gateway`), not in this repository. Without a gateway key
-the picker is absent and `VITE_FUSION_MODEL` applies.
+that does not name a model uses it; the choice survives a reload. Inside the union
+shell, an app without its own pick follows the shell's model preference
+(`fusion.shell.model` handoff, read at call time — changing it in the shell applies
+without a rebuild). Which models appear — and which each API key may use — is decided
+on the gateway side (`allowed_models` per key, backend routing in `fusion-gateway`),
+not in this repository. Without a gateway key the picker is absent and
+`VITE_FUSION_MODEL` applies. The tenant-default stage of the platform model-policy
+chain is tracked in issue #9 (blocked on fusion-gateway#487 and
+fusion-web-shell#115).
 
 AI surfaces by app:
 

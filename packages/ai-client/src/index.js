@@ -1,5 +1,6 @@
 import { log, error as logError } from './log.js'
 import { getSelectedModel, createModelPicker as rawModelPicker } from './model-picker.js'
+import { shellModel } from './shell-model.js'
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
 
@@ -29,13 +30,17 @@ export function isConfigured() {
     return !!config.apiKey
 }
 
-// A call names a model, or falls back to what the person picked in the app's
-// model picker, or to the build-time default.
+// A call names a model, or falls back to the app's model picker (the module
+// override), then to the shell's model preference (the user pref while running
+// in the union shell), then to the build-time default. The tenant default of
+// the platform policy chain will slot between the shell pref and the env once
+// the gateway exposes it (fusion-office issue #9).
 function modelFor(opts) {
-    return opts.model || getSelectedModel() || config.defaultModel
+    return opts.model || getSelectedModel() || shellModel() || config.defaultModel
 }
 
 export { getSelectedModel, setSelectedModel } from './model-picker.js'
+export { inShell, shellModel } from './shell-model.js'
 
 export function createModelPicker(options) {
     return rawModelPicker(options, { isConfigured, listModels, getConfig, logError })

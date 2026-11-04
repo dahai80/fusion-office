@@ -90,9 +90,12 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 ### 选择模型
 
 每个助手面板都有模型下拉框，列出网关提供的模型（`GET /v1/models`，已加载的排在前面）。
-选中后按应用保存，未显式指定模型的所有调用都用它，刷新后仍然生效。提供哪些模型、每个
-API Key 允许用哪些，由网关侧决定（每个 key 的 `allowed_models`、fusion-gateway 的后端
-路由），不在本仓库配置。没有网关 Key 时下拉框不出现，使用 `VITE_FUSION_MODEL`。
+选中后按应用保存，未显式指定模型的所有调用都用它，刷新后仍然生效。在联合 Web Shell 内，
+应用没有自己的选择时跟随 shell 的模型偏好（`fusion.shell.model` 交接键，调用时读取——
+shell 侧修改无需重建即生效）。提供哪些模型、每个 API Key 允许用哪些，由网关侧决定（每个
+key 的 `allowed_models`、fusion-gateway 的后端路由），不在本仓库配置。没有网关 Key 时
+下拉框不出现，使用 `VITE_FUSION_MODEL`。平台模型策略链的租户默认层见 issue #9（依赖
+fusion-gateway#487 与 fusion-web-shell#115）。
 
 各应用的 AI 入口：
 

@@ -1,6 +1,9 @@
 // The model the person picked for this app, kept across sessions. Empty means
-// "use the default". Each app is its own origin (its own dev port or shell
-// path), so the choice is per app, which is what a person expects.
+// "follow the shell preference, or the default". Each app is its own origin
+// (its own dev port or shell path), so the choice is per app, which is what a
+// person expects.
+
+import { shellModel } from './shell-model.js'
 
 const STORAGE_KEY = 'fusion-office.ai-model'
 
@@ -30,9 +33,10 @@ function options(models, selected, fallback) {
 }
 
 function fill(select, models, fallback) {
-    // No stored choice: prefer a loaded model, which is ready to answer.
+    // No stored choice: the shell preference wins, then a loaded model, which
+    // is ready to answer.
     const loaded = models.find(m => m.loaded)
-    const selected = getSelectedModel() || loaded?.id || fallback
+    const selected = getSelectedModel() || shellModel() || loaded?.id || fallback
     const list = options(models, selected, fallback)
     const sorted = [...list].sort((a, b) => (b.loaded ? 1 : 0) - (a.loaded ? 1 : 0) || a.id.localeCompare(b.id))
     select.replaceChildren(...sorted.map(m => {
