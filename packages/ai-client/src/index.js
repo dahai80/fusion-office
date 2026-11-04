@@ -15,7 +15,22 @@ const DEFAULTS = {
     timeoutMs: 300000,
 }
 
+// The fixed ports scripts/shell-serve.mjs uses for the five apps. Served
+// there, AI calls go through its same-origin /__fusion_gateway relay, because
+// the gateway's CORS allowlist does not cover these origins.
+const OFFICE_PORTS = new Set(['11485', '11486', '11487', '11488', '11489'])
+
 let config = { ...DEFAULTS }
+
+function baseUrlFor(loc) {
+    const where = loc === undefined ? (typeof window !== 'undefined' ? window.location : null) : loc
+    try {
+        if (where && OFFICE_PORTS.has(where.port)) return '/__fusion_gateway'
+    } catch (err) {
+        // Odd location object: keep the configured base.
+    }
+    return config.baseUrl
+}
 
 export function configure(overrides) {
     config = { ...config, ...overrides }
@@ -41,6 +56,7 @@ function modelFor(opts) {
 
 export { getSelectedModel, setSelectedModel } from './model-picker.js'
 export { inShell, shellModel } from './shell-model.js'
+export { baseUrlFor }
 
 export function createModelPicker(options) {
     return rawModelPicker(options, { isConfigured, listModels, getConfig, logError })
@@ -56,7 +72,8 @@ async function request(path, init, timeoutMs) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs || config.timeoutMs)
     try {
-        const res = await fetch(config.baseUrl + path, { ...init, headers: headers(), signal: controller.signal })
+        const res = await fetch(baseUrlFor() + path, { ...init, headers: headers(), signal: controller.signal })
+
         if (!res.ok) {
             const body = await res.text().catch(() => '')
             throw new Error('gateway ' + res.status + ': ' + body.slice(0, 500))
@@ -93,7 +110,7 @@ export async function chatStream(opts, onDelta) {
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
     }
-    const res = await fetch(config.baseUrl + '/v1/chat/completions', {
+    const res = await fetch(baseUrlFor() + '/v1/chat/completions', {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify(body),
@@ -152,7 +169,7 @@ export async function* chatStreamEvents(opts) {
     let full = ''
     let toolCount = 0
     try {
-        const res = await fetch(config.baseUrl + '/v1/chat/completions', {
+        const res = await fetch(baseUrlFor() + '/v1/chat/completions', {
             method: 'POST',
             headers: headers(),
             body: JSON.stringify(body),

@@ -85,7 +85,9 @@ npm workspaces: `apps/*` and `packages/*`.
   rows in a database.
 - `packages/ai-client` owns model access. It defaults to
   `http://127.0.0.1:11432` (in dev, the same-origin `/__fusion_gateway` proxy from
-  `dev/gateway-proxy.mjs`, because the gateway's CORS allowlist excludes dev ports),
+  `dev/gateway-proxy.mjs`; when served by `scripts/shell-serve.mjs` on the fixed ports
+  11485-11489, the same `/__fusion_gateway` path — relayed server-side by shell-serve,
+  because the gateway's CORS allowlist covers neither),
   reads `VITE_FUSION_GATEWAY_URL`,
   `VITE_FUSION_GATEWAY_KEY`, and `VITE_FUSION_MODEL` at build time, and exposes
   `chat`, `chatStream`, `chatStreamEvents`, `jsonChat`, `listModels`, and

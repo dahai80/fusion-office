@@ -94,7 +94,8 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 应用没有自己的选择时跟随 shell 的模型偏好（`fusion.shell.model` 交接键，调用时读取——
 shell 侧修改无需重建即生效）。提供哪些模型、每个 API Key 允许用哪些，由网关侧决定（每个
 key 的 `allowed_models`、fusion-gateway 的后端路由），不在本仓库配置。没有网关 Key 时
-下拉框不出现，使用 `VITE_FUSION_MODEL`。平台模型策略链的租户默认层见 issue #9（依赖
+下拉框不出现，使用 `VITE_FUSION_MODEL`。应用由 shell-serve 固定端口（11485-11489）提供
+时，AI 请求经服务端同源 `/__fusion_gateway` 中转，不会被网关 CORS 白名单拦截。平台模型策略链的租户默认层见 issue #9（依赖
 fusion-gateway#487 与 fusion-web-shell#115）。
 
 各应用的 AI 入口：

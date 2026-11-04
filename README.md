@@ -103,7 +103,9 @@ shell, an app without its own pick follows the shell's model preference
 without a rebuild). Which models appear — and which each API key may use — is decided
 on the gateway side (`allowed_models` per key, backend routing in `fusion-gateway`),
 not in this repository. Without a gateway key the picker is absent and
-`VITE_FUSION_MODEL` applies. The tenant-default stage of the platform model-policy
+`VITE_FUSION_MODEL` applies. When an app is served by `shell-serve` on its fixed port
+(11485-11489), AI calls relay through the server's same-origin `/__fusion_gateway`
+route, so the gateway's CORS allowlist never blocks the browser. The tenant-default stage of the platform model-policy
 chain is tracked in issue #9 (blocked on fusion-gateway#487 and
 fusion-web-shell#115).
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
-import { inShell, shellModel, chat, configure } from '../src/index.js';
+import { inShell, shellModel, chat, configure, baseUrlFor } from '../src/index.js';
 import { createModelPicker } from '../src/model-picker.js';
 
 // jsdom 27 ships no localStorage; these tests only need get/set/remove/clear.
@@ -105,5 +105,20 @@ describe('shell model preference', () => {
         await Promise.resolve();
         await Promise.resolve();
         expect(node.value).toBe('picked-model');
+    });
+});
+
+describe('base URL relay', () => {
+    it('relays through /__fusion_gateway on the fixed office ports', () => {
+        configure({ baseUrl: 'http://gw.test', apiKey: 'k', defaultModel: 'm' });
+        expect(baseUrlFor({ port: '11485' })).toBe('/__fusion_gateway');
+        expect(baseUrlFor({ port: '11489' })).toBe('/__fusion_gateway');
+    });
+
+    it('keeps the configured base on any other port and without a location', () => {
+        configure({ baseUrl: 'http://gw.test', apiKey: 'k', defaultModel: 'm' });
+        expect(baseUrlFor({ port: '5189' })).toBe('http://gw.test');
+        expect(baseUrlFor({ port: '' })).toBe('http://gw.test');
+        expect(baseUrlFor(null)).toBe('http://gw.test');
     });
 });

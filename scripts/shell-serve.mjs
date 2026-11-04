@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import { readFile, stat } from 'node:fs/promises';
 import { createHash, createHmac } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +61,31 @@ function serve(dist, port) {
     return new Promise((resolve, reject) => {
         const server = createServer(async (req, res) => {
             const pathname = new URL(req.url, 'http://localhost').pathname;
+            if (pathname.startsWith('/__fusion_gateway/')) {
+                // Same-origin relay so browser AI calls from the fixed office
+                // ports clear the gateway's CORS allowlist; mirrors
+                // dev/gateway-proxy.mjs used by the dev servers.
+                const target = gateway + req.url.slice('/__fusion_gateway'.length);
+                const init = {
+                    method: req.method,
+                    headers: { ...req.headers, host: new URL(gateway).host },
+                };
+                if (req.method !== 'GET' && req.method !== 'HEAD') {
+                    init.body = req;
+                    init.duplex = 'half';
+                }
+                try {
+                    const gw = await fetch(target, init);
+                    res.writeHead(gw.status, Object.fromEntries(gw.headers));
+                    if (gw.body) Readable.fromWeb(gw.body).pipe(res);
+                    else res.end();
+                } catch (error) {
+                    console.error('[shell-serve] gateway relay failed', target, error.message);
+                    res.writeHead(502, { 'Content-Type': 'text/plain' });
+                    res.end('gateway relay failed');
+                }
+                return;
+            }
             const found = await fileAt(dist, pathname === '/' ? '/index.html' : pathname);
             if (!found) {
                 res.writeHead(404, { 'Content-Type': 'text/plain' });
