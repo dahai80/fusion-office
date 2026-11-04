@@ -94,7 +94,10 @@ npm workspaces: `apps/*` and `packages/*`.
   `ensureModelLoaded`. `isConfigured()` reports whether a key is present.
   `createModelPicker()` builds the shared per-app model selector (gateway model list,
   persisted choice); calls without an explicit `model` use the picked model, then the
-  build-time default.
+  build-time default. The gateway key must be baked at build time for browser calls to
+  authenticate (`scripts/build-all.mjs` loads the gitignored root `.env.local` into the
+  environment; Vite reads `VITE_*` files from each app's own directory, so a root env
+  file alone is not enough).
 - Each app keeps the historical `puter.js` / `cloud.js` adapter name so call sites did
   not need to move. Those adapters now delegate to `@fusion-office/storage` and
   `@fusion-office/ai-client`. Do not reintroduce Puter globals.
