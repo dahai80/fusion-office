@@ -24,6 +24,26 @@ describe('AI tools', () => {
     expect(changesWorkbook('write_cells')).toBe(true);
   });
 
+  it('unwraps rows the model double-encoded as a JSON string', () => {
+    const { wb, id, run } = setup();
+    const encoded = JSON.stringify([['Month', 'Payment'], [1, 1000]]);
+    const res = run('write_cells', { start_cell: 'A1', values: encoded });
+    expect(res.ok).toBe(true);
+    expect(wb.getValue(id, 0, 0)).toBe('Month');
+    expect(wb.getValue(id, 1, 1)).toBe(1000);
+  });
+
+  it('tells the model what was wrong with the values shape', () => {
+    const { run } = setup();
+    const asText = run('write_cells', { start_cell: 'A1', values: '[["Month","Payment"]' });
+    expect(asText.content).toMatch(/values was sent as a string.*real JSON array/);
+    const asFlat = run('write_cells', { start_cell: 'A1', values: ['Month', 'Payment'] });
+    expect(asFlat.content).toMatch(/these are not arrays: "Month"/);
+    const missing = run('write_cells', { start_cell: 'A1' });
+    expect(missing.content).toMatch(/values was missing/);
+    expect(asText.content).toMatch(/\{"start_cell":"A1","values":\[\["Month","Payment"\],\[1,1000\]\]\}/);
+  });
+
   it('writes values and formulas as one undo step, numbers as numbers', () => {
     const { wb, id, run } = setup();
     const res = run('write_cells', { start_cell: 'D1', values: [['Total'], ['=B2*C2'], ['=B3*C3']] });
