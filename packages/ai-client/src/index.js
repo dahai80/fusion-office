@@ -26,6 +26,10 @@ function baseUrlFor(loc) {
     const where = loc === undefined ? (typeof window !== 'undefined' ? window.location : null) : loc
     try {
         if (where && OFFICE_PORTS.has(where.port)) return '/__fusion_gateway'
+        // Served by the gateway under /shell/<id>/, the gateway itself is the
+        // page origin: relative requests dodge any localhost-vs-127.0.0.1
+        // origin mismatch and the CORS allowlist entirely.
+        if (where && where.pathname.startsWith('/shell/')) return ''
     } catch (err) {
         // Odd location object: keep the configured base.
     }

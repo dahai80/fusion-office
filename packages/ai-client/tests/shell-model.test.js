@@ -117,8 +117,14 @@ describe('base URL relay', () => {
 
     it('keeps the configured base on any other port and without a location', () => {
         configure({ baseUrl: 'http://gw.test', apiKey: 'k', defaultModel: 'm' });
-        expect(baseUrlFor({ port: '5189' })).toBe('http://gw.test');
-        expect(baseUrlFor({ port: '' })).toBe('http://gw.test');
+        expect(baseUrlFor({ port: '5189', pathname: '/office/documents/' })).toBe('http://gw.test');
+        expect(baseUrlFor({ port: '', pathname: '/x' })).toBe('http://gw.test');
         expect(baseUrlFor(null)).toBe('http://gw.test');
+    });
+
+    it('uses a relative base when served by the gateway under /shell/', () => {
+        configure({ baseUrl: 'http://127.0.0.1:11432', apiKey: 'k', defaultModel: 'm' });
+        expect(baseUrlFor({ port: '11432', pathname: '/shell/fusion-office-documents/' })).toBe('');
+        expect(baseUrlFor({ port: '', pathname: '/shell/fusion-office-pm/' })).toBe('');
     });
 });
