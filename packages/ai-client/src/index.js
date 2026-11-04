@@ -169,7 +169,18 @@ export async function* chatStreamEvents(opts) {
         body.tool_choice = opts.toolChoice || 'auto'
     }
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), opts.timeoutMs || config.timeoutMs)
+    // An idle timeout, not a total one: a slow local model may legitimately
+    // stream a large tool call for many minutes, so every chunk rearms the
+    // timer and only true silence aborts the request.
+    const idleMs = opts.timeoutMs || config.timeoutMs
+    let timer = setTimeout(abortIdle, idleMs)
+    function abortIdle() {
+        controller.abort()
+    }
+    function rearmIdle() {
+        clearTimeout(timer)
+        timer = setTimeout(abortIdle, idleMs)
+    }
     let full = ''
     let toolCount = 0
     try {
@@ -189,6 +200,7 @@ export async function* chatStreamEvents(opts) {
         let buffer = ''
         while (true) {
             const { done, value } = await reader.read()
+            rearmIdle()
             if (done) break
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split(NEWLINE)
@@ -234,6 +246,12 @@ export async function* chatStreamEvents(opts) {
             yield { type: 'tool', id: call.id, name: call.name, input }
         }
         log('ai', 'chatStreamEvents done', full.length + ' chars', toolCount + ' tools')
+    } catch (err) {
+        if (err && (err.name === 'AbortError' || /aborted/i.test(String(err?.message)))) {
+            logError('ai', 'chatStreamEvents aborted by idle timeout')
+            throw new Error('The model stopped replying mid-answer, so the request was aborted. Try again; if it keeps happening, ask for smaller steps or pick a faster model.')
+        }
+        throw err
     } finally {
         clearTimeout(timer)
     }
