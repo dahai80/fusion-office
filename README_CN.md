@@ -95,8 +95,13 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 shell 侧修改无需重建即生效）。提供哪些模型、每个 API Key 允许用哪些，由网关侧决定（每个
 key 的 `allowed_models`、fusion-gateway 的后端路由），不在本仓库配置。没有网关 Key 时
 下拉框不出现，使用 `VITE_FUSION_MODEL`。应用由 shell-serve 固定端口（11485-11489）提供
-时，AI 请求经服务端同源 `/__fusion_gateway` 中转，不会被网关 CORS 白名单拦截。平台模型策略链的租户默认层见 issue #9（依赖
-fusion-gateway#487 与 fusion-web-shell#115）。
+时，AI 请求经服务端同源 `/__fusion_gateway` 中转，不会被网关 CORS 白名单拦截。在联合
+Shell 内，应用没有自己的选择时还会向网关请求平台模型策略的解析结果（shell 会话下的
+`GET /api/v1/shell/model-policy`：模块覆盖 > 用户偏好 > 租户默认，同时返回生效的
+allowlist 与隐私模式）。该请求是尽力而为——不可达、401 或 404 时回退到构建期默认值，
+成功缓存 5 分钟、失败缓存 60 秒——因此独立/开发模式行为与之前完全一致，租户默认的
+修改无需重建即可在几分钟内生效。下拉框的选项受 allowlist 与 `privacy_mode:
+local_only` 约束。
 
 各应用的 AI 入口：
 

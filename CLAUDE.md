@@ -101,13 +101,17 @@ npm workspaces: `apps/*` and `packages/*`.
 - Each app keeps the historical `puter.js` / `cloud.js` adapter name so call sites did
   not need to move. Those adapters now delegate to `@fusion-office/storage` and
   `@fusion-office/ai-client`. Do not reintroduce Puter globals.
-- Model resolution (`packages/ai-client/src/index.js` `modelFor`): explicit
+- Model resolution (`packages/ai-client/src/index.js` `resolvedModel`): explicit
   `opts.model`, then the per-app picker (`fusion-office.ai-model`), then the shell's
   `fusion.shell.model` localStorage handoff (`src/shell-model.js`, read only under a
   `/shell/` pathname, at call time so shell-side changes apply without rebuild), then
-  the build-time `VITE_FUSION_MODEL` default. The tenant-default and allowlist/
-  privacy_mode stages of the platform policy chain are blocked on upstream
-  (fusion-gateway#487, fusion-web-shell#115) — tracked in issue #9.
+  the gateway's policy-resolved model (`src/model-policy.js`, `GET
+  /api/v1/shell/model-policy?module=<id>` under the shell session; success caches 5
+  minutes, failure 60; unreachable, 401 or 404 falls through per the #491 contract),
+  then the build-time `VITE_FUSION_MODEL` default. Standalone/dev skips the policy
+  fetch entirely. The picker's options are constrained by the policy allowlist and
+  `privacy_mode: local_only` (`applyPolicyToModels`; an empty result keeps the full
+  list).
 - Test-only compatibility: documents and spreadsheet use a stubbed `globalThis.puter`
   when `import.meta.env.MODE === 'test'`. Production code paths never touch it.
 - Vite uses a relative `base` in every app so the same build runs standalone and behind

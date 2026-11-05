@@ -68,6 +68,8 @@ describe('model picker', () => {
         setSelectedModel('gone-model');
         const { select } = pickerWith([{ id: 'local-9b', loaded: true }], { fallback: 'default-model' });
         const node = await select;
+        await Promise.resolve();
+        await Promise.resolve();
         const ids = [...node.options].map(o => o.value);
         expect(ids).toEqual(expect.arrayContaining(['gone-model', 'default-model', 'local-9b']));
         expect(node.value).toBe('gone-model');
@@ -81,6 +83,8 @@ describe('model picker', () => {
             getConfig: () => ({ defaultModel: 'default-model' }),
             logError,
         });
+        await Promise.resolve();
+        await Promise.resolve();
         await Promise.resolve();
         await Promise.resolve();
         expect([...node.options].map(o => o.value)).toEqual(['default-model']);

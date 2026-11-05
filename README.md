@@ -105,9 +105,15 @@ on the gateway side (`allowed_models` per key, backend routing in `fusion-gatewa
 not in this repository. Without a gateway key the picker is absent and
 `VITE_FUSION_MODEL` applies. When an app is served by `shell-serve` on its fixed port
 (11485-11489), AI calls relay through the server's same-origin `/__fusion_gateway`
-route, so the gateway's CORS allowlist never blocks the browser. The tenant-default stage of the platform model-policy
-chain is tracked in issue #9 (blocked on fusion-gateway#487 and
-fusion-web-shell#115).
+route, so the gateway's CORS allowlist never blocks the browser. Inside the union
+shell, an app with no pick of its own also asks the gateway for the platform
+model-policy resolution (`GET /api/v1/shell/model-policy` under the shell session:
+module override > user preference > tenant default, plus the effective allowlist and
+privacy mode). The policy is best-effort — unreachable, 401 or 404 falls through to
+the build-time default, cached 5 minutes on success and 60 seconds on failure — so
+standalone/dev behaves exactly as before, and a tenant-default change applies within
+minutes without a rebuild. The picker's options are constrained by the allowlist and
+`privacy_mode: local_only`.
 
 AI surfaces by app:
 

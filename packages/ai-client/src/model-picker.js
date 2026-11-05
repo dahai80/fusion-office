@@ -4,6 +4,7 @@
 // person expects.
 
 import { shellModel } from './shell-model.js'
+import { applyPolicyToModels } from './model-policy.js'
 
 const STORAGE_KEY = 'fusion-office.ai-model'
 
@@ -32,12 +33,14 @@ function options(models, selected, fallback) {
     return list
 }
 
-function fill(select, models, fallback) {
-    // No stored choice: the shell preference wins, then a loaded model, which
-    // is ready to answer.
-    const loaded = models.find(m => m.loaded)
-    const selected = getSelectedModel() || shellModel() || loaded?.id || fallback
-    const list = options(models, selected, fallback)
+function fill(select, models, fallback, policy) {
+    // The policy allowlist (and privacy_mode local_only) constrains what the
+    // picker offers; with no stored choice the shell preference wins, then
+    // the policy-resolved model, then a loaded model.
+    const allowed = applyPolicyToModels(models, policy)
+    const loaded = allowed.find(m => m.loaded)
+    const selected = getSelectedModel() || shellModel() || (policy && policy.resolvedModel) || loaded?.id || fallback
+    const list = options(allowed, selected, fallback)
     const sorted = [...list].sort((a, b) => (b.loaded ? 1 : 0) - (a.loaded ? 1 : 0) || a.id.localeCompare(b.id))
     select.replaceChildren(...sorted.map(m => {
         const option = document.createElement('option')
@@ -54,7 +57,7 @@ function fill(select, models, fallback) {
  * Returns null when AI is not configured, so callers can skip it entirely.
  */
 export function createModelPicker({ onChange } = {}, deps = {}) {
-    const { isConfigured, listModels, getConfig, logError } = deps
+    const { isConfigured, listModels, getConfig, logError, fetchPolicy } = deps
     if (!isConfigured || !isConfigured()) return null
     const select = document.createElement('select')
     select.className = 'ai-model-picker'
@@ -63,8 +66,8 @@ export function createModelPicker({ onChange } = {}, deps = {}) {
     select.style.fontSize = '12px'
     select.style.textOverflow = 'ellipsis'
     fill(select, [], getConfig().defaultModel)
-    listModels()
-        .then(models => fill(select, models, getConfig().defaultModel))
+    Promise.all([listModels(), fetchPolicy ? fetchPolicy() : Promise.resolve(null)])
+        .then(([models, policy]) => fill(select, models, getConfig().defaultModel, policy))
         .catch(err => logError?.('ai', 'model list unavailable', String(err).slice(0, 120)))
     select.addEventListener('change', () => {
         setSelectedModel(select.value)

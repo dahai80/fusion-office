@@ -1,6 +1,7 @@
 import { log, error as logError } from './log.js'
 import { getSelectedModel, createModelPicker as rawModelPicker } from './model-picker.js'
-import { shellModel } from './shell-model.js'
+import { shellModel, inShell } from './shell-model.js'
+import { fetchModelPolicy, moduleFromPath } from './model-policy.js'
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
 
@@ -51,11 +52,45 @@ export function isConfigured() {
 
 // A call names a model, or falls back to the app's model picker (the module
 // override), then to the shell's model preference (the user pref while running
-// in the union shell), then to the build-time default. The tenant default of
-// the platform policy chain will slot between the shell pref and the env once
-// the gateway exposes it (fusion-office issue #9).
+// in the union shell), then to the policy-resolved model inside the shell,
+// then to the build-time default. resolvedModel() below owns the async half.
 function modelFor(opts) {
     return opts.model || getSelectedModel() || shellModel() || config.defaultModel
+}
+
+/* ---- The platform policy layer (issue #9) ---- */
+
+// Inside the shell, the gateway resolves the four-layer chain for this
+// module's shell session (module override > user preference > tenant
+// default); standalone/dev has no shell session and skips the fetch entirely.
+// Success caches for 5 minutes, a failure for 60, so a policy change applies
+// within minutes without a rebuild and a down gateway adds no latency.
+const POLICY_TTL_OK = 300000
+const POLICY_TTL_FAIL = 60000
+let policyCache = { at: 0, policy: null }
+
+export function resetPolicyCache() {
+    policyCache = { at: 0, policy: null }
+}
+
+async function policySnapshot() {
+    if (!inShell() || !config.apiKey) return null
+    const now = Date.now()
+    if (policyCache.at && now - policyCache.at < (policyCache.policy ? POLICY_TTL_OK : POLICY_TTL_FAIL)) return policyCache.policy
+    const policy = await fetchModelPolicy({ baseUrl: baseUrlFor(), headers: headers(), moduleId: moduleFromPath(window.location.pathname) })
+    policyCache = { at: now, policy }
+    if (policy) log('ai', 'model-policy', policy.source, policy.resolvedModel)
+    return policy
+}
+
+// The full runtime chain: explicit call > per-app picker > shell preference >
+// tenant-resolved policy model > build-time default.
+async function resolvedModel(opts) {
+    const local = modelFor({ ...opts, model: undefined })
+    if (opts.model) return opts.model
+    if (getSelectedModel() || shellModel()) return local
+    const policy = await policySnapshot()
+    return (policy && policy.resolvedModel) || config.defaultModel
 }
 
 export { getSelectedModel, setSelectedModel } from './model-picker.js'
@@ -63,7 +98,7 @@ export { inShell, shellModel } from './shell-model.js'
 export { baseUrlFor }
 
 export function createModelPicker(options) {
-    return rawModelPicker(options, { isConfigured, listModels, getConfig, logError })
+    return rawModelPicker(options, { isConfigured, listModels, getConfig, logError, fetchPolicy: () => policySnapshot() })
 }
 
 function headers() {
@@ -90,7 +125,7 @@ async function request(path, init, timeoutMs) {
 
 export async function chat(opts) {
     const body = {
-        model: modelFor(opts),
+        model: await resolvedModel(opts),
         messages: opts.messages,
         stream: false,
         temperature: opts.temperature,
@@ -108,7 +143,7 @@ const NEWLINE = String.fromCharCode(10)
 
 export async function chatStream(opts, onDelta) {
     const body = {
-        model: modelFor(opts),
+        model: await resolvedModel(opts),
         messages: opts.messages,
         stream: true,
         temperature: opts.temperature,
@@ -158,7 +193,7 @@ export async function chatStream(opts, onDelta) {
 
 export async function* chatStreamEvents(opts) {
     const body = {
-        model: modelFor(opts),
+        model: await resolvedModel(opts),
         messages: opts.messages,
         stream: true,
         temperature: opts.temperature,
