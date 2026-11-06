@@ -32,7 +32,7 @@ const FRAME = { padX: 170, padY: 40, thickness: 70, radius: 140, stroke: 16 };
 let textFontBytes;
 /** The app's text font, fetched once, for stamp lettering. */
 export function loadStampFont() {
-  textFontBytes ||= fetch(`${import.meta.env.BASE_URL}fonts/NotoSans-Regular.ttf`)
+  textFontBytes ||= fetch(`${import.meta.env.BASE_URL}fonts/NotoSans-Regular.woff2`)
     .then((r) => {
       if (!r.ok) throw new Error('Could not load the stamp font. Please retry.');
       return r.arrayBuffer();

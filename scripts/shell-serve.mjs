@@ -93,11 +93,24 @@ function serve(dist, port) {
                 return;
             }
             try {
-                const body = await readFile(found.target);
-                res.writeHead(200, {
-                    'Content-Type': MIME[extname(found.target)] || 'application/octet-stream',
-                    'Cache-Control': 'no-cache',
-                });
+                const type = MIME[extname(found.target)] || 'application/octet-stream';
+                // Issue #12: prefer a precompressed .gz sibling when the
+                // client accepts gzip, so narrow pipes do not pay the raw
+                // byte cost and the CPU pays nothing per request.
+                const acceptsGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+                let body = null;
+                let headers = { 'Content-Type': type, 'Cache-Control': 'no-cache' };
+                if (acceptsGzip && !found.target.endsWith('.gz')) {
+                    try {
+                        body = await readFile(found.target + '.gz');
+                        headers['Content-Encoding'] = 'gzip';
+                        headers.Vary = 'Accept-Encoding';
+                    } catch {
+                        body = null;
+                    }
+                }
+                if (body === null) body = await readFile(found.target);
+                res.writeHead(200, headers);
                 res.end(body);
             } catch (error) {
                 console.error('[shell-serve] read failed', found.target, error.message);

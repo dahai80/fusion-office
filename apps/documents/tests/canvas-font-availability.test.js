@@ -40,7 +40,7 @@ it('leaves missing fonts unavailable and does not register a substitute under th
 it('loads the reviewed same-origin face once when its native family is unavailable', async () => {
   const env = await environment({ assets: ['Bebas Neue'] });
   await Promise.all([env.checkFontAvailability('Bebas Neue'), env.checkFontAvailability('bebas neue')]);
-  expect(env.sources).toEqual(['local("Bebas Neue")', 'url("https://documents.test/fonts/BebasNeue-Regular.ttf")']);
+  expect(env.sources).toEqual(['local("Bebas Neue")', 'url("https://documents.test/fonts/BebasNeue-Regular.woff2")']);
   expect(env.fontAvailable('BEBAS NEUE')).toBe(true);
   expect(env.displayedFont({ fontFamily: 'Bebas Neue' })).toBe('Bebas Neue');
 });
@@ -59,7 +59,7 @@ it('resolves reviewed font assets under a relative production base', async () =>
   vi.stubEnv('BASE_URL', './');
   const env = await environment({ assets: ['Bebas Neue'], baseURI: 'https://documents.test/apps/documents/playground.html' });
   await env.checkFontAvailability('Bebas Neue');
-  expect(env.sources.at(-1)).toBe('url("https://documents.test/apps/documents/fonts/BebasNeue-Regular.ttf")');
+  expect(env.sources.at(-1)).toBe('url("https://documents.test/apps/documents/fonts/BebasNeue-Regular.woff2")');
 });
 
 it('registers reviewed variable weight and italic faces as one family', async () => {
@@ -73,7 +73,7 @@ it('registers reviewed variable weight and italic faces as one family', async ()
   expect(env.sources.filter(s => s.startsWith('url('))).toHaveLength(3);
 });
 it('does not register a partially loaded reviewed family', async () => {
-  const env = await environment({ assets: ['Open Sans'], failedAssets: ['OpenSans-Italic.ttf'] });
+  const env = await environment({ assets: ['Open Sans'], failedAssets: ['OpenSans-Italic.woff2'] });
   await env.checkFontAvailability('Open Sans');
   expect(env.added).toEqual([]); expect(env.fontAvailable('Open Sans')).toBe(false);
 });
@@ -82,7 +82,7 @@ it('loads the reviewed Karla upright faces together without replacing installed 
   await Promise.all([env.checkFontAvailability('Karla'), env.checkFontAvailability('KARLA')]);
   expect([...env.fonts].map(face => face.descriptors)).toEqual([{}, { weight: '700' }]);
   expect(env.sources.filter(source => source.startsWith('url('))).toEqual([
-    'url("https://documents.test/fonts/Karla-Regular.ttf")', 'url("https://documents.test/fonts/Karla-Bold.ttf")',
+    'url("https://documents.test/fonts/Karla-Regular.woff2")', 'url("https://documents.test/fonts/Karla-Bold.woff2")',
   ]);
   const installed = await environment({ selectable: ['Karla'], assets: ['Karla'] });
   await installed.checkFontAvailability('Karla');
@@ -90,7 +90,7 @@ it('loads the reviewed Karla upright faces together without replacing installed 
   expect(installed.sources).toEqual(['local("Karla")']);
 });
 it('does not expose a partial Karla family after a failed bold download', async () => {
-  const env = await environment({ assets: ['Karla'], failedAssets: ['Karla-Bold.ttf'] });
+  const env = await environment({ assets: ['Karla'], failedAssets: ['Karla-Bold.woff2'] });
   await env.checkFontAvailability('Karla');
   expect(env.fontAvailable('Karla')).toBe(false); expect(env.added).toEqual([]);
 });
@@ -116,9 +116,9 @@ it.each([['Open Sans Light','OpenSans-Light',undefined],['Open Sans SemiBold','O
  expect(env.fontAvailable(name)).toBe(true);
  const descriptors=weight?{weight}:{};
  expect([...env.fonts].map(f=>f.descriptors)).toEqual([descriptors,{...descriptors,style:'italic'}]);
- expect(env.sources.filter(s=>s.startsWith('url('))).toEqual([`url("https://documents.test/fonts/${file}.ttf")`,`url("https://documents.test/fonts/${file}Italic.ttf")`]);
+ expect(env.sources.filter(s=>s.startsWith('url('))).toEqual([`url("https://documents.test/fonts/${file}.woff2")`,`url("https://documents.test/fonts/${file}Italic.woff2")`]);
 });
-it.each([['Open Sans Light','OpenSans-LightItalic.ttf'],['Open Sans SemiBold','OpenSans-SemiBoldItalic.ttf']])('does not register a partial %s alias when italic fails',async(name,file)=>{
+it.each([['Open Sans Light','OpenSans-LightItalic.woff2'],['Open Sans SemiBold','OpenSans-SemiBoldItalic.woff2']])('does not register a partial %s alias when italic fails',async(name,file)=>{
  const env=await environment({selectable:[name],assets:[name],failedAssets:[file]});
  await env.checkFontAvailability(name);expect(env.fontAvailable(name)).toBe(false);expect(env.added).toEqual([]);
 });
@@ -127,13 +127,13 @@ it('loads the reviewed Selawik Semibold face instead of a selectable sibling',as
  await Promise.all([env.checkFontAvailability('Selawik Semibold'),env.checkFontAvailability('SELAWIK SEMIBOLD')]);
  expect(env.fontAvailable('Selawik Semibold')).toBe(true);
  expect([...env.fonts].map(f=>f.descriptors)).toEqual([{weight:'600'}]);
- expect(env.sources.filter(s=>s.startsWith('url('))).toEqual(['url("https://documents.test/fonts/Selawik-Semibold.ttf")']);
+ expect(env.sources.filter(s=>s.startsWith('url('))).toEqual(['url("https://documents.test/fonts/Selawik-Semibold.woff2")']);
 });
 it('reports Selawik Semibold unavailable when its reviewed asset fails',async()=>{
- const env=await environment({selectable:['Selawik Semibold'],assets:['Selawik Semibold'],failedAssets:['Selawik-Semibold.ttf']});
+ const env=await environment({selectable:['Selawik Semibold'],assets:['Selawik Semibold'],failedAssets:['Selawik-Semibold.woff2']});
  await env.checkFontAvailability('Selawik Semibold');expect(env.fontAvailable('Selawik Semibold')).toBe(false);expect(env.added).toEqual([]);
 });
-it.each([['Source Sans Pro','SourceSansPro-BoldIt.ttf'],['Source Sans Pro Black','SourceSansPro-BlackIt.ttf']])('does not expose a partial %s family',async(name,file)=>{
+it.each([['Source Sans Pro','SourceSansPro-BoldIt.woff2'],['Source Sans Pro Black','SourceSansPro-BlackIt.woff2']])('does not expose a partial %s family',async(name,file)=>{
  const env=await environment({assets:[name],failedAssets:[file]});await env.checkFontAvailability(name);
  expect(env.added).toEqual([]);expect(env.fontAvailable(name)).toBe(false);
 });
@@ -165,7 +165,7 @@ it('retains an installed exact reviewed face without fetching assets',async()=>{
  expect(env.added).toEqual([]);
 });
 it('does not claim an exact face is available when its reviewed italic asset fails',async()=>{
- const env=await environment({selectable:['Source sans pro light'],assets:['Source sans pro light'],failedAssets:['SourceSansPro-LightIt.ttf']});
+ const env=await environment({selectable:['Source sans pro light'],assets:['Source sans pro light'],failedAssets:['SourceSansPro-LightIt.woff2']});
  await env.checkFontAvailability('Source sans pro light');
  expect(env.fontAvailable('Source sans pro light')).toBe(false);expect(env.added).toEqual([]);
 });
@@ -229,7 +229,7 @@ it('loads all reviewed Montserrat styles once and the exact Light alias separate
  expect(env.sources.filter(s=>s.startsWith('url('))).toHaveLength(6);
  expect(env.canvasFontSources('Montserrat Light').map(f=>f.descriptors)).toEqual([{}, {style:'italic'}]);
 });
-it.each([['Montserrat','Montserrat-BoldItalic.ttf'],['Montserrat Light','Montserrat-LightItalic.ttf']])('retains normal fallback if a required %s face fails',async(name,file)=>{
+it.each([['Montserrat','Montserrat-BoldItalic.woff2'],['Montserrat Light','Montserrat-LightItalic.woff2']])('retains normal fallback if a required %s face fails',async(name,file)=>{
  const env=await environment({assets:[name],failedAssets:[file]});await env.checkFontAvailability(name);
  expect(env.fontAvailable(name)).toBe(false);expect(env.added).toEqual([]);
 });

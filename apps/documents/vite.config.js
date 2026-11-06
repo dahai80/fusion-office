@@ -3,9 +3,10 @@ import { fileURLToPath } from 'node:url';
 import puterLocalhost from '../../dev/puter-localhost.mjs';
 import gatewayProxy from '../../dev/gateway-proxy.mjs';
 import collabDevServer from './dev/collab-dev-server.mjs';
+import stripTtfDist from '../../dev/strip-ttf-dist.mjs';
 
 export default defineConfig({
-  plugins: [puterLocalhost('documents'), gatewayProxy(), collabDevServer()],
+  plugins: [puterLocalhost('documents'), gatewayProxy(), collabDevServer(), stripTtfDist()],
   base: './',
   // npm workspaces hoist fflate to the repository root; browser tests import it
   // by the path that existed when every app had its own node_modules.

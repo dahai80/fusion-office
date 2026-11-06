@@ -115,6 +115,13 @@ npm workspaces: `apps/*` and `packages/*`.
   choice outside the list, and with exactly one selectable model the dropdown hides
   entirely (issue #11); the gateway enforces the same tenant policy on chat requests,
   so the picker is not the gate.
+- Asset weight (issue #12): fonts ship as WOFF2 (lossless conversion by
+  `scripts/convert-fonts.py`; TTF originals stay in `public/fonts/` for tests and
+  provenance, stripped from dist by `dev/strip-ttf-dist.mjs`). `npm run build` emits
+  `.gz` siblings for compressible dist files over 1 KB (`scripts/gzip-dist.mjs`), and
+  `scripts/shell-serve.mjs` serves the `.gz` sibling when the client accepts gzip.
+  `fixtures/`, `thesaurus/`, `dictionaries/`, and `ocr/` are fetched on feature use,
+  never on first open.
 - Shell traffic is session-gated (issue #10): inside the shell, `chat`/`chatStream`/
   `chatStreamEvents` POST `/api/v1/shell/chat/completions`, `listModels` reads
   `/api/v1/shell/models`, requests carry `credentials: "include"` and never an

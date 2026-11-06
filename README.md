@@ -275,6 +275,19 @@ model calls. The prompt is capped at the box's 4,000 characters.
 Both apps ignore deep links whose parameters are absent, and unknown parameters never
 change behavior.
 
+## Asset weight (issue #12)
+
+The bundled fonts ship as WOFF2. The TTF originals stay in `apps/<app>/public/fonts/`
+for the font-metrics tests and the SHA-256 provenance in `PROVENANCE.md`; the Vite
+build strips them from `dist` (`dev/strip-ttf-dist.mjs`), so runtime loads only the
+`.woff2` conversions produced by `scripts/convert-fonts.py` (fontTools, lossless —
+no glyph subsetting, metric tables unchanged). `npm run build` also emits a `.gz`
+sibling for every compressible `dist` file over 1 KB (`scripts/gzip-dist.mjs`), and
+`scripts/shell-serve.mjs` serves the `.gz` sibling when the client accepts gzip, so
+a narrow pipe pays the compressed byte cost without per-request compression work.
+Heavy on-demand assets (`fixtures/`, `thesaurus/`, `dictionaries/`, `ocr/`) are
+fetched only when their feature is used, never on first open.
+
 ## Build and test
 
 ```bash

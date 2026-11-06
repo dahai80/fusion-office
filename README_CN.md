@@ -232,6 +232,18 @@ HTML 应用根节点和一个带哈希的静态资源，然后注销全部清单
 
 两个应用对缺少参数的深链接不作处理，未知参数不改变行为。
 
+## 静态资源体积（issue #12）
+
+内置字体以 WOFF2 格式发布。TTF 原件保留在 `apps/<app>/public/fonts/`，供字体度量测试和
+`PROVENANCE.md` 中的 SHA-256 来源记录使用；Vite 构建会把它们从 `dist` 剔除
+（`dev/strip-ttf-dist.mjs`），运行时只加载 `scripts/convert-fonts.py` 生成的 `.woff2`
+转换件（fontTools，无损转换——不裁剪字形，度量表不变）。`npm run build` 还会为 `dist`
+中所有大于 1 KB 的可压缩文件生成 `.gz` 伴生文件（`scripts/gzip-dist.mjs`），
+`scripts/shell-serve.mjs` 在客户端接受 gzip 时直接返回 `.gz` 伴生文件，
+窄带宽链路只需传输压缩后的字节，服务端也无需逐请求压缩。重资源
+（`fixtures/`、`thesaurus/`、`dictionaries/`、`ocr/`）只在对应功能被使用时才拉取，
+不进入首次打开路径。
+
 ## 构建与测试
 
 ```bash

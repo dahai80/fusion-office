@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import puterLocalhost from '../../dev/puter-localhost.mjs';
 import gatewayProxy from '../../dev/gateway-proxy.mjs';
+import stripTtfDist from '../../dev/strip-ttf-dist.mjs';
 
 export default defineConfig({
-  plugins: [puterLocalhost('spreadsheet'), gatewayProxy()],
+  plugins: [puterLocalhost('spreadsheet'), gatewayProxy(), stripTtfDist()],
   base: './',
   build: {
     target: 'es2022',

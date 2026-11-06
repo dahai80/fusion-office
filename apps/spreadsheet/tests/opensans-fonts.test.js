@@ -69,7 +69,7 @@ it('serves every declared face locally with its Apache notice', () => {
   expect(faces).toHaveLength(4);
   for (const face of faces) {
     const path = face.match(/url\('([^']+)'\)/)[1];
-    expect(path).toMatch(/^\/fonts\/opensans\/OpenSans-[A-Za-z]+\.ttf$/);
+    expect(path).toMatch(/^\/fonts\/opensans\/OpenSans-[A-Za-z]+\.woff2$/);
     expect(fs.statSync(new URL(`../public${path}`, import.meta.url)).size).toBeGreaterThan(0);
     expect(face).toContain('font-display: swap');
   }

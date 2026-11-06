@@ -26,7 +26,7 @@ export const MAX_SIGNATURE_TEXT = 60;
 let scriptFontBytes;
 /** The script font for typed signatures, fetched once. */
 export function loadScriptFont() {
-  scriptFontBytes ||= fetch(`${import.meta.env.BASE_URL}fonts/GreatVibes-Regular.ttf`)
+  scriptFontBytes ||= fetch(`${import.meta.env.BASE_URL}fonts/GreatVibes-Regular.woff2`)
     .then((r) => {
       if (!r.ok) throw new Error('Could not load the signature font. Please retry.');
       return r.arrayBuffer();

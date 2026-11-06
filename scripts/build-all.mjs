@@ -42,3 +42,15 @@ if (failed) {
     process.exit(1);
 }
 console.log('[build] all apps built');
+
+// Issue #12: precompress large dist assets so shell-serve can serve .gz
+// siblings without per-request work. Failures warn but do not fail the build.
+const { execFileSync } = await import('node:child_process');
+for (const app of apps) {
+    try {
+        const out = execFileSync('node', [join(root, 'scripts', 'gzip-dist.mjs'), join(root, 'apps', app, 'dist')], { encoding: 'utf8' });
+        console.log(out.trim());
+    } catch (err) {
+        console.error(`[gzip-dist] ${app} failed: ${err.message}`);
+    }
+}
