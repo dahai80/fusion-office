@@ -37,8 +37,13 @@ export function parseModelPolicy(data) {
 // the full catalog is exactly what issue #11 forbids; missing allowlist
 // entries are surfaced as unloaded options instead.
 export function applyPolicyToModels(models, policy) {
-    if (!policy || !Array.isArray(models)) return models
-    if (policy.allowlist && policy.allowlist.length) {
+    if (!Array.isArray(models)) return models
+    // No policy object at all means no policy plane (standalone/dev) — the
+    // catalog passes through. A policy that is present but carries no
+    // allowlist is fail-closed: nothing is offered.
+    if (!policy) return models
+    if (!(policy.allowlist && policy.allowlist.length)) return []
+    if (policy.allowlist.length) {
         const allowed = new Set(policy.allowlist)
         const hit = models.filter((m) => allowed.has(m.id))
         const present = new Set(hit.map((m) => m.id))

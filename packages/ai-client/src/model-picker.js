@@ -42,6 +42,15 @@ function fill(select, models, fallback, policy) {
     const allowed = applyPolicyToModels(models, policy)
     const loaded = allowed.find(m => m.loaded)
     const restrictive = !!(policy && policy.allowlist && policy.allowlist.length)
+    // Fail-closed: a policy without an allowlist offers nothing at all —
+    // never fall back to the stored choice or the build-time default.
+    if (policy && !restrictive) {
+        select.replaceChildren()
+        select.value = ''
+        select.title = 'No model policy configured'
+        select.hidden = true
+        return
+    }
     let selected = getSelectedModel() || shellModel() || (policy && policy.resolvedModel) || loaded?.id || fallback
     if (restrictive && !allowed.some(m => m.id === selected)) selected = (policy && policy.resolvedModel) || loaded?.id || allowed[0]?.id || ''
     const list = options(allowed, selected, restrictive ? '' : fallback)

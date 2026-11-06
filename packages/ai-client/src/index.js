@@ -119,9 +119,14 @@ async function policySnapshot() {
     if (!inShell()) return null
     const now = Date.now()
     if (policyCache.at && now - policyCache.at < (policyCache.policy ? POLICY_TTL_OK : POLICY_TTL_FAIL)) return policyCache.policy
-    const policy = await fetchModelPolicy({ baseUrl: baseUrlFor(), headers: headers(), moduleId: moduleFromPath(window.location.pathname) })
+    const fetched = await fetchModelPolicy({ baseUrl: baseUrlFor(), headers: headers(), moduleId: moduleFromPath(window.location.pathname) })
+    // Fail-closed: inside the shell, a policy that cannot be read is treated
+    // as an empty allowlist — no model is offered or sent, never the full
+    // catalog. Standalone/dev (no shell session) has no policy plane at all.
+    const policy = fetched || { allowlist: [], resolvedModel: '', source: 'unavailable' }
     policyCache = { at: now, policy }
-    if (policy) log('ai', 'model-policy', policy.source, policy.resolvedModel)
+    if (fetched) log('ai', 'model-policy', policy.source, policy.resolvedModel)
+    else log('ai', 'model-policy unavailable, no model will be offered')
     return policy
 }
 
@@ -132,12 +137,14 @@ async function policySnapshot() {
 // reach the gateway and 403 on every message — it falls through to the
 // policy-resolved model instead. An explicit opts.model stays untouched: it
 // is the agent cores' deliberate tool-choice, and the gateway remains the
-// enforcement point.
+// enforcement point. Fail-closed: in the shell, a tenant without a non-empty
+// allowlist resolves to no model at all.
 async function resolvedModel(opts) {
     const policy = await policySnapshot()
-    const allowed = policy && policy.allowlist && policy.allowlist.length ? new Set(policy.allowlist.map((id) => id.toLowerCase())) : null
-    const inAllowlist = (id) => !allowed || allowed.has(String(id).toLowerCase())
     if (opts.model) return opts.model
+    if (policy && !(policy.allowlist && policy.allowlist.length)) return ''
+    const allowed = policy ? new Set(policy.allowlist.map((id) => id.toLowerCase())) : null
+    const inAllowlist = (id) => !allowed || allowed.has(String(id).toLowerCase())
     const stored = getSelectedModel() || shellModel()
     if (stored && inAllowlist(stored)) return stored
     if (policy && policy.resolvedModel) return policy.resolvedModel
