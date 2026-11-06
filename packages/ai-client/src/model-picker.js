@@ -43,7 +43,7 @@ function fill(select, models, fallback, policy) {
     const loaded = allowed.find(m => m.loaded)
     const restrictive = !!(policy && policy.allowlist && policy.allowlist.length)
     let selected = getSelectedModel() || shellModel() || (policy && policy.resolvedModel) || loaded?.id || fallback
-    if (restrictive && !allowed.some(m => m.id === selected)) selected = (policy && policy.resolvedModel) || loaded?.id || ''
+    if (restrictive && !allowed.some(m => m.id === selected)) selected = (policy && policy.resolvedModel) || loaded?.id || allowed[0]?.id || ''
     const list = options(allowed, selected, restrictive ? '' : fallback)
     const sorted = [...list].sort((a, b) => (b.loaded ? 1 : 0) - (a.loaded ? 1 : 0) || a.id.localeCompare(b.id))
     select.replaceChildren(...sorted.map(m => {

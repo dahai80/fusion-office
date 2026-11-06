@@ -96,6 +96,27 @@ describe('model picker', () => {
         expect(select.value).toBe('policy-model');
     });
 
+    it('pins the picker to an allowlisted model absent from the catalog (issue #13)', async () => {
+        const node = createModelPicker({}, {
+            isConfigured: () => true,
+            listModels: async () => [
+                { id: 'cloud-a', loaded: false },
+                { id: 'cloud-b', loaded: false },
+            ],
+            getConfig: () => ({ defaultModel: 'default-model' }),
+            logError: vi.fn(),
+            fetchPolicy: async () => ({ resolvedModel: 'local-only-model', source: 'tenant_default', privacyMode: '', privacyFiltered: false, allowlist: ['local-only-model'] }),
+        });
+        const select = await node;
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect([...select.options].map(o => o.value)).toEqual(['local-only-model']);
+        expect(select.hidden).toBe(true);
+        expect(select.value).toBe('local-only-model');
+    });
+
     it('keeps the picker visible when several models are selectable', async () => {
         const node = createModelPicker({}, {
             isConfigured: () => true,

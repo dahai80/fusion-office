@@ -114,7 +114,13 @@ npm workspaces: `apps/*` and `packages/*`.
   list). A restrictive allowlist also drops the build-time fallback and any stored
   choice outside the list, and with exactly one selectable model the dropdown hides
   entirely (issue #11); the gateway enforces the same tenant policy on chat requests,
-  so the picker is not the gate.
+  so the picker is not the gate. The allowlist pins even when its models are absent
+  from `GET /api/v1/shell/models` — missing entries render as unloaded options and
+  the empty-result fallback only applies to `local_only` narrowing (issue #13). The
+  send path (`resolvedModel()`) clamps every non-explicit candidate (stored pick,
+  shell pref, build default) against the allowlist and falls through to
+  `policy.resolvedModel`; an explicit `opts.model` passes through untouched and the
+  gateway stays the enforcement point (issue #14).
 - Asset weight (issue #12): fonts ship as WOFF2 (lossless conversion by
   `scripts/convert-fonts.py`; TTF originals stay in `public/fonts/` for tests and
   provenance, stripped from dist by `dev/strip-ttf-dist.mjs`). `npm run build` emits

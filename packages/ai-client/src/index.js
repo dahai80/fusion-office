@@ -126,13 +126,24 @@ async function policySnapshot() {
 }
 
 // The full runtime chain: explicit call > per-app picker > shell preference >
-// tenant-resolved policy model > build-time default.
+// tenant-resolved policy model > build-time default. Every non-explicit
+// candidate is clamped against the tenant policy allowlist (issue #14): a
+// stored choice or build default from before the policy landed must not
+// reach the gateway and 403 on every message — it falls through to the
+// policy-resolved model instead. An explicit opts.model stays untouched: it
+// is the agent cores' deliberate tool-choice, and the gateway remains the
+// enforcement point.
 async function resolvedModel(opts) {
-    const local = modelFor({ ...opts, model: undefined })
-    if (opts.model) return opts.model
-    if (getSelectedModel() || shellModel()) return local
     const policy = await policySnapshot()
-    return (policy && policy.resolvedModel) || config.defaultModel
+    const allowed = policy && policy.allowlist && policy.allowlist.length ? new Set(policy.allowlist.map((id) => id.toLowerCase())) : null
+    const inAllowlist = (id) => !allowed || allowed.has(String(id).toLowerCase())
+    if (opts.model) return opts.model
+    const stored = getSelectedModel() || shellModel()
+    if (stored && inAllowlist(stored)) return stored
+    if (policy && policy.resolvedModel) return policy.resolvedModel
+    if (config.defaultModel && inAllowlist(config.defaultModel)) return config.defaultModel
+    if (allowed) return policy.allowlist[0]
+    return stored || config.defaultModel
 }
 
 export { getSelectedModel, setSelectedModel } from './model-picker.js'

@@ -116,7 +116,11 @@ minutes without a rebuild. The picker's options are constrained by the allowlist
 `privacy_mode: local_only`. A restrictive allowlist also drops the fallback entry
 and any stored choice outside the list, and with exactly one selectable model the
 dropdown hides entirely; the gateway enforces the same tenant policy on chat
-requests, so the picker alone is not the gate. Inside the shell no gateway key is
+requests, so the picker alone is not the gate. Allowlisted models that the
+gateway's `/models` catalog does not list (a local MLX model under a cloud
+catalog, for example) still pin the picker as unloaded options, and the send
+path clamps a stored choice or build default from before the policy landed to
+the policy-resolved model instead of shipping a guaranteed 403. Inside the shell no gateway key is
 needed at all: AI
 calls go to the session-gated `/api/v1/shell/*` endpoints and authenticate with the
 HttpOnly shell-session cookie, so nothing extractable is baked into the bundle and

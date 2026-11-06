@@ -70,7 +70,7 @@ describe('applyPolicyToModels', () => {
 
     it('passes models through when there is no policy', () => {
         expect(applyPolicyToModels(models, null)).toBe(models);
-        expect(applyPolicyToModels([], { allowlist: ['a'] })).toEqual([]);
+        expect(applyPolicyToModels([], {})).toEqual([]);
     });
 
     it('filters by the allowlist', () => {
@@ -83,9 +83,16 @@ describe('applyPolicyToModels', () => {
         expect(local.map(m => m.id)).toEqual(['mlx-community/Qwen3.8-27B-8bit', 'mlx-community/other']);
     });
 
-    it('keeps the full list when a filter would empty it', () => {
-        const kept = applyPolicyToModels(models, { allowlist: ['nope'] });
-        expect(kept).toBe(models);
+    it('never falls back to the catalog for an allowlist: missing entries surface as unloaded options (issue #13)', () => {
+        const kept = applyPolicyToModels(models, { allowlist: ['local-only-model'] });
+        expect(kept).toEqual([{ id: 'local-only-model', loaded: false }]);
+    });
+
+    it('keeps allowlisted catalog hits ahead of missing entries (issue #13)', () => {
+        const kept = applyPolicyToModels(models, { allowlist: ['cloud/glm', 'local-only-model'] });
+        expect(kept.map(m => m.id)).toEqual(['cloud/glm', 'local-only-model']);
+        expect(kept[0].loaded).toBe(false);
+        expect(kept[1].loaded).toBe(false);
     });
 });
 
@@ -177,6 +184,35 @@ describe('policy in the model chain', () => {
         expect(gw.state.bodies.map(b => b.model)).toEqual(['explicit-model', 'picked-model', 'shell-model']);
         // The explicit-model call and pick chain never needed the policy.
         expect(gw.state.policyFetches).toBeLessThanOrEqual(2);
+    });
+
+    it('clamps a stored pick outside the tenant allowlist to the policy model (issue #14)', async () => {
+        const ALLOW = { ...POLICY, allowlist: ['policy-model'] };
+        const gw = mockGateway(() => ALLOW);
+        try {
+            localStorage.setItem('fusion-office.ai-model', 'picked-model');
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            expect(gw.state.bodies[0].model).toBe('policy-model');
+            localStorage.setItem('fusion-office.ai-model', 'policy-model');
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            expect(gw.state.bodies[1].model).toBe('policy-model');
+            localStorage.removeItem('fusion-office.ai-model');
+        } finally {
+            gw.restore();
+        }
+    });
+
+    it('clamps the build-time default and passes explicit models through (issue #14)', async () => {
+        const ALLOW = { resolved_model: '', source: 'tenant_default', privacy_mode: '', privacy_filtered: false, allowlist: ['tenant-only-model'] };
+        const gw = mockGateway(() => ALLOW);
+        try {
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            expect(gw.state.bodies[0].model).toBe('tenant-only-model');
+            await chat({ messages: [{ role: 'user', content: 'hi' }], model: 'explicit-model' });
+            expect(gw.state.bodies[1].model).toBe('explicit-model');
+        } finally {
+            gw.restore();
+        }
     });
 
     it('caches the policy across calls and skips the fetch outside the shell', async () => {
