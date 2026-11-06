@@ -16,6 +16,24 @@ const DEFAULTS = {
     timeoutMs: 300000,
 }
 
+// Cap every user message before it leaves the browser so a paste-heavy
+// session cannot blow the daily token budget in one call (cloud-try parity).
+const MAX_INPUT_CHARS = Number(env.VITE_FUSION_MAX_INPUT_CHARS) || 4000
+
+function capMessages(messages) {
+    if (!Array.isArray(messages)) return messages
+    let trimmed = false
+    const out = messages.map((m) => {
+        if (m && m.role === 'user' && typeof m.content === 'string' && m.content.length > MAX_INPUT_CHARS) {
+            trimmed = true
+            return { ...m, content: m.content.slice(-MAX_INPUT_CHARS) }
+        }
+        return m
+    })
+    if (trimmed) log('ai', `input capped to last ${MAX_INPUT_CHARS} chars per user message`)
+    return out
+}
+
 // The fixed ports scripts/shell-serve.mjs uses for the five apps. Served
 // there, AI calls go through its same-origin /__fusion_gateway relay, because
 // the gateway's CORS allowlist does not cover these origins.
@@ -47,7 +65,31 @@ export function getConfig() {
 }
 
 export function isConfigured() {
-    return !!config.apiKey
+    return !!config.apiKey || inShell()
+}
+
+// Issue #10: inside the union shell the apps are same-origin with the
+// gateway, so AI calls go to the session-gated endpoints and authenticate
+// with the HttpOnly shell-session cookie — no key in the bundle, per-user
+// attribution, quota and model-policy enforced. Standalone/dev keeps the
+// static-key /v1/* path.
+function chatPath() {
+    return inShell() ? '/api/v1/shell/chat/completions' : '/v1/chat/completions'
+}
+
+function modelsPath() {
+    return inShell() ? '/api/v1/shell/models' : '/v1/models'
+}
+
+let warnedStaticKey = false
+function warnStaticKey() {
+    if (warnedStaticKey || inShell() || !config.apiKey) return
+    warnedStaticKey = true
+    logError('ai', 'using the static gateway key baked into this build; inside the union shell calls should ride the session-gated endpoints instead')
+}
+
+export function resetStaticKeyWarning() {
+    warnedStaticKey = false
 }
 
 // A call names a model, or falls back to the app's model picker (the module
@@ -74,7 +116,7 @@ export function resetPolicyCache() {
 }
 
 async function policySnapshot() {
-    if (!inShell() || !config.apiKey) return null
+    if (!inShell()) return null
     const now = Date.now()
     if (policyCache.at && now - policyCache.at < (policyCache.policy ? POLICY_TTL_OK : POLICY_TTL_FAIL)) return policyCache.policy
     const policy = await fetchModelPolicy({ baseUrl: baseUrlFor(), headers: headers(), moduleId: moduleFromPath(window.location.pathname) })
@@ -103,15 +145,24 @@ export function createModelPicker(options) {
 
 function headers() {
     const h = { 'Content-Type': 'application/json' }
-    if (config.apiKey) h.Authorization = 'Bearer ' + config.apiKey
+    // Shell-session routes authenticate by the HttpOnly cookie; a Bearer
+    // header here would carry the static key and make withShellSession try
+    // to validate it as a session token.
+    if (config.apiKey && !inShell()) h.Authorization = 'Bearer ' + config.apiKey
     return h
+}
+
+function fetchOpts(init) {
+    const opts = { ...init, headers: headers() }
+    if (inShell()) opts.credentials = 'include'
+    return opts
 }
 
 async function request(path, init, timeoutMs) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs || config.timeoutMs)
     try {
-        const res = await fetch(baseUrlFor() + path, { ...init, headers: headers(), signal: controller.signal })
+        const res = await fetch(baseUrlFor() + path, { ...fetchOpts(init), signal: controller.signal })
 
         if (!res.ok) {
             const body = await res.text().catch(() => '')
@@ -126,13 +177,14 @@ async function request(path, init, timeoutMs) {
 export async function chat(opts) {
     const body = {
         model: await resolvedModel(opts),
-        messages: opts.messages,
+        messages: capMessages(opts.messages),
         stream: false,
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
     }
+    warnStaticKey()
     const t0 = Date.now()
-    const res = await request('/v1/chat/completions', { method: 'POST', body: JSON.stringify(body) }, opts.timeoutMs)
+    const res = await request(chatPath(), { method: 'POST', body: JSON.stringify(body) }, opts.timeoutMs)
     const data = await res.json()
     const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : ''
     log('ai', 'chat ok', (Date.now() - t0) + 'ms', text.length + ' chars')
@@ -144,16 +196,16 @@ const NEWLINE = String.fromCharCode(10)
 export async function chatStream(opts, onDelta) {
     const body = {
         model: await resolvedModel(opts),
-        messages: opts.messages,
+        messages: capMessages(opts.messages),
         stream: true,
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
     }
-    const res = await fetch(baseUrlFor() + '/v1/chat/completions', {
+    warnStaticKey()
+    const res = await fetch(baseUrlFor() + chatPath(), fetchOpts({
         method: 'POST',
-        headers: headers(),
         body: JSON.stringify(body),
-    })
+    }))
     if (!res.ok) {
         const text = await res.text().catch(() => '')
         throw new Error('gateway ' + res.status + ': ' + text.slice(0, 500))
@@ -194,7 +246,7 @@ export async function chatStream(opts, onDelta) {
 export async function* chatStreamEvents(opts) {
     const body = {
         model: await resolvedModel(opts),
-        messages: opts.messages,
+        messages: capMessages(opts.messages),
         stream: true,
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
@@ -219,10 +271,12 @@ export async function* chatStreamEvents(opts) {
     let full = ''
     let toolCount = 0
     try {
-        const res = await fetch(baseUrlFor() + '/v1/chat/completions', {
-            method: 'POST',
-            headers: headers(),
-            body: JSON.stringify(body),
+        warnStaticKey()
+        const res = await fetch(baseUrlFor() + chatPath(), {
+            ...fetchOpts({
+                method: 'POST',
+                body: JSON.stringify(body),
+            }),
             signal: controller.signal,
         })
         if (!res.ok) {
@@ -326,7 +380,8 @@ export async function jsonChat(opts, retries) {
 }
 
 export async function listModels() {
-    const res = await request('/v1/models', { method: 'GET' })
+    warnStaticKey()
+    const res = await request(modelsPath(), { method: 'GET' })
     const data = await res.json()
     const models = (data.data || []).map((m) => ({ id: m.id, loaded: !!m.loaded }))
     log('ai', 'listModels ok', models.length + ' models')
@@ -340,6 +395,9 @@ export async function ensureModelLoaded(modelId) {
     const found = models.find((m) => m.id === modelId)
     if (!found) throw new Error('model not found on gateway: ' + modelId)
     if (found.loaded) return true
+    if (inShell() && !config.apiKey) {
+        throw new Error('model ' + modelId + ' is not loaded; inside the union shell ask the gateway administrator to load it (the session-gated surface has no model-load endpoint)')
+    }
     log('ai', 'loading model', modelId)
     await request('/v1/models/' + encodeURIComponent(modelId) + '/load', { method: 'POST' }, 600000)
     return true

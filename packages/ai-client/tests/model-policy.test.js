@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 import { moduleFromPath, parseModelPolicy, applyPolicyToModels, fetchModelPolicy } from '../src/model-policy.js';
-import { chat, configure, resetPolicyCache } from '../src/index.js';
+import { chat, listModels, isConfigured, configure, resetPolicyCache, resetStaticKeyWarning } from '../src/index.js';
 
 // jsdom 27 ships no localStorage; the chain reads the picker and shell keys.
 beforeAll(() => {
@@ -194,6 +194,56 @@ describe('policy in the model chain', () => {
         } finally {
             gw.restore();
         }
+    });
+
+    it('routes shell calls through the session-gated endpoints with no key header', async () => {
+        const calls = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = async (url, init) => {
+            calls.push({ url: String(url), init: init || {} });
+            if (String(url).includes('model-policy')) return { ok: true, json: async () => POLICY };
+            return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
+        };
+        try {
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            await listModels();
+        } finally {
+            globalThis.fetch = realFetch;
+        }
+        expect(calls.some(c => c.url.endsWith('/api/v1/shell/chat/completions'))).toBe(true);
+        expect(calls.some(c => c.url.endsWith('/api/v1/shell/models'))).toBe(true);
+        const chatCall = calls.find(c => c.url.includes('chat/completions'));
+        expect(chatCall.init.credentials).toBe('include');
+        expect(chatCall.init.headers.Authorization).toBeUndefined();
+    });
+
+    it('keeps the static-key /v1 path with the key header outside the shell', async () => {
+        resetStaticKeyWarning();
+        const calls = [];
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = async (url, init) => {
+            calls.push({ url: String(url), init: init || {} });
+            return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
+        };
+        try {
+            at('/office/documents/');
+            configure({ baseUrl: 'http://gw.test', apiKey: 'k', defaultModel: 'env-model' });
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+        } finally {
+            globalThis.fetch = realFetch;
+        }
+        const chatCalls = calls.filter(c => c.url.includes('chat/completions'));
+        expect(chatCalls[0].url.endsWith('/v1/chat/completions')).toBe(true);
+        expect(chatCalls[0].init.headers.Authorization).toBe('Bearer k');
+    });
+
+    it('reports configured inside the shell without a baked key', () => {
+        at('/shell/fusion-office-documents/');
+        configure({ baseUrl: 'http://gw.test', apiKey: '', defaultModel: 'env-model' });
+        expect(isConfigured()).toBe(true);
+        at('/office/documents/');
+        expect(isConfigured()).toBe(false);
     });
 
     it('falls back to the env default when the gateway rejects the policy', async () => {

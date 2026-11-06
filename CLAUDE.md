@@ -112,6 +112,16 @@ npm workspaces: `apps/*` and `packages/*`.
   fetch entirely. The picker's options are constrained by the policy allowlist and
   `privacy_mode: local_only` (`applyPolicyToModels`; an empty result keeps the full
   list).
+- Shell traffic is session-gated (issue #10): inside the shell, `chat`/`chatStream`/
+  `chatStreamEvents` POST `/api/v1/shell/chat/completions`, `listModels` reads
+  `/api/v1/shell/models`, requests carry `credentials: "include"` and never an
+  `Authorization` header (the HttpOnly `fusion_shell_session` cookie authenticates;
+  a Bearer header would make `withShellSession` try to validate the static key as a
+  session token). Outside the shell the static-key `/v1/*` path applies and a
+  one-time warning is logged, since that key is extractable from the bundle.
+  `isConfigured()` is true inside the shell even with no baked key.
+  `ensureModelLoaded` cannot load models through the session-gated surface — it
+  throws an actionable error when the model is not loaded and no key is present.
 - Test-only compatibility: documents and spreadsheet use a stubbed `globalThis.puter`
   when `import.meta.env.MODE === 'test'`. Production code paths never touch it.
 - Vite uses a relative `base` in every app so the same build runs standalone and behind

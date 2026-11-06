@@ -113,7 +113,12 @@ privacy mode). The policy is best-effort — unreachable, 401 or 404 falls throu
 the build-time default, cached 5 minutes on success and 60 seconds on failure — so
 standalone/dev behaves exactly as before, and a tenant-default change applies within
 minutes without a rebuild. The picker's options are constrained by the allowlist and
-`privacy_mode: local_only`.
+`privacy_mode: local_only`. Inside the shell no gateway key is needed at all: AI
+calls go to the session-gated `/api/v1/shell/*` endpoints and authenticate with the
+HttpOnly shell-session cookie, so nothing extractable is baked into the bundle and
+usage is attributed per user (quotas and model policy apply). The static-key `/v1/*`
+path remains only for standalone dev outside the shell, and its use is logged as a
+warning.
 
 AI surfaces by app:
 
