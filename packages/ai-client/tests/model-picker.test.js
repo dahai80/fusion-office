@@ -75,6 +75,46 @@ describe('model picker', () => {
         expect(node.value).toBe('gone-model');
     });
 
+    it('hides the picker when the policy leaves exactly one model', async () => {
+        const node = createModelPicker({}, {
+            isConfigured: () => true,
+            listModels: async () => [
+                { id: 'policy-model', loaded: true },
+                { id: 'other-model', loaded: false },
+            ],
+            getConfig: () => ({ defaultModel: 'default-model' }),
+            logError: vi.fn(),
+            fetchPolicy: async () => ({ resolvedModel: 'policy-model', source: 'tenant_default', privacyMode: '', privacyFiltered: false, allowlist: ['policy-model'] }),
+        });
+        const select = await node;
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect([...select.options].map(o => o.value)).toEqual(['policy-model']);
+        expect(select.hidden).toBe(true);
+        expect(select.value).toBe('policy-model');
+    });
+
+    it('keeps the picker visible when several models are selectable', async () => {
+        const node = createModelPicker({}, {
+            isConfigured: () => true,
+            listModels: async () => [
+                { id: 'policy-model', loaded: true },
+                { id: 'other-model', loaded: false },
+            ],
+            getConfig: () => ({ defaultModel: 'default-model' }),
+            logError: vi.fn(),
+            fetchPolicy: async () => ({ resolvedModel: 'policy-model', source: 'tenant_default', privacyMode: '', privacyFiltered: false, allowlist: ['policy-model', 'other-model'] }),
+        });
+        const select = await node;
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(select.hidden).toBe(false);
+    });
+
     it('keeps the fallback list when the gateway cannot be reached', async () => {
         const logError = vi.fn();
         const node = createModelPicker({}, {

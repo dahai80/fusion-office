@@ -29,18 +29,22 @@ function options(models, selected, fallback) {
     const ids = new Set(models.map(m => m.id))
     const list = [...models]
     if (selected && !ids.has(selected)) list.unshift({ id: selected, loaded: false })
-    if (!list.some(m => m.id === fallback)) list.unshift({ id: fallback, loaded: false })
+    if (fallback && !list.some(m => m.id === fallback)) list.unshift({ id: fallback, loaded: false })
     return list
 }
 
 function fill(select, models, fallback, policy) {
     // The policy allowlist (and privacy_mode local_only) constrains what the
     // picker offers; with no stored choice the shell preference wins, then
-    // the policy-resolved model, then a loaded model.
+    // the policy-resolved model, then a loaded model. A restrictive
+    // allowlist (issue #11) also drops the build-time fallback and any
+    // stored choice outside the list — the gateway rejects those anyway.
     const allowed = applyPolicyToModels(models, policy)
     const loaded = allowed.find(m => m.loaded)
-    const selected = getSelectedModel() || shellModel() || (policy && policy.resolvedModel) || loaded?.id || fallback
-    const list = options(allowed, selected, fallback)
+    const restrictive = !!(policy && policy.allowlist && policy.allowlist.length)
+    let selected = getSelectedModel() || shellModel() || (policy && policy.resolvedModel) || loaded?.id || fallback
+    if (restrictive && !allowed.some(m => m.id === selected)) selected = (policy && policy.resolvedModel) || loaded?.id || ''
+    const list = options(allowed, selected, restrictive ? '' : fallback)
     const sorted = [...list].sort((a, b) => (b.loaded ? 1 : 0) - (a.loaded ? 1 : 0) || a.id.localeCompare(b.id))
     select.replaceChildren(...sorted.map(m => {
         const option = document.createElement('option')
@@ -50,6 +54,10 @@ function fill(select, models, fallback, policy) {
     }))
     select.value = selected
     select.title = selected
+    // Issue #11: with exactly one selectable model (a single-entry policy
+    // allowlist) the dropdown carries no choice, so hide it — the value the
+    // calls will use is still readable through the option.
+    select.hidden = sorted.length <= 1
 }
 
 /**
