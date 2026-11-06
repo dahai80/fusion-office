@@ -111,7 +111,10 @@ npm workspaces: `apps/*` and `packages/*`.
   then the build-time `VITE_FUSION_MODEL` default. Standalone/dev skips the policy
   fetch entirely. The picker's options are constrained by the policy allowlist and
   `privacy_mode: local_only` (`applyPolicyToModels`; an empty result keeps the full
-  list).
+  list). A restrictive allowlist also drops the build-time fallback and any stored
+  choice outside the list, and with exactly one selectable model the dropdown hides
+  entirely (issue #11); the gateway enforces the same tenant policy on chat requests,
+  so the picker is not the gate.
 - Shell traffic is session-gated (issue #10): inside the shell, `chat`/`chatStream`/
   `chatStreamEvents` POST `/api/v1/shell/chat/completions`, `listModels` reads
   `/api/v1/shell/models`, requests carry `credentials: "include"` and never an
