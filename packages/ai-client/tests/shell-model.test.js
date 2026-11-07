@@ -45,7 +45,10 @@ describe('shell model preference', () => {
         configure({ baseUrl: 'http://gw.test', apiKey: 'k', defaultModel: 'env-model' });
         const bodies = [];
         const realFetch = globalThis.fetch;
-        globalThis.fetch = async (_url, init) => {
+        globalThis.fetch = async (url, init) => {
+            if (String(url).includes('/api/v1/shell/model-policy')) {
+                return { ok: true, json: async () => ({ resolved_model: '', source: 'tenant_default', privacy_mode: '', privacy_filtered: false, allowlist: ['shell-model', 'picked-model'] }) };
+            }
             bodies.push(JSON.parse(init.body));
             return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
         };

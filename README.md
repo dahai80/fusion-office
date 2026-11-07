@@ -125,13 +125,14 @@ route, so the gateway's CORS allowlist never blocks the browser. Inside the unio
 shell, an app with no pick of its own also asks the gateway for the platform
 model-policy resolution (`GET /api/v1/shell/model-policy` under the shell session:
 module override > user preference > tenant default, plus the effective allowlist and
-privacy mode). The policy is best-effort — unreachable, 401 or 404 falls through to
-the build-time default, cached 5 minutes on success and 60 seconds on failure — so
-standalone/dev behaves exactly as before, and a tenant-default change applies within
-minutes without a rebuild. The picker's options are constrained by the allowlist and
-`privacy_mode: local_only`. A restrictive allowlist also drops the fallback entry
-and any stored choice outside the list, and with exactly one selectable model the
-dropdown hides entirely; the gateway enforces the same tenant policy on chat
+privacy mode; cached 5 minutes on success and 60 seconds on failure, so a
+tenant-default change applies within minutes without a rebuild). The policy plane
+is fail-closed inside the shell, mirroring the gateway's tenant gate: a policy that
+cannot be read, or one without a non-empty allowlist, offers no model at all — the
+picker empties and hides and no model is sent. Standalone/dev has no policy plane
+and keeps the build-time default. A non-empty allowlist also drops the fallback
+entry and any stored choice outside the list, and with exactly one selectable model
+the dropdown hides entirely; the gateway enforces the same tenant policy on chat
 requests, so the picker alone is not the gate. Allowlisted models that the
 gateway's `/models` catalog does not list (a local MLX model under a cloud
 catalog, for example) still pin the picker as unloaded options, and the send

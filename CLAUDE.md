@@ -123,20 +123,18 @@ npm workspaces: `apps/*` and `packages/*`.
   `/shell/` pathname, at call time so shell-side changes apply without rebuild), then
   the gateway's policy-resolved model (`src/model-policy.js`, `GET
   /api/v1/shell/model-policy?module=<id>` under the shell session; success caches 5
-  minutes, failure 60; unreachable, 401 or 404 falls through per the #491 contract),
-  then the build-time `VITE_FUSION_MODEL` default. Standalone/dev skips the policy
-  fetch entirely. The picker's options are constrained by the policy allowlist and
-  `privacy_mode: local_only` (`applyPolicyToModels`; an empty result keeps the full
-  list). A restrictive allowlist also drops the build-time fallback and any stored
-  choice outside the list, and with exactly one selectable model the dropdown hides
-  entirely (issue #11); the gateway enforces the same tenant policy on chat requests,
-  so the picker is not the gate. The allowlist pins even when its models are absent
-  from `GET /api/v1/shell/models` — missing entries render as unloaded options and
-  the empty-result fallback only applies to `local_only` narrowing (issue #13). The
-  send path (`resolvedModel()`) clamps every non-explicit candidate (stored pick,
-  shell pref, build default) against the allowlist and falls through to
-  `policy.resolvedModel`; an explicit `opts.model` passes through untouched and the
-  gateway stays the enforcement point (issue #14).
+  minutes, failure 60), then the build-time `VITE_FUSION_MODEL` default.
+  Standalone/dev skips the policy fetch entirely and keeps the legacy chain. Inside
+  the shell the policy plane is fail-closed (mirroring the gateway's tenant gate,
+  which 403s any tenant without a non-empty allowlist): a policy that cannot be
+  read, or one without a non-empty allowlist, offers no model at all — the picker
+  empties and hides, and `resolvedModel()` returns empty so nothing outside the
+  policy reaches the gateway. A non-empty allowlist pins the picker even when its
+  models are absent from `GET /api/v1/shell/models` — missing entries render as
+  unloaded options (issues #11, #13). The send path (`resolvedModel()`) clamps
+  every non-explicit candidate (stored pick, shell pref, build default) against the
+  allowlist and falls through to `policy.resolvedModel`; an explicit `opts.model`
+  passes through untouched and the gateway stays the enforcement point (issue #14).
 - Asset weight (issue #12): fonts ship as WOFF2 (lossless conversion by
   `scripts/convert-fonts.py`; TTF originals stay in `public/fonts/` for tests and
   provenance, stripped from dist by `dev/strip-ttf-dist.mjs`). `npm run build` emits

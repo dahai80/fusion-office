@@ -78,9 +78,8 @@ describe('applyPolicyToModels', () => {
         expect(allowed.map(m => m.id)).toEqual(['cloud/glm']);
     });
 
-    it('local_only without an allowlist keeps only visibly local models', () => {
-        const local = applyPolicyToModels(models, { privacyMode: 'local_only', allowlist: null });
-        expect(local.map(m => m.id)).toEqual(['mlx-community/Qwen3.8-27B-8bit', 'mlx-community/other']);
+    it('a policy without an allowlist offers nothing, local_only included (fail-closed)', () => {
+        expect(applyPolicyToModels(models, { privacyMode: 'local_only', allowlist: null })).toEqual([]);
     });
 
     it('never falls back to the catalog for an allowlist: missing entries surface as unloaded options (issue #13)', () => {
@@ -160,7 +159,8 @@ describe('policy in the model chain', () => {
     };
 
     it('uses the policy-resolved model when nothing earlier in the chain is set', async () => {
-        const gw = mockGateway(() => POLICY);
+        const ALLOWED = { ...POLICY, allowlist: ['policy-model'] };
+        const gw = mockGateway(() => ALLOWED);
         try {
             await chat({ messages: [{ role: 'user', content: 'hi' }] });
         } finally {
@@ -169,8 +169,19 @@ describe('policy in the model chain', () => {
         expect(gw.state.bodies[0].model).toBe('policy-model');
     });
 
-    it('keeps explicit model, per-app pick, and shell pref ahead of the policy', async () => {
+    it('offers no model when the policy carries no allowlist (fail-closed)', async () => {
         const gw = mockGateway(() => POLICY);
+        try {
+            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+        } finally {
+            gw.restore();
+        }
+        expect(gw.state.bodies[0].model).toBe('');
+    });
+
+    it('keeps explicit model, per-app pick, and shell pref ahead of the policy', async () => {
+        const ALLOWED = { ...POLICY, allowlist: ['policy-model', 'picked-model', 'shell-model'] };
+        const gw = mockGateway(() => ALLOWED);
         try {
             await chat({ messages: [{ role: 'user', content: 'hi' }], model: 'explicit-model' });
             localStorage.setItem('fusion-office.ai-model', 'picked-model');
@@ -282,20 +293,9 @@ describe('policy in the model chain', () => {
         expect(isConfigured()).toBe(false);
     });
 
-    it('falls back to the env default when the gateway rejects the policy', async () => {
+    it('offers no model when the gateway rejects the policy (fail-closed)', async () => {
         const realFetch = globalThis.fetch;
-        globalThis.fetch = async (url, init) => {
-            if (String(url).includes('/api/v1/shell/model-policy')) return { ok: false, status: 401 };
-            return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
-        };
-        try {
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
-        } finally {
-            globalThis.fetch = realFetch;
-        }
-        // Assert via the last body captured inside the try; re-run to capture.
         const bodies = [];
-        resetPolicyCache();
         globalThis.fetch = async (url, init) => {
             if (String(url).includes('/api/v1/shell/model-policy')) return { ok: false, status: 401 };
             bodies.push(JSON.parse(init.body));
@@ -303,9 +303,9 @@ describe('policy in the model chain', () => {
         };
         try {
             await chat({ messages: [{ role: 'user', content: 'hi' }] });
-            expect(bodies[0].model).toBe('env-model');
         } finally {
             globalThis.fetch = realFetch;
         }
+        expect(bodies[0].model).toBe('');
     });
 });
