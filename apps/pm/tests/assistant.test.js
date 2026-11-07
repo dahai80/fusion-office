@@ -81,4 +81,22 @@ describe('project assistant', () => {
         expect(document.querySelector('.pm-as-status').textContent).toContain('VITE_FUSION_GATEWAY_KEY');
         modal.close();
     });
+
+    it('offers to create tasks when the reply lists them in prose', async () => {
+        ai.replies = [
+            [{ type: 'text', text: 'Here is the breakdown:\n\n| Task | Notes |\n| --- | --- |\n| Draft the notes | pull from last release |\n| Book the room | for Thursday |' }],
+        ];
+        const modal = openProjectAssistant('p1');
+        document.querySelector('.pm-as-suggestion').click();
+        await flush();
+        expect(fake.added).toEqual([]);
+        const offer = [...document.querySelectorAll('.pm-as-approval')].find(node => node.textContent.includes('lists 2 tasks'));
+        expect(offer).toBeTruthy();
+        [...offer.querySelectorAll('button')].find(b => b.textContent === 'Create').click();
+        await flush();
+        expect(fake.added).toEqual(['Draft the notes', 'Book the room']);
+        expect(fake.doc.tasks[0].description).toBe('pull from last release');
+        expect(document.querySelector('.pm-as-status').textContent).toContain('Created 2 tasks');
+        modal.close();
+    });
 });

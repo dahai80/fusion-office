@@ -10,7 +10,7 @@
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { createAgent, createModelPicker } from '@fusion-office/ai-client';
+import { createAgent, createModelPicker, parseMarkdownTable } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
@@ -140,6 +140,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       if (result.error) failure(answer, result.error);
       else if (!said.trim() && !steps.length) failure(answer, 'The assistant did not answer.');
       if (steps.some(s => s.changed)) currentTurn.append(undoRow());
+      else offerApply(currentTurn, said);
     } catch (e) {
       failure(answer, e);
     } finally {
@@ -191,6 +192,31 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     const applied = el('span.as-applied', { role: 'status' }, 'Changes made');
     const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { const engine = editor(); if (!engine) return; engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
     return el('div.as-actions', {}, applied, undo);
+  }
+
+  /** A reply that only describes a change offers to apply it: a table goes
+   *  in as a table, other rows as plain text. One click is one undo step. */
+  function offerApply(turnNode, said) {
+    if (!turnNode || !said.trim()) return;
+    let rows = null;
+    try { rows = parseMarkdownTable(said); } catch (e) { console.warn('assistant: table parse failed', e); return; }
+    if (!rows) return;
+    const apply = (name, args, done) => {
+      const engine = editor();
+      if (!engine) { toast('Open a document first.', { icon: 'info' }); return; }
+      if (pkg()?.readOnly || engine.viewOnly) { toast('The document is read-only.', { icon: 'info' }); return; }
+      const result = runTool(engine, name, args);
+      if (!result.ok) { toast('The change did not apply. Ask the assistant to try again.', { icon: 'alert' }); return; }
+      const applied = el('span.as-applied', { role: 'status' }, done);
+      const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
+      actions.replaceChildren(applied, undo);
+      engine.focus?.();
+    };
+    const table = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => apply('insert_table', { rows }, 'Table inserted') }, 'Insert as table');
+    const text = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => apply('insert_text', { text: rows.map(r => r.join('\t')).join('\n') }, 'Text inserted') }, 'Insert as text');
+    const actions = el('div.as-actions', {}, el('span.as-applied', {}, 'The assistant answered with a table.'), table, text);
+    turnNode.append(actions);
+    actions.scrollIntoView?.({ block: 'nearest' });
   }
 
   /** A change that replaces the person's words asks first; the tool waits for the answer. */

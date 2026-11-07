@@ -57,7 +57,8 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
 - `packages/storage` 每个会话只解析一次可写根目录：浏览器支持时使用 File System
   Access API 目录选择器，否则使用 OPFS。用户关闭选择器，或浏览器在没有用户手势时
   直接中止选择器，同样回退到 OPFS，应用不会因此不可用。IndexedDB 中维护尽力而为的
-  路径、大小、修改时间索引，用于列表展示。
+  路径、大小、修改时间索引，用于列表展示。读取尚不存在的目录返回空列表，stat 缺失
+  目录下的路径返回 `null`，首次启动不会记录 not-found 错误。
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
   同包的 `createAgent` 提供文档、PDF、项目三个助手共用的工具循环。

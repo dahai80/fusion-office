@@ -407,6 +407,7 @@ export async function listModels() {
 }
 
 export { createAgent, requestMessages, userContent, userText } from './agent.js'
+export { parseMarkdownTable, parseMarkdownTableParts } from './markdown-table.js'
 
 export async function ensureModelLoaded(modelId) {
     const models = await listModels()

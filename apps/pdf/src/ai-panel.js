@@ -48,7 +48,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     const root = el(
         'div',
         { class: 'ai-panel' },
-        el('p', { class: 'panel-note muted' }, 'The assistant reads the pages and can move to them. Answers come from the local AI service through fusion-gateway.'),
+        el('p', { class: 'panel-note muted' }, 'The assistant reads the pages and can move to them, but it is read-only: answers never change the file. Answers come from the local AI service through fusion-gateway.'),
         ...(modelPicker ? [modelPicker] : []),
         question,
         el('div', { class: 'ai-actions' }, askButton, summarizeButton, docSummaryButton, translateLanguage, translateButton),

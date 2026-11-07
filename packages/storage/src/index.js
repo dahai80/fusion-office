@@ -99,12 +99,24 @@ export async function readFile(path) {
     return file
 }
 
+const NOT_FOUND = (err) => err && (err.name === 'NotFoundError' || (typeof err.message === 'string' && err.message.includes('could not be found')))
+
 export async function readdir(path) {
     const base = await root()
     let dir = base
     const parts = String(path).split('/').filter(Boolean)
-    for (const part of parts) {
-        dir = await dir.getDirectoryHandle(part)
+    try {
+        for (const part of parts) {
+            dir = await dir.getDirectoryHandle(part)
+        }
+    } catch (err) {
+        // A folder that does not exist yet reads as empty, so a first boot
+        // listing an app folder the visitor never wrote to is not an error.
+        if (NOT_FOUND(err)) {
+            log('storage', 'readdir on a missing folder read as empty', path)
+            return []
+        }
+        throw err
     }
     const entries = []
     for await (const [name, handle] of dir.entries()) {
@@ -131,7 +143,16 @@ export async function deleteFile(path) {
 }
 
 export async function stat(path) {
-    const { dir, fileName } = await dirFor(path, false)
+    let located = null
+    try {
+        located = await dirFor(path, false)
+    } catch (err) {
+        // A missing parent folder is a missing entry, not a failure: the
+        // caller reads null the same as for a missing file.
+        if (NOT_FOUND(err)) return null
+        throw err
+    }
+    const { dir, fileName } = located
     try {
         const handle = await dir.getFileHandle(fileName)
         const file = await handle.getFile()

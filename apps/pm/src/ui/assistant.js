@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import { openModal } from './modal.js';
 import { store } from '../lib/store.js';
 import * as AI from '@fusion-office/ai-client';
-import { createAgent } from '@fusion-office/ai-client';
+import { createAgent, parseMarkdownTableParts } from '@fusion-office/ai-client';
 import { TOOLS, SYSTEM_PROMPT, changesProject, describeCall, projectSnapshot, runTool } from '../lib/ai-tools.js';
 
 const STATUS_TEXT = { running: 'Working…', done: 'Done', error: 'Failed', declined: 'Skipped', skipped: 'Stopped' };
@@ -24,6 +24,20 @@ function aiError(error) {
     if (/401|unauthori[sz]ed|invalid api key/i.test(message)) return 'The AI service rejected the request. Check VITE_FUSION_GATEWAY_KEY.';
     if (/fetch|network|offline|timed? ?out|abort/i.test(message)) return 'The AI service could not be reached. Check that fusion-gateway is running.';
     return 'The assistant could not answer. Try again in a moment.';
+}
+
+/** Reads a task list out of a plain reply: a markdown table first (a drawn
+ *  header row is dropped), then bullet or numbered lines. Returns rows of
+ *  cells, or null when neither. */
+function fallbackTaskRows(said) {
+    let parts = null;
+    try { parts = parseMarkdownTableParts(said); } catch (error) { console.warn('pm assistant: table parse failed', error); }
+    if (parts) return parts.hasHeader && parts.rows.length > 1 ? parts.rows.slice(1) : parts.rows;
+    const bullets = String(said || '').split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => /^[-*]\s+\S/.test(line) || /^\d+[.)]\s+\S/.test(line))
+        .map(line => [line.replace(/^[-*]\s+/, '').replace(/^\d+[.)]\s+/, '')]);
+    return bullets.length >= 2 ? bullets : null;
 }
 
 export function openProjectAssistant(projectId) {
@@ -92,6 +106,43 @@ export function openProjectAssistant(projectId) {
         });
     }
 
+    /** A reply that lists tasks in a table or as bullets but changed nothing
+     *  offers to create them. The first cell is the title, the rest the
+     *  description; a drawn header row is not a task. Each task is its own
+     *  undoable store change. */
+    function offerTasks(turnNode, said) {
+        const rows = fallbackTaskRows(said);
+        if (!rows) return;
+        const tasks = rows.map(row => ({
+            title: String(row[0] || '').trim().slice(0, 200),
+            description: row.slice(1).map(cell => String(cell).trim()).filter(Boolean).join(' — '),
+        })).filter(task => task.title);
+        if (!tasks.length) return;
+        const card = el('div', { class: 'pm-as-approval' },
+            el('p', {}, `The reply lists ${tasks.length} task${tasks.length === 1 ? '' : 's'}. Create them?`),
+            el('div', { class: 'pm-as-actions' },
+                el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => createAll(card) }, 'Create'),
+                el('button', { class: 'btn btn-sm', type: 'button', onclick: () => card.remove() }, 'Skip')));
+        turnNode.append(card);
+        card.scrollIntoView?.({ block: 'nearest' });
+        async function createAll(node) {
+            let made = 0, failed = 0;
+            for (const task of tasks) {
+                try {
+                    const result = await runTool(store, projectId, 'create_task', { title: task.title, description: task.description });
+                    if (result?.ok) made += 1; else failed += 1;
+                    if (result && !result.ok) console.warn('pm assistant: create_task rejected', result.content);
+                } catch (error) {
+                    console.warn('pm assistant: create_task failed', error);
+                    failed += 1;
+                }
+            }
+            const summary = failed ? `Created ${made} of ${tasks.length} tasks.` : `Created ${made} task${made === 1 ? '' : 's'}.`;
+            node.replaceChildren(el('p', { role: 'status' }, summary));
+            status.textContent = summary;
+        }
+    }
+
     async function submit(prompt) {
         if (busy) return;
         const text = String(prompt || input.value || '').trim();
@@ -127,7 +178,9 @@ export function openProjectAssistant(projectId) {
             });
             if (result.error) status.textContent = aiError(result.error);
             else if (!said.trim() && !rows.size) status.textContent = 'The assistant returned nothing. Try again.';
+            else if (!changed.length) offerTasks(turn, said);
         } catch (error) {
+            console.warn('pm assistant: send failed', error);
             status.textContent = aiError(error);
         } finally {
             setBusy(false);

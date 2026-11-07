@@ -24,7 +24,7 @@ import { renderMarkdown } from './markdown.js';
 import * as P from '../lib/puter.js';
 import { trackEvent } from '../lib/analytics.js';
 import { createAgent, workbookSnapshot, suggestions, userText, APPROVAL_MODES, DEFAULT_APPROVAL } from '../core/aiagent.js';
-import { createModelPicker } from '@fusion-office/ai-client';
+import { createModelPicker, parseMarkdownTable } from '@fusion-office/ai-client';
 import { runTool, describeCall, callTarget, changesWorkbook, qualified } from '../core/aitools.js';
 import { attachmentProblem, attachmentKind, attachmentsTooLarge, formatSize, ATTACH_ACCEPT, MAX_ATTACHMENTS } from '../core/aiattach.js';
 import { readAttachment } from './aiattachments.js';
@@ -778,6 +778,9 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
       });
     }
     renderFoot(reply, { changed, markBefore, markAfter: wb.historyTop, aiSteps, error: !!outcome.error });
+    // A reply that only printed the data as a table offers to write it into
+    // the sheet: a small model often answers in prose instead of a tool call.
+    if (!changed.length && !outcome.error && !outcome.stopped) offerCells(reply, markBefore);
     // Show what changed, unless the user has moved on to other cells meanwhile. A change on a hidden sheet cannot
     // be shown: selecting it would only have the user told, unasked, to unhide the sheet.
     const last = [...changed].reverse().find((s) => s.target && wb.sheet(s.target.sheetId) && !wb.sheet(s.target.sheetId).hidden);
@@ -845,6 +848,46 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
   const undos = new Set();
   const onWbChange = (e) => { if (e.detail?.type === 'history' || e.detail?.type === 'load') for (const fn of undos) fn(); };
   wb.addEventListener('change', onWbChange);
+
+  /** A reply that printed a markdown table but changed nothing offers to
+   *  write its rows into the sheet from the selected cell. One click, one
+   *  undo entry, and only the reply's own cells behind the Undo. */
+  function offerCells(reply, markBefore) {
+    let table = null;
+    try { table = parseMarkdownTable(reply.fullText); } catch (error) { console.warn('ai: table parse failed', error); return; }
+    if (!table) return;
+    const offer = el('div.ai-apply', {},
+      el('span.ai-foot-summary', {}, 'The reply holds a table.'),
+      el('button.btn.btn-sm.ai-undo', { type: 'button', onclick: () => applyCells(reply, offer, markBefore, table) }, 'Write into cells'));
+    reply.foot.hidden = false;
+    reply.foot.append(offer);
+  }
+
+  async function applyCells(reply, offer, markBefore, table) {
+    if (ctx.grid?.editing) { toast('Finish the cell you are typing in first', { icon: 'info' }); return; }
+    const idle = env.whenIdle?.();
+    if (idle) await idle;
+    const sel = env.selection();
+    const startCell = sel && sel.range && wb.sheet(sel.sheetId)
+      ? qualified(wb, sel.sheetId, { r1: sel.range.r1, r2: sel.range.r1, c1: sel.range.c1, c2: sel.range.c1 })
+      : 'A1';
+    // The click itself is the approval: the person asked for these cells.
+    const result = runPinned('write_cells', { start_cell: startCell, values: table });
+    if (!result?.ok) { toast(String(result?.content || 'The cells could not be written'), { icon: 'alert', duration: 4000 }); return; }
+    const markAfter = wb.historyTop;
+    offer.replaceChildren(
+      el('span.ai-foot-summary', { role: 'status' }, 'Cells written'),
+      el('button.btn.btn-sm.ai-undo', {
+        type: 'button',
+        onclick: () => {
+          if (wb.historyTop !== markAfter) { toast('The sheet has changed since. Use Undo in the Edit menu to go back step by step', { icon: 'info', duration: 4000 }); return; }
+          const n = (wb.historySince(markBefore) || []).length;
+          if (!n) return;
+          ctx.run('undoSteps', n);
+          toast('The reply\'s cells were undone', { icon: 'check', duration: 1500 });
+        },
+      }, 'Undo'));
+  }
 
   function stop() {
     if (!agent.busy) return;

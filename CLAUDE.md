@@ -164,6 +164,16 @@ Documents, PDF, and PM assistants run the shared agent loop in
 feeds results back, and asks before destructive steps. Each app owns its tool schemas
 and runner in a `*-tools` module; keep the two in step.
 
+Prose-reply fallback (issues #16-#20): a small model often answers a change request in
+plain text instead of calling a tool. When a turn changes nothing, each app offers to
+apply the reply from `parseMarkdownTable` (`packages/ai-client/src/markdown-table.js`):
+documents shows "Insert as table" / "Insert as text" in the pane, spreadsheet offers
+"Write into cells" from the selected cell, presentation offers "Insert as table" /
+"Insert as text" on the current slide, and pm offers "Create N tasks" from table rows or
+bullet lines. Documents' system prompt also forbids describing a change without calling
+the tools. The PDF panel is read-only by scope and says so (answers never change the
+file; the only write is a bookmark).
+
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool

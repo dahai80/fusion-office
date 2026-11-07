@@ -58,6 +58,8 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   API directory picker when available, otherwise OPFS. A dismissed picker, or a browser
   that aborts it without a user gesture, falls back to OPFS so the app keeps working. A
   best-effort IndexedDB index tracks path, size, and modification time for listings.
+  Reading a folder that does not exist yet yields an empty listing, and stating a path
+  under a missing folder yields `null`, so a first boot never logs a not-found error.
 - `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
   embeds model logic. `createAgent` in the same package runs the tool loop shared by the

@@ -24,7 +24,7 @@ import {
   DEFAULT_APPROVAL,
 } from "./assistant.js";
 import { runTool, describeCall, changesDeck } from "./assistant-tools.js";
-import { createModelPicker } from "@fusion-office/ai-client";
+import { createModelPicker, parseMarkdownTable } from "@fusion-office/ai-client";
 
 const SETTINGS_KEY = "presentation:assistant";
 export const MIN_WIDTH = 300;
@@ -762,6 +762,10 @@ export function createAssistantPanel(env) {
         reply.parts.append(el("p", { class: "ai-stopped" }, "Stopped."));
     }
     renderFoot(reply, changed, !!outcome.error);
+    // A reply that only described its content as a table offers to put it
+    // on the slide: a small model often answers in prose, not tool calls.
+    if (!changed.length && !outcome.error && !outcome.stopped)
+      offerInsert(reply);
     // Show what changed last, unless the user has moved on meanwhile (to
     // another slide or selection) or is typing.
     const last = [...changed].reverse().find((s) => s.target);
@@ -804,6 +808,102 @@ export function createAssistantPanel(env) {
   // change leaves an earlier reply's to the Edit menu, and lets its snapshot
   // go.
   let liveUndo = null;
+
+  /** A reply that printed a markdown table but changed nothing offers to
+   *  insert it on the current slide as a table, or as a text box. The
+   *  click waits for slide typing to commit, as a tool call would. */
+  function offerInsert(reply) {
+    let rows = null;
+    try {
+      rows = parseMarkdownTable(reply.fullText);
+    } catch (error) {
+      console.warn("assistant: table parse failed", error);
+      return;
+    }
+    if (!rows) return;
+    const offer = el(
+      "div",
+      { class: "ai-apply" },
+      el("span", { class: "ai-foot-summary" }, "The reply holds a table."),
+      el(
+        "button",
+        {
+          type: "button",
+          class: "btn ai-btn-sm",
+          onclick: () => applyInsert(offer, [
+            "add_table",
+            { rows, x: 1, y: 1.2, w: 8 },
+            "Table inserted",
+          ]),
+        },
+        "Insert as table",
+      ),
+      el(
+        "button",
+        {
+          type: "button",
+          class: "btn ai-btn-sm",
+          onclick: () => applyInsert(offer, [
+            "add_text",
+            { text: rows.map((r) => r.join("\t")).join("\n"), x: 1, y: 1.2, w: 8, h: Math.max(1, rows.length * 0.4) },
+            "Text inserted",
+          ]),
+        },
+        "Insert as text",
+      ),
+    );
+    reply.foot.hidden = false;
+    reply.foot.append(offer);
+  }
+
+  async function applyInsert(offer, [name, args, done]) {
+    const idle = changesDeck(name) || name === "select" ? env.whenIdle?.() : null;
+    if (idle) await idle;
+    const result = await runTool(name, args, env);
+    if (!result?.ok) {
+      toast(String(result?.content || "The change did not apply."));
+      return;
+    }
+    if (!result.changed) {
+      offer.replaceChildren(
+        el("span", { class: "ai-foot-summary", role: "status" }, done),
+      );
+      return;
+    }
+    const turn = turnOf(result.history || []);
+    const undoBtn = el(
+      "button",
+      { type: "button", class: "btn ai-btn-sm ai-undo" },
+      icon("Undo2", 14),
+      el("span", {}, "Undo"),
+    );
+    const refresh = () => {
+      undoBtn.disabled = !canUndo(turn);
+      undoBtn.title = canUndo(turn)
+        ? "Undo the change this button made"
+        : "The presentation has changed since this change";
+    };
+    undoBtn.addEventListener("click", async () => {
+      if (!canUndo(turn)) {
+        toast(
+          "The presentation has changed since. Use Undo in the Edit menu to go back step by step.",
+        );
+        refresh();
+        return;
+      }
+      undoBtn.disabled = true;
+      await env.undoTurn(turn.first, turn.count);
+      undoBtn.remove();
+      say("The inserted content was undone.");
+    });
+    liveUndo?.retire();
+    liveUndo = { refresh, retire: () => undoBtn.remove() };
+    offer.replaceChildren(
+      el("span", { class: "ai-foot-summary", role: "status" }, done),
+      undoBtn,
+    );
+    refresh();
+  }
   function renderFoot(reply, changed, error) {
     const items = [];
     const text = reply.fullText;
