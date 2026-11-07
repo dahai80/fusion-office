@@ -9,7 +9,7 @@ audience: end-user
 status: draft
 version: 0.1.0
 updated: 2026-11-07
-owner: @dahai
+owner: "@dahai"
 source_of_truth:
   - CHANGELOG.md
 ---
