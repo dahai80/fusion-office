@@ -1,3 +1,19 @@
+---
+doc_id: fusion-office/readme
+product: fusion-office
+class: app
+entry: guided-ui
+doc_type: readme
+title: { zh: "Fusion Office 总览", en: "Fusion Office" }
+audience: end-user
+status: draft
+version: 0.1.0
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - README.md
+---
+
 # Fusion Office
 
 Local-first office suite for the Fusion ecosystem. Five browser applications share one

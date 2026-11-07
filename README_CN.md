@@ -1,3 +1,19 @@
+---
+doc_id: fusion-office/readme
+product: fusion-office
+class: app
+entry: guided-ui
+doc_type: readme
+title: { zh: "Fusion Office 总览（中文）", en: "Fusion Office" }
+audience: end-user
+status: draft
+version: 0.1.0
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - README.md
+---
+
 # Fusion Office
 
 面向 Fusion 生态的本地优先办公套件。
@@ -123,7 +139,7 @@ Shell 之外的独立开发模式，使用时会记录一条警告日志。
 - 演示：提示词生成整套幻灯片、助手面板、幻灯片审阅。演讲者备注栏有"Generate with AI"
   按钮（当前页 + 全部页，按 8000 字符负载上限分批，走与备注框相同的编辑/撤销路径）。
 - PDF：侧栏 **Ask AI** 是基于当前文件的助手：通过工具读取页面、查找文本、跳转页面、
-  调整缩放、添加书签（唯一的修改，可撤销）。两个快捷动作补全场景：**Summarize
+  调整缩放、添加书签（唯一的修改，可撤销）。两个快捷动作补足剩余场景：**Summarize
   document**（走同样的页数上限做有界读取，输出带页码引用的结构化摘要）和 **Translate
   page**（记住上次目标语言）。扫描件需要先做 OCR。
 - 项目：看板标题栏的项目助手可读取并修改项目：新建、更新、移动、归档、删除任务，
