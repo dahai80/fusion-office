@@ -261,6 +261,36 @@ export async function chatStream(opts, onDelta) {
     return full
 }
 
+/** One non-streaming chat, yielded in the same event shape as the stream:
+ *  text first, then the message's tool calls. The empty-stream fallback uses
+ *  it, and it is the shape every event consumer already understands. */
+async function* nonStreamEvents(body) {
+    warnStaticKey()
+    const res = await fetch(baseUrlFor() + chatPath(), fetchOpts({
+        method: 'POST',
+        body: JSON.stringify({ ...body, stream: false }),
+    }))
+    if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error('gateway ' + res.status + ': ' + text.slice(0, 500))
+    }
+    const data = await res.json()
+    const message = (data.choices && data.choices[0] && data.choices[0].message) || {}
+    if (message.content) yield { type: 'text', text: message.content }
+    for (const call of message.tool_calls || []) {
+        let input = {}
+        const raw = call.function && call.function.arguments
+        if (raw) {
+            try {
+                input = JSON.parse(raw)
+            } catch (err) {
+                input = { __unreadable: raw }
+            }
+        }
+        yield { type: 'tool', id: call.id, name: (call.function && call.function.name) || '', input }
+    }
+}
+
 export async function* chatStreamEvents(opts) {
     const body = {
         model: await resolvedModel(opts),
@@ -288,6 +318,7 @@ export async function* chatStreamEvents(opts) {
     }
     let full = ''
     let toolCount = 0
+    let completionTokens = 0
     try {
         warnStaticKey()
         const res = await fetch(baseUrlFor() + chatPath(), {
@@ -325,6 +356,7 @@ export async function* chatStreamEvents(opts) {
                     continue
                 }
                 const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta
+                if (chunk.usage && typeof chunk.usage.completion_tokens === 'number') completionTokens = chunk.usage.completion_tokens
                 if (!delta) continue
                 if (delta.content) {
                     full += delta.content
@@ -339,6 +371,32 @@ export async function* chatStreamEvents(opts) {
                     calls.set(index, current)
                 }
             }
+        }
+        // Some Anthropic-protocol relays drop tool-call deltas on the stream
+        // (they forward text_delta but not content_block_start tool_use or
+        // input_json_delta), so the reply arrives as a short preface — or
+        // nothing at all — and the tools never fire. When tools were sent
+        // and the stream produced none, though the model spent tokens, the
+        // same request without streaming returns the tool calls: ask once
+        // more, non-streaming, and keep the stream's text when the retry
+        // shows the model really did answer in prose.
+        if (opts.tools && opts.tools.length && calls.size === 0 && completionTokens > 0 && full.length < 400) {
+            let sawTool = false
+            for await (const part of nonStreamEvents(body)) {
+                if (part.type === 'tool') {
+                    sawTool = true
+                    toolCount++
+                    yield part
+                } else if (part.type === 'text' && !full) {
+                    full += part.text
+                    yield part
+                }
+            }
+            if (sawTool || !full) {
+                log('ai', 'chatStreamEvents recovered from a dropped tool call', toolCount + ' tools')
+                return
+            }
+            log('ai', 'chatStreamEvents stream ended in prose; keeping it')
         }
         for (const call of calls.values()) {
             let input = {}
