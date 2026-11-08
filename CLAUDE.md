@@ -174,6 +174,12 @@ bullet lines. Documents' system prompt also forbids describing a change without 
 the tools. The PDF panel is read-only by scope and says so (answers never change the
 file; the only write is a bookmark).
 
+- Stream resilience: when tools were sent but the stream ends with a short
+  prose preface and no tool calls while the model spent tokens (Anthropic-protocol
+  relays can drop tool-call deltas; tracked upstream as
+  dahai80/fusion-gateway#580), `chatStreamEvents` replays the request once without
+  streaming — the non-stream path returns `tool_calls` intact — and yields them;
+  if the retry confirms the answer is prose, the text is kept once, not duplicated.
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool

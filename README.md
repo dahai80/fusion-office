@@ -63,7 +63,10 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
 - `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
   embeds model logic. `createAgent` in the same package runs the tool loop shared by the
-  documents, PDF, and project assistants.
+  documents, PDF, and project assistants. When a tool-bearing stream ends with no
+  tool calls despite the model spending tokens (some Anthropic-protocol relays drop
+  the tool-call deltas), `chatStreamEvents` retries the request once without
+  streaming and recovers the tool calls.
 - AI traffic is gated by the gateway API key. Browser builds read the key at build time
   from `VITE_FUSION_GATEWAY_KEY`. PDF and project AI surfaces check `isConfigured()` and
   explain what is missing before sending anything; the other apps surface the gateway's

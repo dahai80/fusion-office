@@ -62,6 +62,8 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
   同包的 `createAgent` 提供文档、PDF、项目三个助手共用的工具循环。
+  当带工具的流式响应结束时没有任何工具调用（部分 Anthropic 协议中转层会丢弃
+  工具调用增量），`chatStreamEvents` 会以非流式方式重试一次并恢复工具调用。
 - AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`。
   PDF 和项目 AI 入口会先检查 `isConfigured()` 并在缺少配置时明确说明，不会发送请求；
   其余应用则把网关错误显示在各自的界面中。
