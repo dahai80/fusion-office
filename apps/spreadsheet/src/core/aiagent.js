@@ -15,10 +15,9 @@ import { dataBounds, describeRange } from './aiformula.js';
 import { TOOLS, TOOL_NAMES, changesWorkbook, qualified } from './aitools.js';
 import { attachmentsIntro, attachmentsGone, attachmentWeight, attachmentsFit, sentBytes } from './aiattach.js';
 
-/** The model the assistant runs on, served by fusion-gateway. */
-export const AI_MODEL =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FUSION_MODEL) ||
-  'mlx-community/Qwen3.8-27B-8bit';
+/** The model the assistant runs on is left to the chat adapter (the model
+ *  picker, the shell's model policy, then the build-time default): a hard
+ *  model id here would bypass the picker and the tenant policy (#22). */
 
 /** When the assistant asks before changing the workbook: before every change, before one that takes away data, or never. */
 export const APPROVAL_MODES = [
@@ -273,7 +272,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
         let text = '';
         let cut = false; // the reply ran into MAX_OUTPUT_TOKENS
         const calls = [];
-        const iterable = chat(requestMessages(transcript, { changelog }), { model: AI_MODEL, tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS });
+        const iterable = chat(requestMessages(transcript, { changelog }), { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS });
         const iter = iterable[Symbol.asyncIterator]();
         for (;;) {
           const next = await Promise.race([iter.next(), stopSignal]);

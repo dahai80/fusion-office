@@ -20,6 +20,16 @@ try {
     // No .env.local: builds run without baked defaults.
 }
 
+// Issue #23: the baked key rides in every standalone bundle, extractable by
+// anyone who downloads it. The admin key (also web_shell.admin_key) is
+// unlimited (rpm/tpm 0), so baking it hands out the master credential —
+// refuse the build rather than ship it. Standalone builds bake a dedicated
+// low-privilege key instead; inside the union shell no key is needed at all.
+if (process.env.VITE_FUSION_GATEWAY_KEY && process.env.VITE_FUSION_GATEWAY_KEY === process.env.FUSION_ADMIN_KEY) {
+    console.error('[build] refusing to bake the gateway admin key (FUSION_ADMIN_KEY) as VITE_FUSION_GATEWAY_KEY: the standalone bundle is public to anyone who downloads it. Use a dedicated low-privilege gateway key with explicit rpm/tpm caps.');
+    process.exit(1);
+}
+
 for (const app of apps) {
     const started = Date.now();
     console.log(`[build] ${app}`);

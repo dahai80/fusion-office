@@ -107,6 +107,11 @@ variables before starting a dev server or build:
 Copy `.env.example` to `.env.local` in the app directory (or export the variables in the
 shell) and put a gateway API key in `VITE_FUSION_GATEWAY_KEY`. Keys are compiled into the
 browser bundle, so use a scoped key, never the master key, and never commit `.env.local`.
+`npm run build` refuses to run when `VITE_FUSION_GATEWAY_KEY` equals `FUSION_ADMIN_KEY`
+(issue #23): the admin key is unlimited (`rpm: 0` / `tpm: 0` on the gateway's key plane),
+so a baked admin key hands the master credential to anyone who downloads the bundle.
+Inside the union shell no baked key is needed at all — calls ride the session-gated
+`/api/v1/shell/chat/completions` with per-user quota and model policy.
 
 During `npm run dev`, `@fusion-office/ai-client` talks to `/__fusion_gateway` on the app's
 own origin, and each Vite config proxies that prefix to the gateway

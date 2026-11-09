@@ -113,7 +113,13 @@ npm workspaces: `apps/*` and `packages/*`.
   build-time default. The gateway key must be baked at build time for browser calls to
   authenticate (`scripts/build-all.mjs` loads the gitignored root `.env.local` into the
   environment; Vite reads `VITE_*` files from each app's own directory, so a root env
-  file alone is not enough).
+  file alone is not enough). `build-all.mjs` refuses the build when
+  `VITE_FUSION_GATEWAY_KEY` equals `FUSION_ADMIN_KEY` (issue #23) — the admin key is
+  unlimited on the gateway key plane and must never be baked into a client bundle.
+  Standalone builds bake a dedicated scoped key; inside the shell no key is needed.
+  The spreadsheet agent loop leaves the model to the chat adapter's resolution chain
+  (picker, shell policy, build default) — no baked model id in the transcript loop
+  (issue #22).
 - Each app keeps the historical `puter.js` / `cloud.js` adapter name so call sites did
   not need to move. Those adapters now delegate to `@fusion-office/storage` and
   `@fusion-office/ai-client`. Do not reintroduce Puter globals.

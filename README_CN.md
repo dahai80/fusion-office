@@ -99,7 +99,11 @@ AI 调用统一走 `@fusion-office/ai-client`。启动开发服务器或构建�
 
 将 `.env.example` 复制为应用目录下的 `.env.local`（或在 Shell 中导出变量），把网关
 API Key 填入 `VITE_FUSION_GATEWAY_KEY`。Key 会被编译进浏览器产物，因此必须使用受限
-Key，禁止使用 master key，禁止提交 `.env.local`。
+Key，禁止使用 master key，禁止提交 `.env.local`。当 `VITE_FUSION_GATEWAY_KEY` 与
+`FUSION_ADMIN_KEY` 相同时 `npm run build` 会直接拒绝构建（issue #23）：admin key 在
+网关 Key 平面上不设限额（`rpm: 0` / `tpm: 0`），编译进产物等于把主凭据交给任何下载
+产物的人。在 Union Shell 内完全不需要烘焙 Key——AI 请求走会话门控的
+`/api/v1/shell/chat/completions`，自带按用户配额与模型策略。
 
 `npm run dev` 期间，`@fusion-office/ai-client` 请求同源的 `/__fusion_gateway`，由各
 Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS 白名单不包含任意本地
