@@ -656,24 +656,37 @@ function valuesShapeNote(v) {
     if (typeof v === 'string') return `values was sent as a string (${v.length} characters) instead of an array; emit the rows as a JSON array literal in the tool call arguments, not as a string containing JSON.`;
     if (Array.isArray(v)) {
         const bad = v.filter((row) => !Array.isArray(row)).slice(0, 2).map((row) => JSON.stringify(row) ?? String(row));
-        return `each row must be an array of cell values; ${v.length} row(s) received, and these are not arrays: ${bad.join(', ')}.`;
+        const stringRows = v.some((row) => typeof row === 'string');
+        const shape = stringRows
+            ? ' each row was a string; send each row as a JSON array of cell values, e.g. ["Month", 1000], not as a string.'
+            : '';
+        return `each row must be an array of cell values; ${v.length} row(s) received, and these are not arrays: ${bad.join(', ')}.${shape}`;
     }
     return `values was a ${typeof v} instead of an array.`;
+}
+
+/** Unwrap a value some models double-encode as a JSON string (bare, or wrapped in a markdown code fence). */
+function unwrapJsonArray(value) {
+  if (typeof value !== 'string') return value;
+  let text = value.trim();
+  const fence = text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  if (fence) text = fence[1].trim();
+  if (!text.startsWith('[')) return value;
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : value;
+  } catch (err) {
+    return value;
+  }
 }
 
 function writeCells(wb, args, env) {
   const { sheetId, range: start } = resolveRange(wb, args.start_cell, env.sheetId());
   // Some models double-encode the rows as a JSON string (bare, or wrapped in a
-  // markdown code fence); unwrap one layer before the shape check (#24).
-  let rows = args.values;
-  if (typeof rows === 'string') {
-    let text = rows.trim();
-    const fence = text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
-    if (fence) text = fence[1].trim();
-    if (text.startsWith('[')) {
-      try { rows = JSON.parse(text); } catch (err) { /* the shape check below reports it with an example */ }
-    }
-  }
+  // markdown code fence); unwrap one layer before the shape check (#24). Others
+  // send each row as its own stringified array; unwrap those too (#25).
+  let rows = unwrapJsonArray(args.values);
+  if (Array.isArray(rows)) rows = rows.map((row) => unwrapJsonArray(row));
   if (!Array.isArray(rows) || !rows.length || !rows.every(Array.isArray)) throw new ToolError(`values must be an array of rows, each row an array of cell values, e.g. {"start_cell":"A1","values":[["Month","Payment"],[1,1000]]}. ${valuesShapeNote(args.values)}`);
   const width = Math.max(...rows.map((row) => row.length));
   if (!width) throw new ToolError('values holds no cells.');

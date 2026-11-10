@@ -45,6 +45,25 @@ describe('AI tools', () => {
     expect(wb.getValue(id, 0, 3)).toBe('a');
   });
 
+  it('unwraps rows the model sends as stringified row arrays (#25)', () => {
+    const { wb, id, run } = setup();
+    const rows = [JSON.stringify(['Month', 'Payment']), JSON.stringify([1, 1000])];
+    const res = run('write_cells', { start_cell: 'A1', values: rows });
+    expect(res.ok).toBe(true);
+    expect(wb.getValue(id, 0, 0)).toBe('Month');
+    expect(wb.getValue(id, 1, 1)).toBe(1000);
+    const fencedRow = run('write_cells', { start_cell: 'A3', values: ['```json\n["x", "y"]\n```'] });
+    expect(fencedRow.ok).toBe(true);
+    expect(wb.getValue(id, 2, 0)).toBe('x');
+  });
+
+  it('tells the model to send arrays when the rows are strings (#25)', () => {
+    const { run } = setup();
+    const res = run('write_cells', { start_cell: 'A1', values: ['Loan Calculator', 'A1'] });
+    expect(res.content).toMatch(/these are not arrays/);
+    expect(res.content).toMatch(/each row was a string; send each row as a JSON array of cell values/);
+  });
+
   it('tells the model what was wrong with the values shape', () => {
     const { run } = setup();
     const asText = run('write_cells', { start_cell: 'A1', values: '[["Month","Payment"]' });
