@@ -64,6 +64,15 @@ describe('AI tools', () => {
     expect(res.content).toMatch(/each row was a string; send each row as a JSON array of cell values/);
   });
 
+  it('returns what the engine computed after a write (#26)', () => {
+    const { run } = setup();
+    const res = run('write_cells', { start_cell: 'A1', values: [[1], [2], [3], ['=SUM(A1:A3)']] });
+    expect(res.ok).toBe(true);
+    const body = JSON.parse(res.content);
+    expect(body.computed).toContainEqual(['A1', 1]);
+    expect(body.computed).toContainEqual(['A4', 6]);
+  });
+
   it('tells the model what was wrong with the values shape', () => {
     const { run } = setup();
     const asText = run('write_cells', { start_cell: 'A1', values: '[["Month","Payment"]' });

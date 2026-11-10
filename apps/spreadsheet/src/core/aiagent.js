@@ -247,6 +247,8 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
   let messages = [];
   let running = null; // { stop(), stopped }
   const changelog = []; // one line per change the assistant made, oldest first
+  let lastCallSig = null; // the tool call before the current one, as name + serialized arguments
+  let repeatCount = 0; // how many times that exact call has been made in a row
 
   function needsApproval(name, info) {
     if (!changesWorkbook(name)) return false;
@@ -349,24 +351,37 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
               step.status = 'declined';
               content = 'The user declined this change, so it was not made. Do not try it another way; say what you would have done.';
             } else {
-              step.status = 'running';
-              emit({ type: 'step', step: { ...step } });
-              let result;
-              try { result = await Promise.race([Promise.resolve(runTool(call.name, call.input, control)), stopSignal]); } catch (e) { result = { ok: false, content: `Error: ${e?.message || e}` }; }
-              step.note = null;
-              if (result === STOP || result?.skipped) {
-                step.status = 'skipped';
-                content = 'Not run: the user stopped the assistant.';
+              // An identical call re-issued with identical arguments is a loop, not work: the
+              // model is retrying its own serialization or a result it refuses to read. Break
+              // it early and tell it what to do instead (#26).
+              const sig = `${call.name}:${JSON.stringify(call.input)}`;
+              repeatCount = sig === lastCallSig ? repeatCount + 1 : 1;
+              lastCallSig = sig;
+              if (repeatCount >= 3) {
+                step.status = 'error';
+                step.error = 'The same call was already made twice with identical arguments.';
+                content = 'Error: you already made this exact call twice with identical arguments and it made no progress. Do not repeat it. Read the last tool result, change what it asks you to change, or stop and tell the user what is blocking you.';
+                emit({ type: 'step', step: { ...step } });
               } else {
-                step.status = result.ok ? 'done' : 'error';
-                step.changed = !!result.changed;
-                step.target = result.target || null;
-                if (step.changed) {
-                    changelog.push(`${step.label || step.name}${step.target ? ` (${step.target})` : ''}`);
-                    if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                step.status = 'running';
+                emit({ type: 'step', step: { ...step } });
+                let result;
+                try { result = await Promise.race([Promise.resolve(runTool(call.name, call.input, control)), stopSignal]); } catch (e) { result = { ok: false, content: `Error: ${e?.message || e}` }; }
+                step.note = null;
+                if (result === STOP || result?.skipped) {
+                  step.status = 'skipped';
+                  content = 'Not run: the user stopped the assistant.';
+                } else {
+                  step.status = result.ok ? 'done' : 'error';
+                  step.changed = !!result.changed;
+                  step.target = result.target || null;
+                  if (step.changed) {
+                      changelog.push(`${step.label || step.name}${step.target ? ` (${step.target})` : ''}`);
+                      if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                  }
+                  if (!result.ok) step.error = String(result.content).replace(/^Error:\s*/, '');
+                  content = String(result.content ?? '');
                 }
-                if (!result.ok) step.error = String(result.content).replace(/^Error:\s*/, '');
-                content = String(result.content ?? '');
               }
             }
           }

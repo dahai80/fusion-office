@@ -60,6 +60,22 @@ describe('AI assistant loop', () => {
     expect(out.steps[0]).toMatchObject({ changed: true, status: 'done', target: { sheetId: id } });
   });
 
+  it('breaks a loop of identical calls with identical arguments instead of running them (#26)', async () => {
+    const { wb, id, agent, requests } = setup([
+      [tool('write_cells', { start_cell: 'B1', values: [[7]] }, 'r1')],
+      [tool('write_cells', { start_cell: 'B1', values: [[7]] }, 'r2')],
+      [tool('write_cells', { start_cell: 'B1', values: [[7]] }, 'r3')],
+      [{ type: 'text', text: 'I am stuck; the same write kept making no progress.' }],
+    ]);
+    const out = await agent.send('Write 7 into B1', () => {});
+    expect(out.error).toBeUndefined();
+    // The first two ran; the third identical call was refused without running.
+    expect(wb.getValue(id, 0, 1)).toBe(7);
+    const toolMessages = requests[3].messages.filter((m) => m.role === 'tool');
+    expect(toolMessages.at(-1).content).toContain('already made this exact call twice');
+    expect(requests[3].messages.at(-1).role).toBe('tool');
+  });
+
   it('asks before replacing data and tells the model when the user declines', async () => {
     const { wb, id, agent, asked, requests } = setup([
       [tool('write_cells', { start_cell: 'A2', values: [[99]] })],

@@ -722,8 +722,21 @@ function writeCells(wb, args, env) {
     ...(refused.length ? { refused_by_validation: refused.slice(0, 10) } : {}),
     ...(errors.length ? { formula_errors: errors } : {}),
     ...(blocked.length ? { spills_blocked: blocked.slice(0, 8) } : {}),
+    // What the engine actually computed for the first cells written: the model checks its
+    // work against these facts instead of its own claims (#26).
+    computed: previewValues(wb, sheetId, planned.slice(0, 12)),
     ...(note ? { note } : {}),
   };
+}
+
+/** The computed value of each cell, as a compact [[cell, value]] list for the tool result. */
+function previewValues(wb, sheetId, cells) {
+  const out = [];
+  for (const { r, c } of cells) {
+    const v = wb.getValue(sheetId, r, c);
+    if (v != null) out.push([cellName(r, c), v]);
+  }
+  return out;
 }
 
 function fillFormula(wb, args, env) {
