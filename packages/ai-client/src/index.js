@@ -338,7 +338,6 @@ export async function* chatStreamEvents(opts) {
         let buffer = ''
         while (true) {
             const { done, value } = await reader.read()
-            rearmIdle()
             if (done) break
             buffer += decoder.decode(value, { stream: true })
             const lines = buffer.split(NEWLINE)
@@ -355,6 +354,10 @@ export async function* chatStreamEvents(opts) {
                     logError('ai', 'bad SSE chunk skipped', payload.slice(0, 120))
                     continue
                 }
+                // Only a real event proves the model is alive. Keepalive comments and
+                // whitespace keep the connection open without producing anything, so
+                // they must not rearm the idle timer or a hung stream never aborts (#26).
+                rearmIdle()
                 const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta
                 if (chunk.usage && typeof chunk.usage.completion_tokens === 'number') completionTokens = chunk.usage.completion_tokens
                 if (!delta) continue

@@ -49,4 +49,35 @@ describe('chatStreamEvents idle timeout', () => {
         }).rejects.toThrow();
         expect(parts.length).toBeLessThan(2);
     });
+
+    it('aborts even when keepalive comments keep arriving without real events (#26)', async () => {
+        const encoder = new TextEncoder();
+        const abort = new AbortController();
+        const sleep = (ms) => new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, ms);
+            abort.signal.addEventListener('abort', () => { clearTimeout(timer); reject(abort.signal.reason); }, { once: true });
+        });
+        const body = new ReadableStream({
+            async start(controller) {
+                // Keepalive comments every 40ms, forever from the stream's side: only the
+                // caller's idle timer ends this. Real events never come.
+                abort.signal.addEventListener('abort', () => controller.error(abort.signal.reason), { once: true });
+                try {
+                    for (;;) {
+                        await sleep(40);
+                        controller.enqueue(encoder.encode(': ping\n\n'));
+                    }
+                } catch { /* errored by the abort listener */ }
+            },
+        });
+        vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+            init.signal.addEventListener('abort', () => abort.abort(), { once: true });
+            return new Response(body, { status: 200 });
+        }));
+        await expect(async () => {
+            for await (const part of chatStreamEvents({ messages: [{ role: 'user', content: 'hi' }], timeoutMs: 150 })) {
+                void part;
+            }
+        }).rejects.toThrow();
+    });
 });
