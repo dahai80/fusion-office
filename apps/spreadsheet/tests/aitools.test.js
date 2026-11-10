@@ -73,6 +73,18 @@ describe('AI tools', () => {
     expect(body.computed).toContainEqual(['A4', 6]);
   });
 
+  it('formats several comma-separated ranges in one call (#26)', () => {
+    const { wb, id, run } = setup();
+    const res = run('format_cells', { range: 'B1:C1,E1:F1', bold: true });
+    expect(res.ok).toBe(true);
+    expect(JSON.parse(res.content).formatted).toEqual(['Sheet1!B1:C1', 'Sheet1!E1:F1']);
+    expect(wb.styleAt(id, 0, 1).bold).toBeTruthy();
+    expect(wb.styleAt(id, 0, 4).bold).toBeTruthy();
+    const prefixed = run('format_cells', { range: 'A3:A5,C3:C5', italic: true });
+    expect(prefixed.ok).toBe(true);
+    expect(wb.styleAt(id, 2, 2).italic).toBeTruthy();
+  });
+
   it('tells the model what was wrong with the values shape', () => {
     const { run } = setup();
     const asText = run('write_cells', { start_cell: 'A1', values: '[["Month","Payment"]' });

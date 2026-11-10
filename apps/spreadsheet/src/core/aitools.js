@@ -131,7 +131,7 @@ export const TOOLS = [
     range: RANGE,
     what: str('"contents" (default), "formats", or "all".', { enum: ['contents', 'formats', 'all'] }),
   }, ['range']),
-  fn('format_cells', 'Format a range. Give only the properties to change.', {
+  fn('format_cells', 'Format a range, or several ranges separated by commas ("A3:A7,A9:A11", up to 8, sharing one sheet prefix). Give only the properties to change.', {
     range: RANGE,
     bold: bool('Bold on or off.'),
     italic: bool('Italic on or off.'),
@@ -778,8 +778,15 @@ function colorArg(value, what) {
 }
 
 function formatCells(wb, args, env) {
-  const { sheetId, range } = resolveRange(wb, args.range, env.sheetId());
-  assertWritable(wb, sheetId, range);
+  // Models list several ranges the way a UI selection does ("A3:A7,A9:A11"); apply each one
+  // instead of rejecting the whole call and grinding through it range by range (#26).
+  const parts = String(args.range ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) throw new ToolError('No range was given.');
+  if (parts.length > 8) throw new ToolError('At most 8 ranges per call; format the rest in another call.');
+  const prefix = parts.find((p) => p.includes('!'))?.split('!')[0];
+  const targets = parts.map((p) => resolveRange(wb, p.includes('!') || !prefix ? p : `${prefix}!${p}`, env.sheetId()));
+  for (const { sheetId, range } of targets) assertWritable(wb, sheetId, range);
+  const { sheetId, range } = targets[0];
   const patch = {};
   if (args.bold != null) patch.bold = !!args.bold || null;
   if (args.italic != null) patch.italic = !!args.italic || null;
@@ -823,10 +830,13 @@ function formatCells(wb, args, env) {
   if (!Object.keys(patch).length && borders == null) throw new ToolError('No formatting was given.');
   // Whole columns and rows are formatted as lines (the way the toolbar formats them), not cell by cell.
   wb.transaction('AI edit', () => {
-    if (Object.keys(patch).length) wb.applyStyle(sheetId, range, patch);
-    if (borders != null) wb.applyBorders(sheetId, range, borders, { scope: lineScope(range) });
+    for (const { sheetId, range } of targets) {
+      if (Object.keys(patch).length) wb.applyStyle(sheetId, range, patch);
+      if (borders != null) wb.applyBorders(sheetId, range, borders, { scope: lineScope(range) });
+    }
   });
-  return { formatted: qualified(wb, sheetId, range), changes: [...Object.keys(patch), ...(borders != null ? [`${borders} borders`] : [])] };
+  const formatted = targets.map(({ sheetId, range }) => qualified(wb, sheetId, range));
+  return { formatted: formatted.length === 1 ? formatted[0] : formatted, changes: [...Object.keys(patch), ...(borders != null ? [`${borders} borders`] : [])] };
 }
 
 function lines(wb, args, env, { axis, remove }) {
