@@ -1,0 +1,129 @@
+{
+  "name": "sales-summary",
+  "prompt": "A1:C6 already holds sales data (region, month, amount). Add a summary block in E1:F4 with total, average, max and min of the amounts, labeled.",
+  "fixture": [
+    [
+      "write_cells",
+      {
+        "start_cell": "A1",
+        "values": [
+          [
+            "Region",
+            "Month",
+            "Amount"
+          ],
+          [
+            "East",
+            "Jan",
+            1200
+          ],
+          [
+            "East",
+            "Feb",
+            1500
+          ],
+          [
+            "West",
+            "Jan",
+            900
+          ],
+          [
+            "West",
+            "Feb",
+            1100
+          ],
+          [
+            "North",
+            "Mar",
+            700
+          ]
+        ]
+      }
+    ]
+  ],
+  "replies": [
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-aa94a84480159b9d",
+        "name": "read_range",
+        "input": {
+          "range": "A1:C6"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-8afbabd9d73c03a5",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "E1",
+          "values": [
+            [
+              "Total",
+              "=SUM(C2:C6)"
+            ],
+            [
+              "Average",
+              "=AVERAGE(C2:C6)"
+            ],
+            [
+              "Max",
+              "=MAX(C2:C6)"
+            ],
+            [
+              "Min",
+              "=MIN(C2:C6)"
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "Done"
+      },
+      {
+        "type": "text",
+        "text": " —"
+      },
+      {
+        "type": "text",
+        "text": " summary block"
+      },
+      {
+        "type": "text",
+        "text": " in E1:F4 with"
+      },
+      {
+        "type": "text",
+        "text": " live formulas: Total "
+      },
+      {
+        "type": "text",
+        "text": "5400, Average "
+      },
+      {
+        "type": "text",
+        "text": "1080, Max 150"
+      },
+      {
+        "type": "text",
+        "text": "0, Min 700."
+      }
+    ]
+  ],
+  "expect": [
+    [
+      "A1",
+      "Region"
+    ]
+  ],
+  "run_meta": {
+    "rounds": 3,
+    "stopped": false,
+    "error": null
+  }
+}

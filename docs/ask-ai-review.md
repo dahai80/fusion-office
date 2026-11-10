@@ -127,3 +127,27 @@ gateway team), the golden-set eval harness (1/2/3/6/11 as one workstream).
 Upstream (report only, per repo rules): the dropped tool-delta relay bug stays
 with dahai80/fusion-gateway#580; the model-policy visibility gap needs a
 gateway response field before any client can show the true answering model.
+
+## Workstreams landed 2026-11-10
+
+- **Golden-set eval harness** (`apps/spreadsheet/eval/`): `record.mjs` records
+  real model runs into `cases/*.json`; `tests/eval-golden.test.js` replays
+  every case with the model stubbed and asserts the final workbook state
+  (defects 1/2/3/6/11's precondition — capability is now measured against
+  recorded reality, not invented model behavior).
+- **Live pass@k runner** (`apps/spreadsheet/eval/run-live.mjs`): re-runs each
+  case N times against the gateway, per model, manually. `--planner` runs the
+  same cases through the plan-then-apply core for an architecture comparison.
+- **Plan-then-apply prototype** (`src/core/aiplan.js`): the model reads with
+  the read tools, then commits the whole change as one `apply_plan` call —
+  validated whole before anything is written, asked about once, applied in
+  order; a failing edit stops the plan and reports what applied. Tests in
+  `tests/aiplan.test.js`; not yet wired into the panel.
+- **Task corpus** (`src/core/aitelemetry.js`): every prompt the user sends is
+  recorded in that browser's localStorage (200 newest, attachments counted
+  never stored); console helpers `fusionOffice.promptLog()` /
+  `exportPromptLog()` / `clearPromptLog()` feed the eval set with real task
+  distribution. Tests in `tests/aitelemetry.test.js`.
+- **Stream watchdog** (defect 7): keepalive comments no longer rearm the idle
+  timer, so a stream that produces nothing real aborts and the non-stream
+  fallback replays it (packages/ai-client, #26).

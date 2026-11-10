@@ -1,0 +1,546 @@
+{
+  "name": "loan-calculator",
+  "prompt": "Create a loan calculator with a payment schedule: loan amount 1000000, annual rate 4.2%, term 20 years. Monthly payment, interest, principal and remaining balance columns for the first 24 payments.",
+  "fixture": [],
+  "replies": [
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-83bff808448b4eb3",
+        "name": "get_workbook_info",
+        "input": {}
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-bd3103696f481fd6",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "A1",
+          "values": [
+            [
+              "Loan Calculator"
+            ],
+            [
+              "Loan amount",
+              1000000
+            ],
+            [
+              "Annual interest rate",
+              0.042
+            ],
+            [
+              "Term (years)",
+              20
+            ],
+            [
+              "Monthly payment",
+              "=PMT(B3/12,B4*12,-B2)"
+            ],
+            [
+              null
+            ],
+            [
+              "Payment #",
+              "Payment",
+              "Interest",
+              "Principal",
+              "Remaining balance"
+            ],
+            [
+              1,
+              "=$B$5",
+              "=B2*B3/12",
+              "=B9-C9",
+              "=B2-D9"
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-99979f970fd8493e",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=IF(A10=\"\",\"\",IF(E9=\"\",\"\",MIN($B$5,E9+C10),E9+C10))",
+          "range": "B10:B31"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-a1a657e1425f4ab0",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=E9*$B$3/12",
+          "range": "C10:C31"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-be1573583af3c27a",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=B10-C10",
+          "range": "D10:D31"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-a85bd516224231b6",
+        "name": "read_range",
+        "input": {
+          "range": "A7:E12"
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "Row"
+      },
+      {
+        "type": "text",
+        "text": " 9"
+      },
+      {
+        "type": "text",
+        "text": " came"
+      },
+      {
+        "type": "text",
+        "text": " out empty — let"
+      },
+      {
+        "type": "text",
+        "text": " me rebuild"
+      },
+      {
+        "type": "text",
+        "text": " the schedule cleanly."
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-9c617a73b2830f1b",
+        "name": "clear_range",
+        "input": {
+          "range": "A8:E31",
+          "what": "all"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-b4d5d3c844dd4ecf",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "A8",
+          "values": [
+            [
+              1,
+              "=$B$5",
+              "=B2*B3/12",
+              "=B9-C9",
+              "=B2-D9"
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-a1d49a99e7a628af",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=IF(ROW()>31,\"\",ROW()-7)",
+          "range": "A9:A31"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-ba39225da8868886",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=$B$5",
+          "range": "B9:B31"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-978fb76496d8a696",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=E8*$B$3/12",
+          "range": "C9:C31"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-808c686383a246dd",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=B9-C9",
+          "range": "D9:D31"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-a0c13beff8fb2505",
+        "name": "fill_formula",
+        "input": {
+          "formula": "=E8-D9",
+          "range": "E9:E31"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-82247e003c7443b7",
+        "name": "read_range",
+        "input": {
+          "range": "A8:E12"
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "The first"
+      },
+      {
+        "type": "text",
+        "text": " schedule"
+      },
+      {
+        "type": "text",
+        "text": " row I"
+      },
+      {
+        "type": "text",
+        "text": " wrote had"
+      },
+      {
+        "type": "text",
+        "text": " wrong relative"
+      },
+      {
+        "type": "text",
+        "text": " references,"
+      },
+      {
+        "type": "text",
+        "text": " creating a circular"
+      },
+      {
+        "type": "text",
+        "text": " chain. Fixing D8"
+      },
+      {
+        "type": "text",
+        "text": " and E8:"
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-81138a275927bf7c",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "D8",
+          "values": [
+            [
+              "=B8-C8",
+              "=B2-D8"
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-b12968061ddcf715",
+        "name": "read_range",
+        "input": {
+          "range": "A7:E31"
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "The schedule"
+      },
+      {
+        "type": "text",
+        "text": " is correct. Adding formatting:"
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-b3f3a52539d531ed",
+        "name": "format_cells",
+        "input": {
+          "bold": true,
+          "range": "A1,A2:A5,A7:A7"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-88373c6d9adf1046",
+        "name": "format_cells",
+        "input": {
+          "currency": "USD",
+          "decimals": 2,
+          "range": "B2,B5,B8:E31"
+        }
+      },
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-a95661f3a482699e",
+        "name": "format_cells",
+        "input": {
+          "number_format": "0.00%",
+          "range": "B3"
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "Done —"
+      },
+      {
+        "type": "text",
+        "text": " the loan calculator is on"
+      },
+      {
+        "type": "text",
+        "text": " Sheet1:\n\n"
+      },
+      {
+        "type": "text",
+        "text": "- **Inputs ("
+      },
+      {
+        "type": "text",
+        "text": "A"
+      },
+      {
+        "type": "text",
+        "text": "2:B"
+      },
+      {
+        "type": "text",
+        "text": "4):"
+      },
+      {
+        "type": "text",
+        "text": "** loan amount 1,"
+      },
+      {
+        "type": "text",
+        "text": "000,000, annual rate"
+      },
+      {
+        "type": "text",
+        "text": " 4.2% ("
+      },
+      {
+        "type": "text",
+        "text": "B3),"
+      },
+      {
+        "type": "text",
+        "text": " term 20 years (B"
+      },
+      {
+        "type": "text",
+        "text": "4). Change these"
+      },
+      {
+        "type": "text",
+        "text": " and everything"
+      },
+      {
+        "type": "text",
+        "text": " updates"
+      },
+      {
+        "type": "text",
+        "text": ".\n- **Monthly payment ("
+      },
+      {
+        "type": "text",
+        "text": "B5):** `"
+      },
+      {
+        "type": "text",
+        "text": "=PMT(B3"
+      },
+      {
+        "type": "text",
+        "text": "/12,"
+      },
+      {
+        "type": "text",
+        "text": " B4*12, -"
+      },
+      {
+        "type": "text",
+        "text": "B2)`"
+      },
+      {
+        "type": "text",
+        "text": " → **$"
+      },
+      {
+        "type": "text",
+        "text": "6,165"
+      },
+      {
+        "type": "text",
+        "text": ".71"
+      },
+      {
+        "type": "text",
+        "text": "**"
+      },
+      {
+        "type": "text",
+        "text": ".\n- **Schedule (A"
+      },
+      {
+        "type": "text",
+        "text": "7:E31):** "
+      },
+      {
+        "type": "text",
+        "text": "24 rows"
+      },
+      {
+        "type": "text",
+        "text": " with"
+      },
+      {
+        "type": "text",
+        "text": " Payment #"
+      },
+      {
+        "type": "text",
+        "text": ", Payment"
+      },
+      {
+        "type": "text",
+        "text": ", Interest ("
+      },
+      {
+        "type": "text",
+        "text": "prior"
+      },
+      {
+        "type": "text",
+        "text": " balance ×"
+      },
+      {
+        "type": "text",
+        "text": " rate"
+      },
+      {
+        "type": "text",
+        "text": "/12), Principal"
+      },
+      {
+        "type": "text",
+        "text": ","
+      },
+      {
+        "type": "text",
+        "text": " and Remaining balance"
+      },
+      {
+        "type": "text",
+        "text": " — all live formulas chained"
+      },
+      {
+        "type": "text",
+        "text": " row"
+      },
+      {
+        "type": "text",
+        "text": " to"
+      },
+      {
+        "type": "text",
+        "text": " row,"
+      },
+      {
+        "type": "text",
+        "text": " ending"
+      },
+      {
+        "type": "text",
+        "text": " at a"
+      },
+      {
+        "type": "text",
+        "text": " balance of $"
+      },
+      {
+        "type": "text",
+        "text": "933,380.63"
+      },
+      {
+        "type": "text",
+        "text": " after payment"
+      },
+      {
+        "type": "text",
+        "text": " 24.\n"
+      },
+      {
+        "type": "text",
+        "text": "- Currency and"
+      },
+      {
+        "type": "text",
+        "text": " percent formats"
+      },
+      {
+        "type": "text",
+        "text": " applied;"
+      },
+      {
+        "type": "text",
+        "text": " headers"
+      },
+      {
+        "type": "text",
+        "text": " bold."
+      }
+    ]
+  ],
+  "expect": [
+    [
+      "B2",
+      1000000
+    ],
+    [
+      "B5",
+      6165.707354179501
+    ]
+  ],
+  "run_meta": {
+    "rounds": 14,
+    "stopped": false,
+    "error": null
+  }
+}

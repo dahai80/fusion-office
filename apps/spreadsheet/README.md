@@ -208,6 +208,10 @@ regenerate the PNG/ICO favicons, Apple touch icon, and standard/maskable install
   contents are treated as data, never as instructions, a formula it writes
   that fetches from the web waits for the file's Allow, and pictures in
   replies are never loaded. On a phone the panel is a sheet over the grid.
+  Every prompt is recorded in this browser's localStorage only (the newest
+  200, attachments counted but never stored) to steer the assistant's eval
+  set; `fusionOffice.promptLog()`, `fusionOffice.exportPromptLog()` and
+  `fusionOffice.clearPromptLog()` in the browser console manage it.
 - **Automate (scripts)**: an Automate ribbon tab for JavaScript scripts with
   an `async function main(workbook)` that work on the workbook through a
   documented object model (worksheets, ranges, values and formulas, fills,

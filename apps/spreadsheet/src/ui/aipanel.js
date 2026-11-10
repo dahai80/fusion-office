@@ -28,6 +28,7 @@ import { createModelPicker, parseMarkdownTable } from '@fusion-office/ai-client'
 import { runTool, describeCall, callTarget, changesWorkbook, qualified } from '../core/aitools.js';
 import { attachmentProblem, attachmentKind, attachmentsTooLarge, formatSize, ATTACH_ACCEPT, MAX_ATTACHMENTS } from '../core/aiattach.js';
 import { readAttachment } from './aiattachments.js';
+import { recordPrompt, readPromptLog, clearPromptLog, exportPromptLog } from '../core/aitelemetry.js';
 
 const SETTINGS_KEY = 'spreadsheet:ai';
 export const MIN_WIDTH = 300;
@@ -107,6 +108,11 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
   const settings = loadAiSettings();
   let isOpen = false;
   let destroyed = false;
+
+  // The prompt corpus stays local (aitelemetry.js); these console helpers are the way in and out.
+  if (typeof window !== 'undefined') {
+    window.fusionOffice = { ...(window.fusionOffice || {}), promptLog: readPromptLog, exportPromptLog, clearPromptLog };
+  }
 
   // The sheet a range without a sheet name means to the assistant: the one the user was on when they sent the message,
   // moved on only by the assistant's own steps (adding or showing a sheet, selecting a range elsewhere). The user may
@@ -701,6 +707,8 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
     // (A failure's New chat goes with it: the chat has moved on without one.)
     for (const button of log.querySelectorAll('.ai-retry, .ai-new-chat')) button.remove();
     userBubble(message, items);
+    // Task-corpus telemetry: the prompt is kept in this browser only (aitelemetry.js).
+    recordPrompt({ text: message, attachments: files.length });
     exchange((onEvent) => agent.send(message, onEvent, { attachments: files }));
   }
 

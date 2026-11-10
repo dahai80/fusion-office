@@ -1,0 +1,129 @@
+{
+  "name": "formula-fix",
+  "prompt": "B1 is supposed to be the total of A1:A5 but it is wrong. Fix it and tell me what it should be.",
+  "fixture": [
+    [
+      "write_cells",
+      {
+        "start_cell": "A1",
+        "values": [
+          [
+            10
+          ],
+          [
+            20
+          ],
+          [
+            30
+          ],
+          [
+            40
+          ],
+          [
+            50
+          ]
+        ]
+      }
+    ],
+    [
+      "write_cells",
+      {
+        "start_cell": "B1",
+        "values": [
+          [
+            "=SUM(A1:A4)"
+          ]
+        ]
+      }
+    ]
+  ],
+  "replies": [
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-90764f68e9736898",
+        "name": "read_range",
+        "input": {
+          "range": "A1:B5"
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-85b26be3320f289c",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "B1",
+          "values": [
+            "=SUM(A1:A5)"
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "tool",
+        "id": "chatcmpl-tool-b9af775deb537fc0",
+        "name": "write_cells",
+        "input": {
+          "start_cell": "B1",
+          "values": [
+            [
+              "=SUM(A1:A5)"
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "type": "text",
+        "text": "Fixed —"
+      },
+      {
+        "type": "text",
+        "text": " B1 was"
+      },
+      {
+        "type": "text",
+        "text": " `=SUM(A1:A"
+      },
+      {
+        "type": "text",
+        "text": "4)"
+      },
+      {
+        "type": "text",
+        "text": "`, missing A"
+      },
+      {
+        "type": "text",
+        "text": "5. It's"
+      },
+      {
+        "type": "text",
+        "text": " now `=SUM(A1"
+      },
+      {
+        "type": "text",
+        "text": ":A5)` and shows"
+      },
+      {
+        "type": "text",
+        "text": " **150**."
+      }
+    ]
+  ],
+  "expect": [
+    [
+      "B1",
+      150
+    ]
+  ],
+  "run_meta": {
+    "rounds": 4,
+    "stopped": false,
+    "error": null
+  }
+}
