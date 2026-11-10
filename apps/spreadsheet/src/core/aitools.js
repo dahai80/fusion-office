@@ -653,7 +653,7 @@ function reachingNote(env, reached) {
 // Describes what was actually sent when the values shape is wrong, so the model can fix its call.
 function valuesShapeNote(v) {
     if (v == null) return 'values was missing.';
-    if (typeof v === 'string') return `values was sent as a string (${v.length} characters) instead of an array; send the rows as a real JSON array, not as text.`;
+    if (typeof v === 'string') return `values was sent as a string (${v.length} characters) instead of an array; emit the rows as a JSON array literal in the tool call arguments, not as a string containing JSON.`;
     if (Array.isArray(v)) {
         const bad = v.filter((row) => !Array.isArray(row)).slice(0, 2).map((row) => JSON.stringify(row) ?? String(row));
         return `each row must be an array of cell values; ${v.length} row(s) received, and these are not arrays: ${bad.join(', ')}.`;
@@ -663,10 +663,16 @@ function valuesShapeNote(v) {
 
 function writeCells(wb, args, env) {
   const { sheetId, range: start } = resolveRange(wb, args.start_cell, env.sheetId());
-  // Some models double-encode the rows as a JSON string; unwrap one layer before the shape check.
+  // Some models double-encode the rows as a JSON string (bare, or wrapped in a
+  // markdown code fence); unwrap one layer before the shape check (#24).
   let rows = args.values;
-  if (typeof rows === 'string' && rows.trim().startsWith('[')) {
-    try { rows = JSON.parse(rows); } catch (err) { /* the shape check below reports it with an example */ }
+  if (typeof rows === 'string') {
+    let text = rows.trim();
+    const fence = text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+    if (fence) text = fence[1].trim();
+    if (text.startsWith('[')) {
+      try { rows = JSON.parse(text); } catch (err) { /* the shape check below reports it with an example */ }
+    }
   }
   if (!Array.isArray(rows) || !rows.length || !rows.every(Array.isArray)) throw new ToolError(`values must be an array of rows, each row an array of cell values, e.g. {"start_cell":"A1","values":[["Month","Payment"],[1,1000]]}. ${valuesShapeNote(args.values)}`);
   const width = Math.max(...rows.map((row) => row.length));

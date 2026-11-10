@@ -33,10 +33,22 @@ describe('AI tools', () => {
     expect(wb.getValue(id, 1, 1)).toBe(1000);
   });
 
+  it('unwraps rows double-encoded inside a markdown code fence (#24)', () => {
+    const { wb, id, run } = setup();
+    const fenced = '```json\n' + JSON.stringify([['Month', 'Payment'], [1, 1000]], null, 2) + '\n```';
+    const res = run('write_cells', { start_cell: 'A1', values: fenced });
+    expect(res.ok).toBe(true);
+    expect(wb.getValue(id, 0, 0)).toBe('Month');
+    expect(wb.getValue(id, 1, 1)).toBe(1000);
+    const bare = run('write_cells', { start_cell: 'D1', values: '```\n' + JSON.stringify([['a', 'b']]) + '\n```' });
+    expect(bare.ok).toBe(true);
+    expect(wb.getValue(id, 0, 3)).toBe('a');
+  });
+
   it('tells the model what was wrong with the values shape', () => {
     const { run } = setup();
     const asText = run('write_cells', { start_cell: 'A1', values: '[["Month","Payment"]' });
-    expect(asText.content).toMatch(/values was sent as a string.*real JSON array/);
+    expect(asText.content).toMatch(/values was sent as a string.*JSON array literal/);
     const asFlat = run('write_cells', { start_cell: 'A1', values: ['Month', 'Payment'] });
     expect(asFlat.content).toMatch(/these are not arrays: "Month"/);
     const missing = run('write_cells', { start_cell: 'A1' });
