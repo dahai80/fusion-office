@@ -15,7 +15,8 @@ import { fileURLToPath } from 'node:url'
 // so both architectures can be compared on the same model.
 const here = dirname(fileURLToPath(import.meta.url))
 const flagPlanner = process.argv.includes('--planner')
-const args = process.argv.slice(2).filter((a) => a !== '--planner')
+const flagTrace = process.argv.includes('--trace')
+const args = process.argv.slice(2).filter((a) => a !== '--planner' && a !== '--trace')
 const runs = Number(args[0] || 3)
 const baseUrl = args[1] || 'http://127.0.0.1:11432'
 const apiKey = args[2] || ''
@@ -44,7 +45,12 @@ function makeCore(wb, env) {
         return createPlanner({
             wb,
             chat: (messages, opts) => chatStreamEvents({ messages, tools: opts.tools, maxTokens: Math.min(opts.maxTokens, 8192) }),
-            runTool: async (name, args) => runTool(wb, name, args, env),
+            runTool: async (name, args) => {
+                if (flagTrace) console.log(`trace: ${name} ${JSON.stringify(args).slice(0, 200)}`)
+                const result = await runTool(wb, name, args, env)
+                if (flagTrace) console.log(`trace: -> ${result?.ok ? 'ok' : 'ERR'} ${String(result?.content || result?.error || '').slice(0, 160)}`)
+                return result
+            },
             describe: (name, args) => { try { return describeCall(wb, name, args, env) } catch { return { label: name } } },
             approve: async () => true,
             snapshot: () => 'The user is looking at "Sheet1".',
@@ -53,7 +59,12 @@ function makeCore(wb, env) {
     }
     return createAgent({
         chat: (messages, opts) => chatStreamEvents({ messages, tools: opts.tools, maxTokens: Math.min(opts.maxTokens, 8192) }),
-        runTool: async (name, args) => runTool(wb, name, args, env),
+        runTool: async (name, args) => {
+            if (flagTrace) console.log(`trace: ${name} ${JSON.stringify(args).slice(0, 200)}`)
+            const result = await runTool(wb, name, args, env)
+            if (flagTrace) console.log(`trace: -> ${result?.ok ? 'ok' : 'ERR'} ${String(result?.content || result?.error || '').slice(0, 160)}`)
+            return result
+        },
         describe: (name, args) => ({ label: name, destructive: changesWorkbook(name), detail: '' }),
         approve: async () => true,
         snapshot: () => 'The user is looking at "Sheet1".',

@@ -72,8 +72,41 @@ describe('AI assistant loop', () => {
     // The first two ran; the third identical call was refused without running.
     expect(wb.getValue(id, 0, 1)).toBe(7);
     const toolMessages = requests[3].messages.filter((m) => m.role === 'tool');
-    expect(toolMessages.at(-1).content).toContain('already made this exact call twice');
+    expect(toolMessages.at(-1).content).toContain('already repeated twice with identical arguments');
     expect(requests[3].messages.at(-1).role).toBe('tool');
+  });
+
+  it('breaks an alternating two-call loop instead of running the third lap (#26)', async () => {
+    // Live record: the model re-derived the same value with tweaked calculate
+    // formulas forever — A,B,A,B — which the consecutive-identical guard never caught.
+    const { agent, requests } = setup([
+      [tool('calculate', { formula: '=1000000 * 0.042 / 12' }, 'r1')],
+      [tool('calculate', { formula: '=(1000000 * 0.042 / 12) * 12' }, 'r2')],
+      [tool('calculate', { formula: '=1000000 * 0.042 / 12' }, 'r3')],
+      [tool('calculate', { formula: '=(1000000 * 0.042 / 12) * 12' }, 'r4')],
+      [tool('calculate', { formula: '=1000000 * 0.042 / 12' }, 'r5')],
+      [{ type: 'text', text: 'I am going in circles.' }],
+    ]);
+    const out = await agent.send('Make a loan calculator', () => {});
+    expect(out.error).toBeUndefined();
+    // The first four ran (each call twice); the fifth, the third occurrence of
+    // the first formula with no change in between, was refused.
+    const toolMessages = requests[5].messages.filter((m) => m.role === 'tool');
+    expect(toolMessages.at(-1).content).toContain('already repeated twice with identical arguments');
+    expect(toolMessages.at(-1).content).toContain('write the value where it belongs');
+    expect(requests[5].messages.at(-1).role).toBe('tool');
+  });
+
+  it('lets a repeated call land outside a cycle (read, write, read again)', async () => {
+    const { wb, id, agent } = setup([
+      [tool('read_range', { range: 'A1:A3' }, 'r1')],
+      [tool('write_cells', { start_cell: 'B1', values: [['=SUM(A1:A3)']] }, 'r2')],
+      [tool('read_range', { range: 'A1:A3' }, 'r3')],
+      [{ type: 'text', text: 'Done.' }],
+    ]);
+    const out = await agent.send('Total A1:A3 into B1, then check the input', () => {});
+    expect(out.error).toBeUndefined();
+    expect(wb.getValue(id, 0, 1)).toBe(10);
   });
 
   it('asks before replacing data and tells the model when the user declines', async () => {

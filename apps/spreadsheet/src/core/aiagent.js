@@ -247,8 +247,27 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
   let messages = [];
   let running = null; // { stop(), stopped }
   const changelog = []; // one line per change the assistant made, oldest first
-  let lastCallSig = null; // the tool call before the current one, as name + serialized arguments
-  let repeatCount = 0; // how many times that exact call has been made in a row
+  let sigCounts = new Map(); // occurrences of each call signature since the last change that landed
+  let lastSig = null; // the signature of the previous call, for the consecutive-run count
+  let lastSigRun = 0; // how many times that exact call has been made in a row
+  // A call that keeps coming back with identical arguments and no change in
+  // between is a loop, not work (#26). The third occurrence of the same call
+  // since the last real change is refused: a small model re-derives the same
+  // value with tweaked formulas instead of writing the result it already has.
+  // A landed change resets the counts — re-reading a range after writing it is
+  // legitimate verification, not a loop.
+  function noteCall(sig) {
+    lastSigRun = sig === lastSig ? lastSigRun + 1 : 1;
+    lastSig = sig;
+    const count = (sigCounts.get(sig) || 0) + 1;
+    sigCounts.set(sig, count);
+    return Math.max(lastSigRun, count);
+  }
+  function noteChange(sig) {
+    sigCounts = new Map([[sig, 1]]);
+    lastSig = null;
+    lastSigRun = 0;
+  }
 
   function needsApproval(name, info) {
     if (!changesWorkbook(name)) return false;
@@ -355,12 +374,11 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
               // model is retrying its own serialization or a result it refuses to read. Break
               // it early and tell it what to do instead (#26).
               const sig = `${call.name}:${JSON.stringify(call.input)}`;
-              repeatCount = sig === lastCallSig ? repeatCount + 1 : 1;
-              lastCallSig = sig;
-              if (repeatCount >= 3) {
+              const streak = noteCall(sig);
+              if (streak >= 3) {
                 step.status = 'error';
-                step.error = 'The same call was already made twice with identical arguments.';
-                content = 'Error: you already made this exact call twice with identical arguments and it made no progress. Do not repeat it. Read the last tool result, change what it asks you to change, or stop and tell the user what is blocking you.';
+                step.error = 'This call has already run twice with identical arguments and no change in between.';
+                content = 'Error: this call has already repeated twice with identical arguments and made no progress. Do not keep re-deriving the same values with tweaked arguments. Read the last tool result, write the value where it belongs (for example with write_cells or fill_formula), or stop and tell the user what is blocking you.';
                 emit({ type: 'step', step: { ...step } });
               } else {
                 step.status = 'running';
@@ -379,6 +397,9 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
                       changelog.push(`${step.label || step.name}${step.target ? ` (${step.target})` : ''}`);
                       if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
                   }
+                  // A landed change makes every later call fresh work: the loop
+                  // counts restart from it (#26).
+                  if (result.ok && result.changed) noteChange(sig);
                   if (!result.ok) step.error = String(result.content).replace(/^Error:\s*/, '');
                   content = String(result.content ?? '');
                 }
@@ -412,6 +433,9 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
      */
     send(text, onEvent, { attachments = [] } = {}) {
       if (running) throw new Error('The assistant is still answering');
+      sigCounts = new Map();
+      lastSig = null;
+      lastSigRun = 0;
       // A reply that failed or was cut off before it finished leaves the turn open: it is closed first, so
       // the transcript keeps its turns in order (two user messages in a row are refused by some models).
       if (messages.length && messages.at(-1).role !== 'assistant') messages.push({ role: 'assistant', content: '(My previous reply did not finish.)' });
@@ -434,7 +458,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     },
     stop() { running?.stop(); },
     // The chat starts over at once: the exchange under way is stopped and let go, so a message can be sent straight away.
-    reset() { running?.stop(); running = null; messages = []; changelog.length = 0; },
+    reset() { running?.stop(); running = null; messages = []; changelog.length = 0; sigCounts = new Map(); lastSig = null; lastSigRun = 0; },
   };
 }
 

@@ -30,7 +30,9 @@ the point is replaying real behavior, including its encoding quirks.
 Replay is deterministic; stochastic pass rates need live runs. `run-live.mjs`
 re-runs each case N times against the gateway and reports the pass rate per
 case and model — the capability-gating measurement from the review. It makes
-real model calls; run it manually, never in CI.
+real model calls; run it manually, never in CI. `--trace` logs every tool call
+and its result to the console (loop diagnosis); `--planner` runs the same
+cases through the plan-then-apply core.
 
 ## Plan-then-apply comparison
 
@@ -38,5 +40,4 @@ real model calls; run it manually, never in CI.
 model commits the whole change as one `apply_plan` call that is validated
 whole, asked about once, and applied in order. The same cases run through both
 cores (`createAgent` vs `createPlanner`) measure whether the architecture, not
-just the model, changes the pass rate. `run-live.mjs` takes a `--planner` flag
-for this.
+just the model, changes the pass rate.
