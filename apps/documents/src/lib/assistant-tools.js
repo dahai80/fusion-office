@@ -4,7 +4,8 @@
 // model sees, so they say when to prefer another tool and what each returns.
 
 import { tableCells } from '../engine/tables.js';
-import { paragraphText } from '../engine/model.js';
+import { paragraphText, paragraphLength } from '../engine/model.js';
+import { hasMarkdown, parseMarkdownBlocks } from './markdown-doc.js';
 
 const MAX_READ = 20000;
 const MAX_ROWS = 500;
@@ -193,6 +194,83 @@ function normalizeRows(rows) {
     return rows.map(row => (Array.isArray(row) ? row : [row]).map(cell => String(cell ?? '')));
 }
 
+// The caret, when it sits inside paragraph `index` of the model text.
+function paragraphAtCaret(m, offset) {
+    for (let i = 0; i < m.paragraphs.length; i++) {
+        const start = m.paragraphOffset(i);
+        if (start <= offset && offset <= start + paragraphLength(m.paragraphs[i])) return i;
+    }
+    return m.paragraphs.length - 1;
+}
+
+/**
+ * Insert Markdown text as real document formatting (issue #27): headings as
+ * heading styles, **bold** and *italic* as run formatting, list markers as
+ * bullet/number lists, pipe tables as tables. Runs inside engine.execute, so
+ * the whole conversion is one undo step. Returns what was applied.
+ */
+export function insertMarkdown(engine, text) {
+    const m = engine.model;
+    const blocks = parseMarkdownBlocks(text);
+    const applied = { headings: 0, paragraphs: 0, lists: 0, tables: 0, characters: 0 };
+    blocks.forEach((block, index) => {
+        if (index) m.replace('\n');
+        if (block.type === 'table') {
+            // A table cannot land inside a paragraph of text: give it its own line.
+            const at = m.range[1];
+            const p = m.paragraphs[paragraphAtCaret(m, at)];
+            if (paragraphLength(p)) m.replace('\n');
+            insertTable(engine, block.rows);
+            m.select(m.text.length);
+            applied.tables++;
+            return;
+        }
+        if (block.type === 'list') {
+            const start = m.range[1];
+            block.items.forEach((runs, i) => { if (i) m.replace('\n'); insertRuns(m, runs); });
+            m.select(start, m.range[1]);
+            m.toggleList(block.ordered ? 'number' : 'bullet');
+            m.select(m.range[1]);
+            applied.lists++;
+            return;
+        }
+        const start = m.range[1];
+        insertRuns(m, block.runs);
+        if (block.type === 'heading') {
+            m.select(start, m.range[1]);
+            // A document without the Heading styles (a fresh file) still gets the
+            // outline level, so the heading shows in the outline and exports as one.
+            const style = m.paragraphStyles.find(s => s.name?.toLowerCase() === `heading ${block.level}`);
+            if (style) m.setParagraphStyle(style.id);
+            else m.setOutlineLevel(block.level - 1);
+            m.select(m.range[1]);
+            applied.headings++;
+        } else applied.paragraphs++;
+    });
+    const blockChars = (b) => b.type === 'table'
+        ? b.rows.reduce((n, row) => n + row.join('').length, 0)
+        : b.type === 'list'
+            ? b.items.reduce((n, runs) => n + runs.reduce((n2, r) => n2 + r.text.length, 0), 0)
+            : b.runs.reduce((n, r) => n + r.text.length, 0);
+    applied.characters = blocks.reduce((n, b) => n + blockChars(b), 0);
+    return applied;
+}
+
+// One run of parsed inline text at the caret; formatting goes on the span it wrote.
+function insertRuns(m, runs) {
+    for (const run of runs) {
+        if (!run.text) continue;
+        const at = m.range[1];
+        m.replace(run.text);
+        const end = m.range[1];
+        if (run.bold || run.italic) {
+            m.select(at, end);
+            m.setRunFormat({ ...(run.bold ? { bold: true } : {}), ...(run.italic ? { italic: true } : {}) });
+            m.select(end);
+        }
+    }
+}
+
 /** Run one call; returns { ok, content, changed, target } for the model and the pane. */
 export function runTool(engine, name, args = {}) {
     const m = engine?.model;
@@ -238,19 +316,36 @@ export function runTool(engine, name, args = {}) {
         case 'insert_text': {
             const where = args.where || 'cursor';
             const text = String(args.text ?? '');
+            const markdown = hasMarkdown(text);
+            let applied = null;
             const ok = engine.execute(() => {
                 if (where === 'start') m.select(0);
                 else if (where === 'end') m.select(m.text.length);
+                else if (m.range[0] !== m.range[1]) m.select(m.range[1]);
+                // Issue #27: Markdown in an insert becomes real formatting, never literal text.
+                if (markdown) { applied = insertMarkdown(engine, text); return true; }
                 return m.replace(text);
             });
-            return { ok: !!ok, changed: !!ok, content: ok ? `Inserted ${text.length} characters.` : 'Nothing was inserted.' };
+            if (!ok) return { ok: false, changed: false, content: 'Nothing was inserted.' };
+            return { ok: true, changed: true, content: markdown
+                ? `Inserted as formatted content: ${applied.headings} heading(s), ${applied.paragraphs} paragraph(s), ${applied.lists} list(s), ${applied.tables} table(s).`
+                : `Inserted ${text.length} characters.` };
         }
         case 'replace_selection': {
             const [start, end] = m.range;
             if (start === end) return { ok: false, content: 'Error: nothing is selected. Use insert_text instead.' };
             const text = String(args.text ?? '');
-            const ok = engine.execute(() => m.replace(text));
-            return { ok: !!ok, changed: !!ok, content: ok ? 'Replaced the selection.' : 'The replacement changed nothing.' };
+            const markdown = hasMarkdown(text);
+            let applied = null;
+            const ok = engine.execute(() => {
+                if (!m.replace('')) return false;
+                if (markdown) { applied = insertMarkdown(engine, text); return true; }
+                return m.replace(text);
+            });
+            if (!ok) return { ok: false, changed: false, content: 'The replacement changed nothing.' };
+            return { ok: true, changed: true, content: markdown
+                ? `Replaced the selection with formatted content: ${applied.headings} heading(s), ${applied.paragraphs} paragraph(s), ${applied.lists} list(s), ${applied.tables} table(s).`
+                : 'Replaced the selection.' };
         }
         case 'format_text': {
             let changed = false;
@@ -289,6 +384,7 @@ How to work
 - Look before you act: use get_document_info, read_document and find_text to learn what the document holds. Never guess what it says or how it is formatted.
 - "This", "here" or "the selected text" means the user's selection. The snapshot says whether anything is selected.
 - Keep the user's formatting and wording unless they ask for a change. Use format_text for styling and insert_text or replace_selection for words.
+- insert_text and replace_selection accept Markdown structure: lines starting with #/##/### become real heading styles, **bold** and *italic* become real character formatting, "- " and "1. " lines become real lists, and | pipe-table rows (with a --- separator line) become a real table. Write the structure in Markdown and it lands formatted; never describe formatting in the chat without calling a tool.
 - To build a table, put the header row first in insert_table. Keep cells short and plain text.
 - When the user asks for a table of things you know (brands, countries, steps, comparisons), pick sensible columns yourself, fill every cell, and insert it. Do not ask which rows and columns they want; make a reasonable table and tell them they can ask for changes.
 - When the user asks you to create or change something, do it with the tools and say what you changed. Never only describe the change in the chat; the chat is for answers and plans, the tools are for edits.
