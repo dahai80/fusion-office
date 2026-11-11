@@ -96,6 +96,7 @@ AI 调用统一走 `@fusion-office/ai-client`。启动开发服务器或构建�
 | `VITE_FUSION_GATEWAY_URL` | `http://127.0.0.1:11432` | 网关地址 |
 | `VITE_FUSION_GATEWAY_KEY` | 空 | 以 `Authorization: Bearer` 发送的 API Key |
 | `VITE_FUSION_MODEL` | `mlx-community/Qwen3.8-27B-8bit` | 默认对话模型 |
+| `VITE_FUSION_CUSTOMER_MODE` | 未设置 | 设为 `1` 隐藏各应用的模型下拉框（issue #29） |
 
 将 `.env.example` 复制为应用目录下的 `.env.local`（或在 Shell 中导出变量），把网关
 API Key 填入 `VITE_FUSION_GATEWAY_KEY`。Key 会被编译进浏览器产物，因此必须使用受限
@@ -126,7 +127,11 @@ allowlist 与隐私模式；成功缓存 5 分钟、失败缓存 60 秒，租户
 读取失败、或策略未配置非空 allowlist 时，不提供任何模型——下拉框清空并隐藏，也不会
 发送任何模型名。独立/开发模式没有策略平面，继续使用构建期默认值。非空 allowlist
 还会剔除兜底项和列表外的已存选择；可选模型只剩一个时下拉框直接隐藏。网关在推理侧执行同一租户策略，下拉框并非唯一的闸门
-（fusion-gateway #511）。allowlist 中的模型即使不在网关 `/models` 目录里（例如云目录下的本地
+（fusion-gateway #511）。构建期设置 `VITE_FUSION_CUSTOMER_MODE=1` 会彻底移除所有面板的模型
+下拉框（issue #29）：模型选择属于管理员职责，解析链路——显式指定、已存选择、shell 偏好、
+策略、构建期默认值——保持不变。当解析链路没有任何模型可发送时（allowlist 为空的
+fail-closed 策略，或没有默认值），请求在离开浏览器前即失败，并提示用户联系管理员
+（issue #28），而不是发出 `model: ""` 后收到网关的报错。allowlist 中的模型即使不在网关 `/models` 目录里（例如云目录下的本地
 MLX 模型）也会以未加载项的形式钉住下拉框（issue #13）；发送链路会把策略生效前的已存选择或
 构建期默认值钳制到策略解析模型，而不是发出去必然 403（issue #14）。在 Shell 内完全不需要网关 Key：AI 请求走会话门控的
 `/api/v1/shell/*` 端点，用 HttpOnly 的 shell 会话 Cookie 认证——打包产物里没有可被

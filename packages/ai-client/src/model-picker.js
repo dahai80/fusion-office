@@ -6,7 +6,16 @@
 import { shellModel } from './shell-model.js'
 import { applyPolicyToModels } from './model-policy.js'
 
+const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
+
 const STORAGE_KEY = 'fusion-office.ai-model'
+
+// Issue #29: a customer-facing build shows no model picker at all — model
+// choice is an administrator concern. The resolution chain (picker, shell
+// preference, policy, build default) is untouched; only the dropdown dies.
+export function customerMode() {
+    return env.VITE_FUSION_CUSTOMER_MODE === '1' || env.VITE_FUSION_CUSTOMER_MODE === 'true'
+}
 
 export function getSelectedModel() {
     try {
@@ -76,6 +85,7 @@ function fill(select, models, fallback, policy) {
 export function createModelPicker({ onChange } = {}, deps = {}) {
     const { isConfigured, listModels, getConfig, logError, fetchPolicy } = deps
     if (!isConfigured || !isConfigured()) return null
+    if (customerMode()) return null
     const select = document.createElement('select')
     select.className = 'ai-model-picker'
     select.setAttribute('aria-label', 'AI model')

@@ -103,6 +103,7 @@ variables before starting a dev server or build:
 | `VITE_FUSION_GATEWAY_URL` | `http://127.0.0.1:11432` | Gateway base URL |
 | `VITE_FUSION_GATEWAY_KEY` | empty | API key sent as `Authorization: Bearer` |
 | `VITE_FUSION_MODEL` | `mlx-community/Qwen3.8-27B-8bit` | Default chat model |
+| `VITE_FUSION_CUSTOMER_MODE` | unset | Set to `1` to hide the per-app model picker (issue #29) |
 
 Copy `.env.example` to `.env.local` in the app directory (or export the variables in the
 shell) and put a gateway API key in `VITE_FUSION_GATEWAY_KEY`. Keys are compiled into the
@@ -143,7 +144,14 @@ picker empties and hides and no model is sent. Standalone/dev has no policy plan
 and keeps the build-time default. A non-empty allowlist also drops the fallback
 entry and any stored choice outside the list, and with exactly one selectable model
 the dropdown hides entirely; the gateway enforces the same tenant policy on chat
-requests, so the picker alone is not the gate. Allowlisted models that the
+requests, so the picker alone is not the gate. Setting `VITE_FUSION_CUSTOMER_MODE=1`
+at build time removes the picker from every panel entirely (issue #29): model choice
+is an administrator concern, and the resolution chain — explicit call, stored pick,
+shell preference, policy, build default — is unchanged. When the resolution chain
+has no model to send (a fail-closed policy with an empty allowlist, or no default),
+the request fails before it leaves the browser with a message telling the customer
+to ask their administrator (issue #28) instead of a `model: ""` rejection from the
+gateway. Allowlisted models that the
 gateway's `/models` catalog does not list (a local MLX model under a cloud
 catalog, for example) still pin the picker as unloaded options, and the send
 path clamps a stored choice or build default from before the policy landed to

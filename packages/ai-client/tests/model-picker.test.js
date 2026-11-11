@@ -151,4 +151,20 @@ describe('model picker', () => {
         expect([...node.options].map(o => o.value)).toEqual(['default-model']);
         expect(logError).toHaveBeenCalled();
     });
+
+    it('renders no picker in customer mode (issue #29)', async () => {
+        vi.resetModules();
+        vi.stubEnv('VITE_FUSION_CUSTOMER_MODE', '1');
+        const mod = await import('../src/model-picker.js');
+        expect(mod.customerMode()).toBe(true);
+        const picker = mod.createModelPicker({}, {
+            isConfigured: () => true,
+            listModels: async () => [{ id: 'm1', loaded: true }],
+            getConfig: () => ({ defaultModel: 'default-model' }),
+            logError: vi.fn(),
+        });
+        expect(picker).toBeNull();
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
 });

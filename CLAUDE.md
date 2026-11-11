@@ -110,7 +110,10 @@ npm workspaces: `apps/*` and `packages/*`.
   `ensureModelLoaded`. `isConfigured()` reports whether a key is present.
   `createModelPicker()` builds the shared per-app model selector (gateway model list,
   persisted choice); calls without an explicit `model` use the picked model, then the
-  build-time default. The gateway key must be baked at build time for browser calls to
+  build-time default. `VITE_FUSION_CUSTOMER_MODE=1` suppresses the picker entirely
+  (issue #29); when the resolution chain yields no model, `chat`/`chatStream`/
+  `chatStreamEvents` fail before the request with a customer-actionable message
+  instead of sending `model: ""` (issue #28). The gateway key must be baked at build time for browser calls to
   authenticate (`scripts/build-all.mjs` loads the gitignored root `.env.local` into the
   environment; Vite reads `VITE_*` files from each app's own directory, so a root env
   file alone is not enough). `build-all.mjs` refuses the build when

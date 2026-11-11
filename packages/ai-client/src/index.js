@@ -92,14 +92,6 @@ export function resetStaticKeyWarning() {
     warnedStaticKey = false
 }
 
-// A call names a model, or falls back to the app's model picker (the module
-// override), then to the shell's model preference (the user pref while running
-// in the union shell), then to the policy-resolved model inside the shell,
-// then to the build-time default. resolvedModel() below owns the async half.
-function modelFor(opts) {
-    return opts.model || getSelectedModel() || shellModel() || config.defaultModel
-}
-
 /* ---- The platform policy layer (issue #9) ---- */
 
 // Inside the shell, the gateway resolves the four-layer chain for this
@@ -161,6 +153,15 @@ export function createModelPicker(options) {
     return rawModelPicker(options, { isConfigured, listModels, getConfig, logError, fetchPolicy: () => policySnapshot() })
 }
 
+// Issue #28: a request with no model is a policy or build gap, not something the
+// gateway can answer — sending model: "" only produces a rejection the panel
+// cannot explain. Fail here, in words a customer can act on, instead.
+async function modelFor(opts) {
+    const model = await resolvedModel(opts)
+    if (!model) throw new Error('No AI model is available for this app. Ask your administrator to allow a model for it in the AI settings.')
+    return model
+}
+
 function headers() {
     const h = { 'Content-Type': 'application/json' }
     // Shell-session routes authenticate by the HttpOnly cookie; a Bearer
@@ -194,7 +195,7 @@ async function request(path, init, timeoutMs) {
 
 export async function chat(opts) {
     const body = {
-        model: await resolvedModel(opts),
+        model: await modelFor(opts),
         messages: capMessages(opts.messages),
         stream: false,
         temperature: opts.temperature,
@@ -213,7 +214,7 @@ const NEWLINE = String.fromCharCode(10)
 
 export async function chatStream(opts, onDelta) {
     const body = {
-        model: await resolvedModel(opts),
+        model: await modelFor(opts),
         messages: capMessages(opts.messages),
         stream: true,
         temperature: opts.temperature,
@@ -293,7 +294,7 @@ async function* nonStreamEvents(body) {
 
 export async function* chatStreamEvents(opts) {
     const body = {
-        model: await resolvedModel(opts),
+        model: await modelFor(opts),
         messages: capMessages(opts.messages),
         stream: true,
         temperature: opts.temperature,

@@ -126,7 +126,7 @@ describe('PDF AI panel', () => {
         panel.el.querySelector('.btn.primary').click();
         await flush();
         expect(state.calls).toHaveLength(0);
-        expect(panel.el.querySelector('.ai-status').textContent).toContain('VITE_FUSION_GATEWAY_KEY');
+        expect(panel.el.querySelector('.ai-status').textContent).toContain('AI is not set up');
     });
 
     it('reports a gateway failure in plain words', async () => {
@@ -135,7 +135,7 @@ describe('PDF AI panel', () => {
         panel.el.querySelector('.ai-question').value = 'Why?';
         panel.el.querySelector('.btn.primary').click();
         await flush();
-        expect(panel.el.querySelector('.ai-status').textContent).toContain('VITE_FUSION_GATEWAY_KEY');
+        expect(panel.el.querySelector('.ai-status').textContent).toContain('Sign in again');
     });
 
     it('summarizes the document in bounded chunks and shows the result', async () => {

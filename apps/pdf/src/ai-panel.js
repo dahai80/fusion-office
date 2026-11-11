@@ -6,11 +6,11 @@ import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCall, pdfSnapshot, runTo
 function aiError(error) {
     const message = String(error?.message || error || '');
     if (/401|unauthori[sz]ed|invalid api key/i.test(message))
-        return 'The AI service rejected the request. Check VITE_FUSION_GATEWAY_KEY.';
+        return 'The AI service rejected this request. Sign in again; if it keeps failing, ask your administrator to check the AI service settings.';
     if (/402|insufficient|quota|allowance/i.test(message))
         return 'The AI service has no capacity left right now.';
     if (/fetch|network|offline|timed? ?out|abort/i.test(message))
-        return 'The AI service could not be reached. Check that fusion-gateway is running.';
+        return 'The AI service could not be reached. Check that the AI service is running.';
     return 'The assistant could not answer. Try again in a moment.';
 }
 
@@ -102,7 +102,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
             return;
         }
         if (!isConfigured()) {
-            status.textContent = 'AI is not configured. Set VITE_FUSION_GATEWAY_KEY for the gateway.';
+            status.textContent = 'AI is not set up for this app. Ask your administrator to enable the AI service.';
             return;
         }
         setBusy(true);
@@ -144,7 +144,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     async function summarizeDocument() {
         if (busy) return;
         if (!isConfigured()) {
-            status.textContent = 'AI is not configured. Set VITE_FUSION_GATEWAY_KEY for the gateway.';
+            status.textContent = 'AI is not set up for this app. Ask your administrator to enable the AI service.';
             return;
         }
         setBusy(true);
@@ -220,7 +220,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     async function translatePage() {
         if (busy) return;
         if (!isConfigured()) {
-            status.textContent = 'AI is not configured. Set VITE_FUSION_GATEWAY_KEY for the gateway.';
+            status.textContent = 'AI is not set up for this app. Ask your administrator to enable the AI service.';
             return;
         }
         const target = (translateLanguage.value || lastLanguage || '').trim();

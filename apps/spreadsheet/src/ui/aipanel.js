@@ -87,7 +87,7 @@ export function friendlyAiError(error, { firstMessage = false } = {}) {
   }
   if (/rate.?limit|too many requests|\b429\b|overloaded|try again later/i.test(`${text} ${code}`)) return 'The AI service is busy. Wait a moment, then try again.';
   if (/insufficient.?(funds|credit|balance)|out of credit|quota|usage.?limit|allowance|billing|payment required|\b402\b/i.test(`${text} ${code}`)) return 'The AI service cannot answer right now. Try again shortly.';
-  if (/sign.?in|not signed|unauthori[sz]ed|\b401\b|auth(entication)? (required|failed)/i.test(`${text} ${code}`)) return 'The AI service rejected the request. Check the gateway key and try again.';
+  if (/sign.?in|not signed|unauthori[sz]ed|\b401\b|auth(entication)? (required|failed)/i.test(`${text} ${code}`)) return 'The AI service rejected this request. Sign in again; if it keeps failing, ask your administrator to check the AI service settings.';
   if (/network|failed to fetch|offline|timed? ?out|took too long|deadline exceeded|context canceled|ECONN|connection/i.test(text)) return 'The AI service could not be reached. Check your connection.';
   return text ? `The AI service said: ${text.slice(0, 300)}` : 'The AI service did not answer.';
 }

@@ -172,11 +172,14 @@ describe('policy in the model chain', () => {
     it('offers no model when the policy carries no allowlist (fail-closed)', async () => {
         const gw = mockGateway(() => POLICY);
         try {
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            // Issue #28: fail-closed no longer sends model: "" — it fails
+            // before the request, in words a customer can act on.
+            await expect(chat({ messages: [{ role: 'user', content: 'hi' }] }))
+                .rejects.toThrow('No AI model is available for this app');
         } finally {
             gw.restore();
         }
-        expect(gw.state.bodies[0].model).toBe('');
+        expect(gw.state.bodies).toEqual([]);
     });
 
     it('keeps explicit model, per-app pick, and shell pref ahead of the policy', async () => {
@@ -229,8 +232,8 @@ describe('policy in the model chain', () => {
     it('caches the policy across calls and skips the fetch outside the shell', async () => {
         const gw = mockGateway(() => POLICY);
         try {
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            await chat({ model: 'policy-model', messages: [{ role: 'user', content: 'hi' }] });
+            await chat({ model: 'policy-model', messages: [{ role: 'user', content: 'hi' }] });
             expect(gw.state.policyFetches).toBe(1);
             resetPolicyCache();
             at('/office/documents/');
@@ -252,7 +255,7 @@ describe('policy in the model chain', () => {
             return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
         };
         try {
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            await chat({ model: 'policy-model', messages: [{ role: 'user', content: 'hi' }] });
             await listModels();
         } finally {
             globalThis.fetch = realFetch;
@@ -302,10 +305,13 @@ describe('policy in the model chain', () => {
             return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
         };
         try {
-            await chat({ messages: [{ role: 'user', content: 'hi' }] });
+            // Issue #28: fail-closed no longer sends model: "" — it fails
+            // before the request, in words a customer can act on.
+            await expect(chat({ messages: [{ role: 'user', content: 'hi' }] }))
+                .rejects.toThrow('No AI model is available for this app');
         } finally {
             globalThis.fetch = realFetch;
         }
-        expect(bodies[0].model).toBe('');
+        expect(bodies).toEqual([]);
     });
 });
