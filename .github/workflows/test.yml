@@ -1,0 +1,31 @@
+name: test
+
+on:
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "ci/**"
+      - ".github/workflows/docs.yml"
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vitest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [documents, spreadsheet, presentation, pdf, pm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test apps/${{ matrix.app }}
+        run: npm test -w apps/${{ matrix.app }}
