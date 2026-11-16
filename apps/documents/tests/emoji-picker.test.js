@@ -9,7 +9,14 @@ describe('emoji picker keyboard', () => {
     window.matchMedia = () => ({ matches: true, addEventListener() {} });
     localStorage.clear();
   });
-  afterEach(() => { closeAllModals(); document.body.replaceChildren(); });
+  afterEach(async () => {
+    closeAllModals();
+    document.body.replaceChildren();
+    // close() schedules a 200 ms exit timer that touches document; let it fire
+    // while the jsdom environment still exists, or it crashes the worker after
+    // teardown with an uncaught ReferenceError and fails the whole run (CI).
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
   const type = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
   const press = (node, key) => node.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
 

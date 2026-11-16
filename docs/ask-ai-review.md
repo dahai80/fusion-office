@@ -1,3 +1,21 @@
+---
+doc_id: fusion-office/guide
+product: fusion-office
+class: app
+entry: developer
+doc_type: guide
+title: { zh: "Ask AI 复盘", en: "Ask AI review" }
+audience: developer
+status: draft
+version: 0.1.0
+updated: 2026-11-10
+owner: "@dahai"
+source_of_truth:
+  - apps/spreadsheet/src/core/aiagent.js
+  - apps/spreadsheet/src/core/aiplan.js
+  - apps/spreadsheet/eval
+---
+
 # Ask AI review: an expert audit of the assistant loop
 
 Date: 2026-11-10. Scope: the AI assistant surface of all five apps (documents,
