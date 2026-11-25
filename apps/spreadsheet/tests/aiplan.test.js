@@ -3,7 +3,7 @@ import { Workbook } from '../src/core/workbook.js';
 import { createPlanner, validatePlan, PLAN_OPS } from '../src/core/aiplan.js';
 import { runTool, describeCall } from '../src/core/aitools.js';
 
-function setup({ fixture = [], approval = 'destructive', approveImpl } = {}) {
+function setup({ fixture = [], approval = 'destructive', approveImpl, outcomes = null } = {}) {
   const wb = new Workbook();
   const id = wb.activeSheetId;
   const env = { sheetId: () => id, selection: () => ({ sheetId: id, range: { r1: 0, c1: 0, r2: 0, c2: 0 } }), distrust: vi.fn() };
@@ -29,6 +29,7 @@ function setup({ fixture = [], approval = 'destructive', approveImpl } = {}) {
         snapshot: () => 'The user is looking at "Sheet1".',
         settings: () => ({ approval }),
         env,
+        outcomes,
       });
     },
   };
@@ -151,5 +152,25 @@ describe('createPlanner', () => {
     expect(validatePlan(s.wb, s.env, { edits: many })).toContain('most one plan may apply');
     expect(PLAN_OPS).not.toContain('select_range');
     expect(PLAN_OPS).not.toContain('read_range');
+  });
+});
+
+describe('createPlanner outcome signals (#33)', () => {
+  const reporter = () => { const reports = []; return { reports, report: (r) => reports.push(r) }; };
+  const clearReply = [tool('apply_plan', { edits: [{ tool: 'clear_range', args: { range: 'A1', what: 'all' } }] }), text('done')];
+
+  it('reports user_accepted and task_success for an applied plan', async () => {
+    const outcomes = reporter();
+    const s = setup({ fixture: [['write_cells', { start_cell: 'A1', values: [['keep me']] }]], outcomes });
+    await s.planner([clearReply]).send('clear A1', () => {});
+    expect(outcomes.reports.map((r) => r.signal)).toEqual(['user_accepted', 'task_success']);
+  });
+
+  it('reports user_rejected when the plan is declined, and no task_success', async () => {
+    const outcomes = reporter();
+    const s = setup({ fixture: [['write_cells', { start_cell: 'A1', values: [['keep me']] }]], outcomes });
+    s.approve.mockResolvedValue(false);
+    await s.planner([clearReply]).send('clear A1', () => {});
+    expect(outcomes.reports.map((r) => r.signal)).toEqual(['user_rejected']);
   });
 });

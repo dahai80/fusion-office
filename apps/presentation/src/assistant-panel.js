@@ -24,7 +24,11 @@ import {
   DEFAULT_APPROVAL,
 } from "./assistant.js";
 import { runTool, describeCall, changesDeck } from "./assistant-tools.js";
-import { createModelPicker, parseMarkdownTable } from "@fusion-office/ai-client";
+import {
+  createModelPicker,
+  parseMarkdownTable,
+  createOutcomeReporter,
+} from "@fusion-office/ai-client";
 
 const SETTINGS_KEY = "presentation:assistant";
 export const MIN_WIDTH = 300;
@@ -136,6 +140,7 @@ export function createAssistantPanel(env) {
     },
     describe: (name, args) => describeCall(name, args, env),
     approve: (step) => askApproval(step),
+    outcomes: createOutcomeReporter({ app: "presentation" }),
     snapshot: () =>
       deckSnapshot(env.pres(), {
         slideIndex: env.slideIndex(),

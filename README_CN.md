@@ -177,6 +177,19 @@ Shell 之外的独立开发模式，使用时会记录一条警告日志。
    （`- Set the cell (Sheet1!B2)`），最多保留 100 条，紧跟在系统提示词之后注入，助手
    无需重放原始历史也能记住自己做过什么。
 
+### 结果信号（issue #33）
+
+每次确认或失败的助手操作都会上报到训练数据面。`createOutcomeReporter`
+（`packages/ai-client/src/outcomes.js`）按 rollout-tap schema v1 形状把每条结果
+POST 到 office-api 的 `POST /v1/outcomes`，由其追加到 fusion-trainer
+`rollout_ingest` 无需改动即可消费的 JSONL sink。信号与默认奖励和 trainer 的映射
+一致：`task_success`/`user_accepted` = 1.0，`user_edited` = 0.5，
+`user_rejected`/`error` = 0。共享 agent 循环在确认时上报
+`user_accepted`/`user_rejected`，回合结束上报 `task_success`/`error`；
+spreadsheet 的 plan-apply 核心上报同样信号。上报为 fire-and-forget（按 rollout
+事件幂等，失败只记日志），绝不阻塞用户操作。消息内容默认脱敏为 `[redacted:N]`，
+仅当 reporter 以 `contentMode: "raw"` 构建时保留原文。
+
 用真实已加载模型做端到端验证：
 
 ```bash
@@ -325,6 +338,9 @@ python -m pytest tests -q
 - `POST /v1/pptx/write` — 可选 `multipart` 字段 `file` 加 `slides` JSON 数组；
   每项 `{index?, title?, body?, notes?}` 就地修改第 `index` 页或追加新页，返回
   更新后的二进制，并带 `X-Office-Doc-SHA256`。母版与版式保持不变。
+- `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
+  `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
+  fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。
 - `GET /healthz`、`GET /readyz`。
 - 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
   外部请求。`/v1/docx/snapshot` 推迟到 v0.2。

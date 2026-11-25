@@ -190,6 +190,14 @@ file; the only write is a bookmark).
   dahai80/fusion-gateway#580), `chatStreamEvents` replays the request once without
   streaming — the non-stream path returns `tool_calls` intact — and yields them;
   if the retry confirms the answer is prose, the text is kept once, not duplicated.
+- Outcome signals (issue #33): `createOutcomeReporter`
+  (`packages/ai-client/src/outcomes.js`) posts rollout-tap schema v1 records to
+  office-api's `POST /v1/outcomes`, which appends them to the JSONL sink
+  fusion-trainer's `rollout_ingest` consumes unchanged. The shared agent loop reports
+  `user_accepted`/`user_rejected` on approvals and `task_success`/`error` at turn end
+  (spreadsheet's `aiagent.js`/`aiplan.js` and presentation's `assistant.js` carry the
+  same wiring in their own loops). Fire-and-forget, idempotent per rollout event,
+  content redacted unless `contentMode: "raw"`.
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool

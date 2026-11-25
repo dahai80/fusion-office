@@ -1,6 +1,6 @@
 import { el } from './lib/ui.js';
 import * as AI from '@fusion-office/ai-client';
-import { createAgent } from '@fusion-office/ai-client';
+import { createAgent, createOutcomeReporter } from '@fusion-office/ai-client';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCall, pdfSnapshot, runTool } from './ai-tools.js';
 
 function aiError(error) {
@@ -67,6 +67,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
         changes: changesDocument,
         describe: (tool, args) => describeCall(commands, tool, args),
         runTool: (tool, args) => runTool(commands, tool, args),
+        outcomes: createOutcomeReporter({ app: 'pdf' }),
     });
 
     function setBusy(on) {

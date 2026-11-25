@@ -10,7 +10,7 @@
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { createAgent, createModelPicker, parseMarkdownTable } from '@fusion-office/ai-client';
+import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
@@ -83,6 +83,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       return runTool(engine, name, args);
     },
     approve: step => askApproval(step),
+    outcomes: createOutcomeReporter({ app: 'documents' }),
   });
 
   /* ---- What the person can see ---- */

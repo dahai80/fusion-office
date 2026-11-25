@@ -24,7 +24,7 @@ import { renderMarkdown } from './markdown.js';
 import * as P from '../lib/puter.js';
 import { trackEvent } from '../lib/analytics.js';
 import { createAgent, workbookSnapshot, suggestions, userText, APPROVAL_MODES, DEFAULT_APPROVAL } from '../core/aiagent.js';
-import { createModelPicker, parseMarkdownTable } from '@fusion-office/ai-client';
+import { createModelPicker, parseMarkdownTable, createOutcomeReporter } from '@fusion-office/ai-client';
 import { runTool, describeCall, callTarget, changesWorkbook, qualified } from '../core/aitools.js';
 import { attachmentProblem, attachmentKind, attachmentsTooLarge, formatSize, ATTACH_ACCEPT, MAX_ATTACHMENTS } from '../core/aiattach.js';
 import { readAttachment } from './aiattachments.js';
@@ -161,6 +161,7 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
     approve: (step) => askApproval(step),
     snapshot: () => workbookSnapshot(wb, { sheetId: env.sheetId(), selection: env.selection(), docName: ctx.doc?.name }),
     settings: () => settings,
+    outcomes: createOutcomeReporter({ app: 'spreadsheet' }),
   });
 
   /* ---------- Frame ---------- */

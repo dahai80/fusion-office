@@ -21,6 +21,7 @@ import {
   displayShapeText,
 } from "./model.js";
 import { TOOLS, TOOL_NAMES, changesDeck } from "./assistant-tools.js";
+import { newRolloutId } from "@fusion-office/ai-client";
 
 /** The model the assistant runs on, served by fusion-gateway. */
 export const AI_MODEL =
@@ -257,6 +258,7 @@ export function createAgent({
   approve,
   snapshot = () => "",
   settings = () => ({}),
+  outcomes = null,
 }) {
   let messages = [];
   let running = null;
@@ -295,6 +297,27 @@ export function createAgent({
     };
     running = run;
     const steps = [];
+    // Outcome signals for the rollout-tap plane (#33): one rollout per turn,
+    // each reported outcome its own record under a stable event id.
+    const rolloutId = outcomes ? newRolloutId() : null;
+    let eventSeq = 0;
+    const report = (signal, detail) => {
+      if (!outcomes) return;
+      try {
+        outcomes.report({
+          signal,
+          detail,
+          model: AI_MODEL,
+          messages: transcript.map((m) => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : "",
+          })),
+          rolloutId: `${rolloutId}:e${++eventSeq}`,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
         if (round) emit({ type: "round" });
@@ -352,6 +375,7 @@ export function createAgent({
         });
         if (!calls.length) {
           if (empty) emit({ type: "text", text });
+          if (steps.some((s) => s.changed)) report("task_success", "the turn ended with changes applied");
           return { stopped: false, steps };
         }
         for (const call of calls) {
@@ -386,6 +410,7 @@ export function createAgent({
                 stopSignal,
               ]);
               if (allowed === STOP) allowed = false;
+              report(allowed ? "user_accepted" : "user_rejected", step.label || step.name);
             }
             if (run.stopped && step.status === "waiting") {
               step.status = "skipped";
@@ -445,8 +470,10 @@ export function createAgent({
       const note = `\n\nI stopped after ${MAX_ROUNDS} steps. Say "continue" if you want me to carry on.`;
       transcript.push({ role: "assistant", content: note.trim() });
       emit({ type: "text", text: note });
+      report("error", `the assistant stopped after ${MAX_ROUNDS} rounds without finishing`);
       return { stopped: false, steps };
     } catch (error) {
+      report("error", String(error?.message || error).slice(0, 500));
       return { stopped: run.stopped, error, steps };
     } finally {
       if (running === run) running = null;

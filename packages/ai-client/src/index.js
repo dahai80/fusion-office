@@ -470,6 +470,7 @@ export async function listModels() {
 
 export { createAgent, requestMessages, userContent, userText } from './agent.js'
 export { parseMarkdownTable, parseMarkdownTableParts } from './markdown-table.js'
+export { createOutcomeReporter, newRolloutId, outcomeScore, OUTCOME_SIGNALS } from './outcomes.js'
 
 export async function ensureModelLoaded(modelId) {
     const models = await listModels()
