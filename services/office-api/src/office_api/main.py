@@ -21,9 +21,10 @@ from openpyxl.utils.exceptions import InvalidFileException
 from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 
 from . import __version__
-from .docx import fill_document
+from .docx import fill_document, parse_document
+from .markdown import parse_blocks, write_docx_from_markdown
 from .outcomes import append_record, default_sink, validate_record
-from .pptx import parse_deck, write_deck
+from .pptx import parse_deck, write_deck, write_deck_from_markdown
 from .xlsx import parse_workbook
 
 logging.basicConfig(
@@ -125,6 +126,33 @@ async def docx_fill(
     return Response(content=filled, media_type=DOCX_MIME, headers=headers)
 
 
+@app.post("/v1/docx/parse")
+async def docx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+    content = await _read_limited(file)
+    if not content:
+        raise HTTPException(status_code=422, detail="empty file")
+    try:
+        parsed = parse_document(content)
+    except (PackageNotFoundError, zipfile.BadZipFile, KeyError, ValueError) as error:
+        raise _invalid("docx", error) from error
+    log.info("parsed docx %s: %d blocks", file.filename, len(parsed["blocks"]))
+    return JSONResponse(parsed)
+
+
+@app.post("/v1/docx/write")
+async def docx_write(markdown: Annotated[str, Form()]) -> Response:
+    try:
+        written = write_docx_from_markdown(markdown)
+    except (KeyError, ValueError) as error:
+        raise _invalid("docx", error) from error
+    headers: dict[str, str] = {
+        "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
+        "Content-Disposition": 'attachment; filename="document.docx"',
+    }
+    log.info("wrote docx from markdown: %d bytes", len(written))
+    return Response(content=written, media_type=DOCX_MIME, headers=headers)
+
+
 @app.post("/v1/pptx/parse")
 async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
     content = await _read_limited(file)
@@ -148,30 +176,42 @@ async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
 async def pptx_write(
     file: Annotated[UploadFile | None, File()] = None,
     slides: Annotated[str, Form()] = "",
+    format: Annotated[str, Form()] = "ops",
 ) -> Response:
-    try:
-        ops = json.loads(slides)
-    except json.JSONDecodeError as error:
-        raise HTTPException(status_code=422, detail=f"slides is not JSON: {error}") from error
-    if not isinstance(ops, list) or any(not isinstance(op, dict) for op in ops):
-        raise HTTPException(status_code=422, detail="slides must be a JSON array of objects")
-    content = b""
-    if file is not None and file.filename:
-        content = await _read_limited(file)
-    try:
-        written = write_deck(content or None, ops)
-    except (
-        PackageNotFoundError,
-        PptxPackageNotFoundError,
-        zipfile.BadZipFile,
-        KeyError,
-        ValueError,
-    ) as error:
-        raise _invalid("pptx", error) from error
+    if format == "markdown":
+        # Markdown mode regenerates a fresh deck (#36); the file part is not read.
+        try:
+            written = write_deck_from_markdown(slides)
+        except (KeyError, ValueError) as error:
+            raise _invalid("pptx", error) from error
+        slide_count = sum(1 for block in parse_blocks(slides) if block["kind"] == "heading")
+    elif format == "ops":
+        try:
+            ops = json.loads(slides)
+        except json.JSONDecodeError as error:
+            raise HTTPException(status_code=422, detail=f"slides is not JSON: {error}") from error
+        if not isinstance(ops, list) or any(not isinstance(op, dict) for op in ops):
+            raise HTTPException(status_code=422, detail="slides must be a JSON array of objects")
+        content = b""
+        if file is not None and file.filename:
+            content = await _read_limited(file)
+        try:
+            written = write_deck(content or None, ops)
+        except (
+            PackageNotFoundError,
+            PptxPackageNotFoundError,
+            zipfile.BadZipFile,
+            KeyError,
+            ValueError,
+        ) as error:
+            raise _invalid("pptx", error) from error
+        slide_count = len(ops)
+    else:
+        raise HTTPException(status_code=422, detail="format must be 'ops' or 'markdown'")
     headers: dict[str, str] = {
         "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
         "Content-Disposition": 'attachment; filename="deck.pptx"',
-        "X-Office-Slide-Count": str(len(ops)),
+        "X-Office-Slide-Count": str(slide_count),
     }
     return Response(content=written, media_type=PPTX_MIME, headers=headers)
 

@@ -29,7 +29,8 @@ The code is migrated from HeyPuter/everything. Documents, presentation, pdf, and
 MIT. Spreadsheet is AGPL-3.0-only and the root MIT license does not cover it.
 
 `services/office-api` is a Python FastAPI document-capability service (xlsx table
-parsing, docx template filling, pptx parse/write per issue #32) consumed by other
+parsing, docx template fill + markdown parse/write per issue #35, pptx
+parse/write incl. a `format=markdown` mode per issues #32/#36) consumed by other
 Fusion projects. It implements the contract in issue #1, binds to
 `127.0.0.1:11492`, and holds no business logic.
 

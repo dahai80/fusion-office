@@ -82,6 +82,38 @@ def _fill_story(story: Any, values: dict[str, Any], found: set[str]) -> None:
     _fill_tables(story.tables, values, found)
 
 
+def _heading_level(paragraph: Paragraph) -> int | None:
+    name = paragraph.style.name if paragraph.style is not None else ""
+    if name == "Title":
+        return 1
+    match = re.fullmatch(r"Heading ([1-6])", name)
+    return int(match.group(1)) if match else None
+
+
+def parse_document(content: bytes) -> dict[str, Any]:
+    document: DocxDocument = Document(BytesIO(content))
+    blocks: list[dict[str, Any]] = []
+    for item in document.iter_inner_content():
+        if isinstance(item, Paragraph):
+            text = item.text.strip()
+            if not text:
+                continue
+            level = _heading_level(item)
+            if level is not None:
+                blocks.append({"kind": "heading", "level": level, "text": text})
+            else:
+                blocks.append({"kind": "para", "text": text})
+        elif isinstance(item, Table):
+            blocks.append(
+                {
+                    "kind": "table",
+                    "rows": [[cell.text.strip() for cell in row.cells] for row in item.rows],
+                }
+            )
+    log.info("parsed docx: %d blocks", len(blocks))
+    return {"blocks": blocks}
+
+
 def fill_document(content: bytes, values: dict[str, Any]) -> tuple[bytes, list[str]]:
     document: DocxDocument = Document(BytesIO(content))
     found: set[str] = set()

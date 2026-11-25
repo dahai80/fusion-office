@@ -190,3 +190,79 @@ def test_pptx_slides_must_be_an_array_of_objects(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def docx_parse_bytes() -> bytes:
+    document = Document()
+    document.add_heading("Overview", level=1)
+    document.add_paragraph("Body paragraph.")
+    buffer = BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def test_docx_parse_endpoint_returns_blocks(client: TestClient) -> None:
+    response = client.post(
+        "/v1/docx/parse",
+        files={"file": ("report.docx", docx_parse_bytes())},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["blocks"] == [
+        {"kind": "heading", "level": 1, "text": "Overview"},
+        {"kind": "para", "text": "Body paragraph."},
+    ]
+
+
+def test_docx_parse_endpoint_rejects_malformed_file(client: TestClient) -> None:
+    response = client.post(
+        "/v1/docx/parse",
+        files={"file": ("broken.docx", b"not a zip")},
+    )
+
+    assert response.status_code == 422
+    assert "detail" in response.json()
+
+
+def test_docx_write_endpoint_returns_document(client: TestClient) -> None:
+    markdown = "# Plan\n\nShip it.\n\n| a | b |\n| 1 | 2 |"
+    response = client.post(
+        "/v1/docx/write",
+        data={"markdown": markdown},
+    )
+
+    assert response.status_code == 200
+    body = response.content
+    assert response.headers["content-type"].startswith(main.DOCX_MIME)
+    assert response.headers["X-Office-Doc-SHA256"] == hashlib.sha256(body).hexdigest()
+    reopened = Document(BytesIO(body))
+    assert reopened.paragraphs[0].text == "Plan"
+    assert reopened.paragraphs[1].text == "Ship it."
+    assert reopened.tables[0].cell(1, 0).text == "1"
+
+
+def test_pptx_write_markdown_mode_regenerates_deck(client: TestClient) -> None:
+    markdown = "# Kickoff\n\nAgenda item\n\n## Wrap"
+    response = client.post(
+        "/v1/pptx/write",
+        data={"slides": markdown, "format": "markdown"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Office-Slide-Count"] == "2"
+    parsed = client.post(
+        "/v1/pptx/parse",
+        files={"file": ("deck.pptx", response.content)},
+    ).json()
+    assert [slide["title"] for slide in parsed["slides"]] == ["Kickoff", "Wrap"]
+    assert parsed["slides"][0]["body"] == ["Agenda item"]
+
+
+def test_pptx_write_rejects_unknown_format(client: TestClient) -> None:
+    response = client.post(
+        "/v1/pptx/write",
+        data={"slides": "[]", "format": "html"},
+    )
+
+    assert response.status_code == 422
+    assert "format" in response.json()["detail"]

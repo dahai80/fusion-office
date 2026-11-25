@@ -337,7 +337,15 @@ python -m pytest tests -q
   fusion-rag 的 PPTX 抽取一致（issue #32）。
 - `POST /v1/pptx/write` — 可选 `multipart` 字段 `file` 加 `slides` JSON 数组；
   每项 `{index?, title?, body?, notes?}` 就地修改第 `index` 页或追加新页，返回
-  更新后的二进制，并带 `X-Office-Doc-SHA256`。母版与版式保持不变。
+  更新后的二进制，并带 `X-Office-Doc-SHA256`。母版与版式保持不变。传
+  `format=markdown` 时 `slides` 字段改为携带 markdown，生成一份全新演示文稿：
+  标题开新页、段落填正文、管道表格渲染为真实 pptx 表格 —— 与
+  fusion-artifacts-engine 进程内回写同一契约（issue #36）。
+- `POST /v1/docx/parse` — `multipart` 字段 `file`；把文档按顺序解析为块
+  （`heading` 带层级、`para`、`table` 行），供编辑器导入（issue #35）。
+- `POST /v1/docx/write` — `markdown` 表单字段；返回 .docx 二进制并带
+  `X-Office-Doc-SHA256`，标题/段落/表格按 markdown 块映射，与
+  `/v1/docx/parse` 精确往返（issue #35）。
 - `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
   `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
   fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。
