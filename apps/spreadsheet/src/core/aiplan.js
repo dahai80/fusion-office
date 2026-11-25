@@ -13,6 +13,7 @@
 import { cutText } from './cell.js';
 import { TOOLS, TOOL_NAMES, changesWorkbook, describeCall, resolveRange } from './aitools.js';
 import { SYSTEM_PROMPT, requestMessages, userContent } from './aiagent.js';
+import { newRolloutId } from './aioutcomes.js';
 
 const READ_NAMES = ['get_workbook_info', 'read_range', 'calculate', 'find'];
 
@@ -97,7 +98,7 @@ export function validatePlan(wb, env, input) {
  * distrust). send(text, onEvent) resolves to { stopped, error, steps, applied, planRounds }:
  * `applied` counts the edits written, `steps` carries every step shown, plan rounds included.
  */
-export function createPlanner({ wb, chat, runTool: run, describe, approve, snapshot = () => '', settings = () => ({}), env }) {
+export function createPlanner({ wb, chat, runTool: run, describe, approve, snapshot = () => '', settings = () => ({}), env, outcomes = null }) {
   let messages = [];
   let running = null;
 
@@ -111,6 +112,20 @@ export function createPlanner({ wb, chat, runTool: run, describe, approve, snaps
     const steps = [];
     let applied = 0;
     let planRounds = 0;
+    // Outcome signals for the rollout-tap plane (#33): one rollout per turn,
+    // each reported outcome its own record under a stable event id.
+    const rolloutId = outcomes ? newRolloutId() : null;
+    let eventSeq = 0;
+    const report = (signal, detail) => {
+      if (!outcomes) return;
+      try {
+        outcomes.report({
+          signal, detail, model: '',
+          messages: transcript.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' })),
+          rolloutId: `${rolloutId}:e${++eventSeq}`,
+        });
+      } catch (err) { console.error(err); }
+    };
     const control = {
       stopped: () => runState.stopped,
       waiting: () => {},
@@ -182,6 +197,7 @@ export function createPlanner({ wb, chat, runTool: run, describe, approve, snaps
         if (planStep.destructive && (settings().approval || 'destructive') !== 'never') {
           emit({ type: 'plan', status: 'waiting', step: { ...planStep } });
           const allowed = await Promise.race([Promise.resolve(approve(planStep)).then((v) => !!v, () => false), stopSignal]);
+          report(allowed ? 'user_accepted' : 'user_rejected', planStep.label);
           if (!allowed) {
             planStep.status = 'declined';
             emit({ type: 'plan', status: 'declined', step: { ...planStep } });
@@ -209,6 +225,7 @@ export function createPlanner({ wb, chat, runTool: run, describe, approve, snaps
         }
         planStep.status = failed ? 'error' : 'done';
         if (failed) planStep.error = `Edit ${failed.index + 1} failed: ${failed.reason}`;
+        report(failed ? 'error' : 'task_success', failed ? planStep.error : `applied ${applied} edit${applied === 1 ? '' : 's'}`);
         emit({ type: 'plan', status: planStep.status, step: { ...planStep } });
         transcript.push({
           role: 'tool', tool_call_id: plan.id,
@@ -219,6 +236,7 @@ export function createPlanner({ wb, chat, runTool: run, describe, approve, snaps
       }
       return { stopped: false, steps, applied, planRounds };
     } catch (error) {
+      report('error', String(error?.message || error).slice(0, 500));
       return { stopped: runState.stopped, error, steps, applied, planRounds };
     } finally {
       if (running === runState) running = null;

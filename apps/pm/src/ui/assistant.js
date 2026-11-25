@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import { openModal } from './modal.js';
 import { store } from '../lib/store.js';
 import * as AI from '@fusion-office/ai-client';
-import { createAgent, parseMarkdownTableParts } from '@fusion-office/ai-client';
+import { createAgent, parseMarkdownTableParts, createOutcomeReporter } from '@fusion-office/ai-client';
 import { TOOLS, SYSTEM_PROMPT, changesProject, describeCall, projectSnapshot, runTool } from '../lib/ai-tools.js';
 
 const STATUS_TEXT = { running: 'Working…', done: 'Done', error: 'Failed', declined: 'Skipped', skipped: 'Stopped' };
@@ -62,6 +62,7 @@ export function openProjectAssistant(projectId) {
         describe: (name, args) => describeCall(store, projectId, name, args),
         runTool: (name, args) => runTool(store, projectId, name, args),
         approve: step => askApproval(step),
+        outcomes: createOutcomeReporter({ app: 'pm' }),
     });
 
     function setBusy(on) {

@@ -219,6 +219,20 @@ local model:
    to 100 entries and injected right behind the system prompt, so the assistant remembers
    what it did without replaying raw history.
 
+### Outcome signals (issue #33)
+
+Every confirmed or failed assistant action is reported to the training-data plane.
+`createOutcomeReporter` (`packages/ai-client/src/outcomes.js`) posts one record per
+outcome in the rollout-tap schema v1 shape to office-api's `POST /v1/outcomes`, which
+appends it to a JSONL sink fusion-trainer's `rollout_ingest` reads unchanged. Signals
+and default rewards match the trainer's map: `task_success`/`user_accepted` = 1.0,
+`user_edited` = 0.5, `user_rejected`/`error` = 0. The shared agent loop reports
+`user_accepted`/`user_rejected` on approvals and `task_success`/`error` at turn end;
+spreadsheet's plan-apply core reports the same. Reporting is fire-and-forget
+(idempotent per rollout event, failures only logged) and never blocks the user action.
+Message content is redacted to `[redacted:N]` unless the reporter is built with
+`contentMode: "raw"`.
+
 Verify end-to-end connectivity with a real loaded model:
 
 ```bash
@@ -379,6 +393,16 @@ contract in issue #1:
 - `POST /v1/docx/fill` — multipart `file` plus a `values` JSON object; fills
   `{{placeholder}}` markers in paragraphs, table cells, headers and footers and returns
   the filled binary with `X-Office-Doc-SHA256` and `X-Office-Unfilled`.
+- `POST /v1/pptx/parse` — multipart `file`; returns slides as structured JSON
+  (`index`, `title`, reading-order `body` lines, speaker `notes`), matching the
+  content fusion-rag extracts (issue #32).
+- `POST /v1/pptx/write` — optional multipart `file` plus a `slides` JSON array;
+  each entry `{index?, title?, body?, notes?}` modifies slide `index` in place or
+  appends a new slide, and the updated deck comes back as binary with
+  `X-Office-Doc-SHA256`. Slide masters and layouts are preserved.
+- `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
+  `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
+  JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).
 - `GET /healthz`, `GET /readyz`.
 - Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
   loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.

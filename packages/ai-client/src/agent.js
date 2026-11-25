@@ -5,6 +5,8 @@
 // brings its own tools, executor, descriptions and snapshot; nothing here
 // touches a page.
 
+import { newRolloutId } from './outcomes.js';
+
 const OLD_RESULT_CHARS = 1500;
 const DEFAULT_BUDGET = 240000;
 const DEFAULT_OPEN = '<app_state>';
@@ -77,7 +79,7 @@ export function requestMessages(messages, { system = '', budget = DEFAULT_BUDGET
  * send(text, onEvent) reports { type: 'text' }, { type: 'step' } and
  * { type: 'round' }, and resolves to { stopped, error, steps, empty }.
  */
-export function createAgent({ chat, tools = [], runTool, describe = () => ({}), changes = () => false, approve = async () => true, snapshot = () => '', settings = () => ({}), system = '', model = '', maxRounds = 12, maxOutputTokens = 8192 }) {
+export function createAgent({ chat, tools = [], runTool, describe = () => ({}), changes = () => false, approve = async () => true, snapshot = () => '', settings = () => ({}), system = '', model = '', maxRounds = 12, maxOutputTokens = 8192, outcomes = null }) {
     const names = new Set(tools.map(tool => tool.function?.name).filter(Boolean));
     let messages = [];
     let running = null;
@@ -99,6 +101,16 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
         const run = { stopped: false, stop() { if (!this.stopped) { this.stopped = true; release(true); } } };
         running = run;
         const steps = [];
+        // Issue #33: one rollout per turn; each emitted outcome is its own
+        // record under a stable event id, so confirmations and the turn's end
+        // state are reported separately and neither is dropped as a duplicate.
+        const rolloutId = outcomes ? newRolloutId() : null;
+        let eventSeq = 0;
+        const transcriptForOutcome = () => transcript.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }));
+        const report = (signal, detail) => {
+            if (!outcomes) return;
+            try { outcomes.report({ signal, detail, model, messages: transcriptForOutcome(), rolloutId: `${rolloutId}:e${++eventSeq}` }); } catch { /* reporting must not stop the turn */ }
+        };
         transcript.push({ role: 'user', content: userContent(text, snapshot()) });
         try {
             for (let round = 0; round < maxRounds; round++) {
@@ -127,6 +139,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 });
                 if (!calls.length) {
                     if (empty) emit({ type: 'text', text: said });
+                    if (steps.some(step => step.changed)) report('task_success', 'the turn ended with changes applied');
                     return { stopped: false, steps, ...(empty ? { empty: true } : {}) };
                 }
                 for (const call of calls) {
@@ -144,34 +157,45 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                     } else if (call.input.__unreadable != null) {
                         step.status = 'error';
                         content = 'Error: the arguments could not be read as JSON.';
-                    } else if (needsApproval(call.name, call.input, info) && !(await approve(step))) {
-                        step.status = 'declined';
-                        content = 'The user declined this change. Do not try it another way; say what you would have done.';
                     } else {
-                        try {
-                            const result = await runTool(call.name, call.input, { stopped: () => run.stopped });
-                            const value = result && typeof result === 'object' ? result : { ok: true, content: String(result ?? '') };
-                            Object.assign(step, value.ok === false ? { status: 'error' } : { status: 'done' });
-                            if (value.changed) step.changed = true;
-                            if (value.target !== undefined) step.target = value.target;
-                            if (value.error) step.error = value.error;
-                            if (step.changed) {
-                                changelog.push(`${step.label || step.name}${step.target !== undefined && step.target !== null ? ` (${step.target})` : ''}`);
-                                if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                        const wantsApproval = needsApproval(call.name, call.input, info);
+                        const approved = wantsApproval ? await approve(step) : false;
+                        if (wantsApproval && !approved) {
+                            step.status = 'declined';
+                            report('user_rejected', step.label || step.name);
+                        } else if (wantsApproval) {
+                            report('user_accepted', step.label || step.name);
+                        }
+                        if (wantsApproval && !approved) {
+                            content = 'The user declined this change. Do not try it another way; say what you would have done.';
+                        } else {
+                            try {
+                                const result = await runTool(call.name, call.input, { stopped: () => run.stopped });
+                                const value = result && typeof result === 'object' ? result : { ok: true, content: String(result ?? '') };
+                                Object.assign(step, value.ok === false ? { status: 'error' } : { status: 'done' });
+                                if (value.changed) step.changed = true;
+                                if (value.target !== undefined) step.target = value.target;
+                                if (value.error) step.error = value.error;
+                                if (step.changed) {
+                                    changelog.push(`${step.label || step.name}${step.target !== undefined && step.target !== null ? ` (${step.target})` : ''}`);
+                                    if (changelog.length > 100) changelog.splice(0, changelog.length - 100);
+                                }
+                                content = value.content ?? (value.ok === false ? 'Error: the tool failed.' : 'Done.');
+                            } catch (err) {
+                                step.status = 'error';
+                                step.error = String(err?.message || err);
+                                content = `Error: ${step.error}`;
                             }
-                            content = value.content ?? (value.ok === false ? 'Error: the tool failed.' : 'Done.');
-                        } catch (err) {
-                            step.status = 'error';
-                            step.error = String(err?.message || err);
-                            content = `Error: ${step.error}`;
                         }
                     }
                     emit({ type: 'step', step: { ...step } });
                     transcript.push({ role: 'tool', tool_call_id: call.id, content });
                 }
             }
+            report('error', `the assistant stopped after ${maxRounds} replies without finishing`);
             return { stopped: false, steps, error: `The assistant stopped after ${maxRounds} replies without finishing.` };
         } catch (err) {
+            report('error', String(err?.message || err).slice(0, 500));
             return { stopped: false, steps, error: err?.message || String(err) };
         } finally {
             if (running === run) running = null;

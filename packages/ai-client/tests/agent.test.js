@@ -83,3 +83,59 @@ describe('createAgent change log', () => {
         expect(agent.messages).toHaveLength(0);
     });
 });
+
+describe('createAgent outcome signals (#33)', () => {
+    function agentWith(outcomes, { approve, runTool } = {}) {
+        agentWith.rounds = 0;
+        return createAgent({
+            chat: async function* (messages) {
+                agentWith.rounds = (agentWith.rounds || 0) + 1;
+                if (agentWith.rounds === 1) yield { type: 'tool', id: 'c1', name: 'replace_selection', input: { text: 'hi' } };
+                yield { type: 'text', text: 'done' };
+            },
+            tools: [{ type: 'function', function: { name: 'replace_selection' } }],
+            runTool: runTool || (() => ({ ok: true, changed: true, target: 'Paragraph 2', content: 'Done.' })),
+            describe: () => ({ label: 'Replaced the selection', destructive: true }),
+            changes: () => true,
+            approve: approve || (async () => true),
+            outcomes,
+        });
+    }
+    const signalsOf = (reporter) => reporter.reports.map((r) => r.signal);
+
+    it('reports user_accepted for an approved change and task_success when the turn lands it', async () => {
+        const reporter = { report: (...call) => reporter.reports.push(call[0]), reports: [] };
+        await agentWith(reporter).send('change something');
+        expect(signalsOf(reporter)).toEqual(['user_accepted', 'task_success']);
+        expect(reporter.reports[0].detail).toBe('Replaced the selection');
+        expect(reporter.reports[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
+        expect(reporter.reports[1].rolloutId).toMatch(/:e2$/);
+    });
+
+    it('reports user_rejected for a declined change and no task_success', async () => {
+        const reporter = { report: (...call) => reporter.reports.push(call[0]), reports: [] };
+        await agentWith(reporter, { approve: async () => false }).send('change something');
+        expect(signalsOf(reporter)).toEqual(['user_rejected']);
+    });
+
+    it('reports error when the chat request itself fails', async () => {
+        const reporter = { report: (...call) => reporter.reports.push(call[0]), reports: [] };
+        const agent = createAgent({
+            chat: () => { throw new Error('gateway down'); },
+            tools: [{ type: 'function', function: { name: 'replace_selection' } }],
+            runTool: () => ({ ok: true, content: 'Done.' }),
+            outcomes: reporter,
+        });
+        const result = await agent.send('change something');
+        expect(result.error).toBe('gateway down');
+        expect(signalsOf(reporter)).toEqual(['error']);
+        expect(reporter.reports[0].detail).toBe('gateway down');
+    });
+
+    it('carries the transcript messages on every report', async () => {
+        const reporter = { report: (...call) => reporter.reports.push(call[0]), reports: [] };
+        await agentWith(reporter).send('change something');
+        const roles = reporter.reports[1].messages.map((m) => m.role);
+        expect(roles).toEqual(['user', 'assistant', 'tool', 'assistant']);
+    });
+});

@@ -14,6 +14,7 @@ import { rangeName, cutText } from './cell.js';
 import { dataBounds, describeRange } from './aiformula.js';
 import { TOOLS, TOOL_NAMES, changesWorkbook, qualified } from './aitools.js';
 import { attachmentsIntro, attachmentsGone, attachmentWeight, attachmentsFit, sentBytes } from './aiattach.js';
+import { newRolloutId } from './aioutcomes.js';
 
 /** The model the assistant runs on is left to the chat adapter (the model
  *  picker, the shell's model policy, then the build-time default): a hard
@@ -243,7 +244,7 @@ const newCallId = () => `call_${Date.now().toString(36)}_${(++callSeq).toString(
  * and resolves to { stopped, error, cut, steps, empty } once the model has finished (or failed, or was stopped); `cut`: its
  * last reply ran into MAX_OUTPUT_TOKENS and ends unfinished.
  */
-export function createAgent({ chat, runTool, describe, approve, ready = null, snapshot = () => '', settings = () => ({}) }) {
+export function createAgent({ chat, runTool, describe, approve, ready = null, snapshot = () => '', settings = () => ({}) , outcomes = null }) {
   let messages = [];
   let running = null; // { stop(), stopped }
   const changelog = []; // one line per change the assistant made, oldest first
@@ -287,6 +288,20 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     const run = { stopped: false, stop() { if (!this.stopped) { this.stopped = true; stopResolve(STOP); } } };
     running = run;
     const steps = [];
+    // Outcome signals for the rollout-tap plane (#33): one rollout per turn,
+    // each reported outcome its own record under a stable event id.
+    const rolloutId = outcomes ? newRolloutId() : null;
+    let eventSeq = 0;
+    const report = (signal, detail) => {
+      if (!outcomes) return;
+      try {
+        outcomes.report({
+          signal, detail, model: '',
+          messages: transcript.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' })),
+          rolloutId: `${rolloutId}:e${++eventSeq}`,
+        });
+      } catch (err) { console.error(err); }
+    };
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
         if (round) emit({ type: 'round' });
@@ -324,6 +339,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
         });
         if (!calls.length) {
           if (empty) emit({ type: 'text', text });
+          if (steps.some((s) => s.changed)) report('task_success', 'the turn ended with changes applied');
           return { stopped: false, cut, steps, ...(empty ? { empty: true } : {}) };
         }
         for (const call of calls) {
@@ -362,6 +378,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
               emit({ type: 'step', step: { ...step } });
               allowed = await Promise.race([Promise.resolve(approve(step)).then((v) => !!v, () => false), stopSignal]);
               if (allowed === STOP) allowed = false;
+              report(allowed ? 'user_accepted' : 'user_rejected', step.label || step.name);
             }
             if (run.stopped && (step.status === 'waiting' || wait)) {
               step.status = 'skipped';
@@ -416,8 +433,10 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
       const note = `\n\nI stopped after ${MAX_ROUNDS} steps. Say "continue" if you want me to carry on.`;
       transcript.push({ role: 'assistant', content: note.trim() });
       emit({ type: 'text', text: note });
+      report('error', `the assistant stopped after ${MAX_ROUNDS} rounds without finishing`);
       return { stopped: false, steps };
     } catch (error) {
+      report('error', String(error?.message || error).slice(0, 500));
       return { stopped: run.stopped, error, steps };
     } finally {
       if (running === run) running = null;

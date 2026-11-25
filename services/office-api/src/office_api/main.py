@@ -8,17 +8,22 @@ import hashlib
 import json
 import logging
 import zipfile
+from pathlib import Path
 from typing import Annotated
 
 import uvicorn
 from docx.opc.exceptions import PackageNotFoundError
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fusion_core.config import get_env, service_port
 from openpyxl.utils.exceptions import InvalidFileException
+from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 
 from . import __version__
 from .docx import fill_document
+from .outcomes import append_record, default_sink, validate_record
+from .pptx import parse_deck, write_deck
 from .xlsx import parse_workbook
 
 logging.basicConfig(
@@ -29,8 +34,19 @@ log = logging.getLogger("office_api")
 
 MAX_BYTES = get_env("FUSION_OFFICE_API_MAX_BYTES", 100 * 1024 * 1024, cast=int)
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 app = FastAPI(title="fusion-office", version=__version__)
+
+# The outcome endpoint (#33) is called from the browser apps, which run on
+# other loopback ports (5189-5191 in dev, 11485-11489 in the shell). Loopback
+# origins only; the service itself still binds to 127.0.0.1.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 
 async def _read_limited(upload: UploadFile) -> bytes:
@@ -107,6 +123,81 @@ async def docx_fill(
         ",".join(unfilled) or "-",
     )
     return Response(content=filled, media_type=DOCX_MIME, headers=headers)
+
+
+@app.post("/v1/pptx/parse")
+async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+    content = await _read_limited(file)
+    if not content:
+        raise HTTPException(status_code=422, detail="empty file")
+    try:
+        parsed = parse_deck(content)
+    except (
+        PackageNotFoundError,
+        PptxPackageNotFoundError,
+        zipfile.BadZipFile,
+        KeyError,
+        ValueError,
+    ) as error:
+        raise _invalid("pptx", error) from error
+    log.info("parsed pptx %s: %d slides", file.filename, len(parsed["slides"]))
+    return JSONResponse(parsed)
+
+
+@app.post("/v1/pptx/write")
+async def pptx_write(
+    file: Annotated[UploadFile | None, File()] = None,
+    slides: Annotated[str, Form()] = "",
+) -> Response:
+    try:
+        ops = json.loads(slides)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=422, detail=f"slides is not JSON: {error}") from error
+    if not isinstance(ops, list) or any(not isinstance(op, dict) for op in ops):
+        raise HTTPException(status_code=422, detail="slides must be a JSON array of objects")
+    content = b""
+    if file is not None and file.filename:
+        content = await _read_limited(file)
+    try:
+        written = write_deck(content or None, ops)
+    except (
+        PackageNotFoundError,
+        PptxPackageNotFoundError,
+        zipfile.BadZipFile,
+        KeyError,
+        ValueError,
+    ) as error:
+        raise _invalid("pptx", error) from error
+    headers: dict[str, str] = {
+        "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
+        "Content-Disposition": 'attachment; filename="deck.pptx"',
+        "X-Office-Slide-Count": str(len(ops)),
+    }
+    return Response(content=written, media_type=PPTX_MIME, headers=headers)
+
+
+# App-reported outcome sink (#33): one JSONL file in the rollout-tap schema
+# fusion-trainer's rollout_ingest already reads.
+OUTCOME_SINK = Path(get_env("FUSION_OFFICE_API_OUTCOME_SINK", str(default_sink())))
+
+
+@app.post("/v1/outcomes", status_code=202)
+async def outcomes_report(request: Request) -> dict[str, str]:
+    try:
+        record = await request.json()
+    except Exception as error:
+        raise HTTPException(status_code=422, detail=f"body is not JSON: {error}") from error
+    invalid = validate_record(record)
+    if invalid:
+        log.warning("rejected outcome record: %s", invalid)
+        raise HTTPException(status_code=422, detail=invalid)
+    try:
+        append_record(OUTCOME_SINK, record)
+    except OSError as error:
+        log.error("outcome sink write failed (%s): %s", OUTCOME_SINK, error)
+        raise HTTPException(status_code=500, detail="outcome sink write failed") from error
+    log.info("recorded outcome %s: %s", record["rollout_id"], record["outcome"]["signal"])
+    return {"accepted": record["rollout_id"]}
 
 
 # Registered as fusion-office-api in architecture/port-registry.yaml (issue #3:

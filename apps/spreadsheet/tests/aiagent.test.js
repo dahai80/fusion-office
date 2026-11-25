@@ -14,7 +14,7 @@ function scripted(replies) {
   return { chat, requests };
 }
 
-function setup(replies, { approval = 'destructive', approve = async () => true } = {}) {
+function setup(replies, { approval = 'destructive', approve = async () => true, outcomes = null } = {}) {
   const wb = new Workbook();
   const id = wb.activeSheetId;
   wb.setInput(id, 0, 0, 'Qty');
@@ -30,6 +30,7 @@ function setup(replies, { approval = 'destructive', approve = async () => true }
     approve: (step) => { asked.push(step.label); return approve(step); },
     snapshot: () => workbookSnapshot(wb, { sheetId: id, selection: env.selection(), now: new Date(2026, 8, 27) }),
     settings: () => ({ approval }),
+    outcomes,
   });
   return { wb, id, agent, requests, asked };
 }
@@ -404,5 +405,34 @@ describe('starter suggestions', () => {
     chart.kind = 'chart';
     expect(first(chart.id)).toMatch(/^Build a monthly budget/);
     expect(first('missing')).toMatch(/^Build a monthly budget/);
+  });
+});
+
+describe('outcome signals (#33)', () => {
+  const reporter = () => { const reports = []; return { reports, report: (r) => reports.push(r) }; };
+  const write = [tool('write_cells', { start_cell: 'B1', values: [[1]] })];
+
+  it('reports user_accepted for an approved change and task_success when it lands', async () => {
+    const outcomes = reporter();
+    const { agent } = setup([[...write, { type: 'text', text: 'done' }]], { approval: 'always', outcomes });
+    await agent.send('put 1 in B1');
+    expect(outcomes.reports.map((r) => r.signal)).toEqual(['user_accepted', 'task_success']);
+    expect(outcomes.reports[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
+    expect(outcomes.reports[1].rolloutId).toMatch(/:e2$/);
+    expect(outcomes.reports[1].messages[0].role).toBe('user');
+  });
+
+  it('reports user_rejected for a declined change and no task_success', async () => {
+    const outcomes = reporter();
+    const { agent } = setup([[...write, { type: 'text', text: 'ok' }]], { approval: 'always', approve: async () => false, outcomes });
+    await agent.send('put 1 in B1');
+    expect(outcomes.reports.map((r) => r.signal)).toEqual(['user_rejected']);
+  });
+
+  it('reports nothing when the turn changes nothing', async () => {
+    const outcomes = reporter();
+    const { agent } = setup([[{ type: 'text', text: 'The total is 10.' }]], { approval: 'always', outcomes });
+    await agent.send('what is the total?');
+    expect(outcomes.reports).toEqual([]);
   });
 });
