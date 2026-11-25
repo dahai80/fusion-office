@@ -16,9 +16,11 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
 from fusion_core.config import get_env, service_port
 from openpyxl.utils.exceptions import InvalidFileException
+from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 
 from . import __version__
 from .docx import fill_document
+from .pptx import parse_deck, write_deck
 from .xlsx import parse_workbook
 
 logging.basicConfig(
@@ -29,6 +31,7 @@ log = logging.getLogger("office_api")
 
 MAX_BYTES = get_env("FUSION_OFFICE_API_MAX_BYTES", 100 * 1024 * 1024, cast=int)
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 app = FastAPI(title="fusion-office", version=__version__)
 
@@ -107,6 +110,57 @@ async def docx_fill(
         ",".join(unfilled) or "-",
     )
     return Response(content=filled, media_type=DOCX_MIME, headers=headers)
+
+
+@app.post("/v1/pptx/parse")
+async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+    content = await _read_limited(file)
+    if not content:
+        raise HTTPException(status_code=422, detail="empty file")
+    try:
+        parsed = parse_deck(content)
+    except (
+        PackageNotFoundError,
+        PptxPackageNotFoundError,
+        zipfile.BadZipFile,
+        KeyError,
+        ValueError,
+    ) as error:
+        raise _invalid("pptx", error) from error
+    log.info("parsed pptx %s: %d slides", file.filename, len(parsed["slides"]))
+    return JSONResponse(parsed)
+
+
+@app.post("/v1/pptx/write")
+async def pptx_write(
+    file: Annotated[UploadFile | None, File()] = None,
+    slides: Annotated[str, Form()] = "",
+) -> Response:
+    try:
+        ops = json.loads(slides)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=422, detail=f"slides is not JSON: {error}") from error
+    if not isinstance(ops, list) or any(not isinstance(op, dict) for op in ops):
+        raise HTTPException(status_code=422, detail="slides must be a JSON array of objects")
+    content = b""
+    if file is not None and file.filename:
+        content = await _read_limited(file)
+    try:
+        written = write_deck(content or None, ops)
+    except (
+        PackageNotFoundError,
+        PptxPackageNotFoundError,
+        zipfile.BadZipFile,
+        KeyError,
+        ValueError,
+    ) as error:
+        raise _invalid("pptx", error) from error
+    headers: dict[str, str] = {
+        "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
+        "Content-Disposition": 'attachment; filename="deck.pptx"',
+        "X-Office-Slide-Count": str(len(ops)),
+    }
+    return Response(content=written, media_type=PPTX_MIME, headers=headers)
 
 
 # Registered as fusion-office-api in architecture/port-registry.yaml (issue #3:

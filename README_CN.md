@@ -319,6 +319,12 @@ python -m pytest tests -q
 - `POST /v1/docx/fill` — `multipart` 字段 `file` 加 `values` JSON；替换段落、表格
   单元格、页眉页脚中的 `{{placeholder}}`，返回填充后的二进制，并带
   `X-Office-Doc-SHA256` 与 `X-Office-Unfilled` 响应头。
+- `POST /v1/pptx/parse` — `multipart` 字段 `file`；按幻灯片返回结构化 JSON
+  （`index`、`title`、阅读顺序的 `body` 行、演讲者备注 `notes`），内容口径与
+  fusion-rag 的 PPTX 抽取一致（issue #32）。
+- `POST /v1/pptx/write` — 可选 `multipart` 字段 `file` 加 `slides` JSON 数组；
+  每项 `{index?, title?, body?, notes?}` 就地修改第 `index` 页或追加新页，返回
+  更新后的二进制，并带 `X-Office-Doc-SHA256`。母版与版式保持不变。
 - `GET /healthz`、`GET /readyz`。
 - 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
   外部请求。`/v1/docx/snapshot` 推迟到 v0.2。

@@ -8,6 +8,7 @@ import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
+from pptx import Presentation
 
 from office_api import main
 
@@ -33,6 +34,17 @@ def docx_bytes() -> bytes:
     document.add_paragraph("Site: {{site}} {{missing}}")
     buffer = BytesIO()
     document.save(buffer)
+    return buffer.getvalue()
+
+
+def pptx_bytes() -> bytes:
+    deck = Presentation()
+    slide = deck.slides.add_slide(deck.slide_layouts[1])
+    slide.shapes.title.text = "Kickoff"
+    slide.placeholders[1].text_frame.text = "Agenda item"
+    slide.notes_slide.notes_text_frame.text = "say hello"
+    buffer = BytesIO()
+    deck.save(buffer)
     return buffer.getvalue()
 
 
@@ -107,3 +119,74 @@ def test_oversized_upload_is_413(client: TestClient, monkeypatch: pytest.MonkeyP
     )
 
     assert response.status_code == 413
+
+
+def test_pptx_parse_endpoint_returns_slides(client: TestClient) -> None:
+    response = client.post(
+        "/v1/pptx/parse",
+        files={"file": ("kickoff.pptx", pptx_bytes())},
+    )
+
+    assert response.status_code == 200
+    slides = response.json()["slides"]
+    assert slides[0]["title"] == "Kickoff"
+    assert slides[0]["body"] == ["Agenda item"]
+    assert slides[0]["notes"] == "say hello"
+
+
+def test_pptx_write_endpoint_modifies_and_returns_deck(client: TestClient) -> None:
+    ops = [{"index": 1, "title": "Renamed", "body": ["new line"], "notes": "updated"}]
+    response = client.post(
+        "/v1/pptx/write",
+        files={"file": ("kickoff.pptx", pptx_bytes())},
+        data={"slides": json.dumps(ops)},
+    )
+
+    assert response.status_code == 200
+    body = response.content
+    assert response.headers["content-type"].startswith(main.PPTX_MIME)
+    assert response.headers["X-Office-Doc-SHA256"] == hashlib.sha256(body).hexdigest()
+    reopened = Presentation(BytesIO(body))
+    assert reopened.slides[0].shapes.title.text == "Renamed"
+
+
+def test_pptx_write_endpoint_creates_deck_without_file(client: TestClient) -> None:
+    ops = [{"title": "Fresh", "body": ["one", "two"]}]
+    response = client.post(
+        "/v1/pptx/write",
+        data={"slides": json.dumps(ops)},
+    )
+
+    assert response.status_code == 200
+    parsed = client.post(
+        "/v1/pptx/parse",
+        files={"file": ("deck.pptx", response.content)},
+    ).json()
+    assert parsed["slides"][0]["title"] == "Fresh"
+    assert parsed["slides"][0]["body"] == ["one", "two"]
+
+
+def test_pptx_malformed_file_is_422(client: TestClient) -> None:
+    response = client.post(
+        "/v1/pptx/parse",
+        files={"file": ("broken.pptx", b"not a zip")},
+    )
+
+    assert response.status_code == 422
+    assert "detail" in response.json()
+
+
+def test_pptx_slides_must_be_an_array_of_objects(client: TestClient) -> None:
+    response = client.post(
+        "/v1/pptx/write",
+        data={"slides": json.dumps({"title": "not a list"})},
+    )
+
+    assert response.status_code == 422
+
+    response = client.post(
+        "/v1/pptx/write",
+        data={"slides": "not json"},
+    )
+
+    assert response.status_code == 422
