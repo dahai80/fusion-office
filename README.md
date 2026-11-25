@@ -399,7 +399,17 @@ contract in issue #1:
 - `POST /v1/pptx/write` — optional multipart `file` plus a `slides` JSON array;
   each entry `{index?, title?, body?, notes?}` modifies slide `index` in place or
   appends a new slide, and the updated deck comes back as binary with
-  `X-Office-Doc-SHA256`. Slide masters and layouts are preserved.
+  `X-Office-Doc-SHA256`. Slide masters and layouts are preserved. With
+  `format=markdown` the `slides` field carries markdown instead and a fresh deck
+  is generated: headings start slides, paragraphs fill the body, pipe tables
+  render as pptx tables — the same write-back contract fusion-artifacts-engine
+  uses in-process (issue #36).
+- `POST /v1/docx/parse` — multipart `file`; returns the document as ordered
+  blocks (`heading` with level, `para`, `table` rows) for import into an editor
+  (issue #35).
+- `POST /v1/docx/write` — a `markdown` form field; returns the .docx binary with
+  `X-Office-Doc-SHA256`, headings/paragraphs/tables mapped from the markdown
+  blocks, round-tripping with `/v1/docx/parse` (issue #35).
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).

@@ -14,8 +14,11 @@ in the consuming application (`dahai80/envipermit` is the first consumer).
 | GET | `/readyz` | Readiness |
 | POST | `/v1/xlsx/parse` | Multipart `file` (.xlsx) → sheets, tables, merged cells, unparsed regions |
 | POST | `/v1/docx/fill` | Multipart `file` (.docx) + `values` JSON → filled .docx |
+| POST | `/v1/docx/parse` | Multipart `file` (.docx) → blocks (headings, paragraphs, tables) |
+| POST | `/v1/docx/write` | `markdown` form field → .docx binary (issue #35) |
 | POST | `/v1/pptx/parse` | Multipart `file` (.pptx) → slides with title, body lines, speaker notes |
 | POST | `/v1/pptx/write` | Optional multipart `file` (.pptx) + `slides` JSON → updated .pptx |
+| POST | `/v1/outcomes` | Rollout-tap outcome record (schema v1) appended to the JSONL sink |
 
 Responses:
 
@@ -42,7 +45,23 @@ Responses:
   appends a new slide on a title+content layout. Omitted fields are left
   untouched; an empty `body` clears the text. Masters and layouts are
   preserved. Without a `file` part it creates a new deck. The response is the
-  updated binary with `X-Office-Doc-SHA256`.
+  updated binary with `X-Office-Doc-SHA256`. With `format=markdown` the
+  `slides` field carries markdown instead and a fresh deck is generated
+  (issue #36): every heading starts a slide (its text becomes the title),
+  paragraphs fill the body placeholder (fallback textbox), and pipe tables
+  render as real pptx tables; `X-Office-Slide-Count` then counts headings.
+  The markdown block model mirrors fusion-artifacts-engine's `office_ingest`
+  write-back, so its patch→regenerate path can switch to office-api.
+- `/v1/docx/parse` returns `{"blocks": [...]}` in document order:
+  `{kind: "heading", level, text}` (Heading 1–6 styles, `Title` maps to
+  level 1), `{kind: "para", text}` (empty paragraphs skipped), and
+  `{kind: "table", rows}` (cell text stripped). Import into an editor is the
+  consumer's job (issue #35).
+- `/v1/docx/write` takes a `markdown` form field and returns the .docx binary
+  with `X-Office-Doc-SHA256` (issue #35): markdown headings become Heading
+  styles at the same level, paragraphs become body paragraphs, pipe tables
+  become Word tables (short rows padded with empty cells). `parse` and
+  `write` round-trip blocks exactly.
 - Files over `FUSION_OFFICE_API_MAX_BYTES` (default 100 MB) get `413`. Malformed input
   gets `422` with FastAPI's `{"detail": ...}` shape. The uploaded template is
   never modified.

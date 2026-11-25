@@ -5,7 +5,7 @@ from io import BytesIO
 from pptx import Presentation
 from pptx.util import Inches
 
-from office_api.pptx import parse_deck, write_deck
+from office_api.pptx import parse_deck, write_deck, write_deck_from_markdown
 
 
 def deck_bytes(build) -> bytes:
@@ -159,3 +159,33 @@ def test_roundtrip_parse_write_parse_keeps_deck_openable() -> None:
         "body": ["raw data"],
         "notes": "backup",
     }
+
+
+def test_write_deck_from_markdown_builds_slides_and_tables() -> None:
+    markdown = "# Kickoff\nAgenda item\n\n| name | value |\n| a | 1 |\n## Wrap\nDone"
+
+    written = write_deck_from_markdown(markdown)
+
+    parsed = parse_deck(written)
+    assert [slide["title"] for slide in parsed["slides"]] == ["Kickoff", "Wrap"]
+    assert parsed["slides"][0]["body"] == ["Agenda item"]
+    assert parsed["slides"][1]["body"] == ["Done"]
+    deck = Presentation(BytesIO(written))
+    tables = [shape for shape in deck.slides[0].shapes if shape.has_table]
+    assert len(tables) == 1
+    assert tables[0].table.cell(0, 0).text == "name"
+    assert tables[0].table.cell(1, 1).text == "1"
+
+
+def test_write_deck_from_markdown_without_headings_makes_one_slide() -> None:
+    written = write_deck_from_markdown("Just a paragraph")
+
+    parsed = parse_deck(written)
+    assert len(parsed["slides"]) == 1
+    assert parsed["slides"][0]["body"] == ["Just a paragraph"]
+
+
+def test_write_deck_from_markdown_empty_input_makes_one_blank_slide() -> None:
+    written = write_deck_from_markdown("")
+
+    assert len(parse_deck(written)["slides"]) == 1
