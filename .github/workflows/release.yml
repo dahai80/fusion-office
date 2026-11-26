@@ -1,0 +1,87 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '26'
+  SEA_NODE_VERSION: '26.7.0'
+
+jobs:
+  executables:
+    name: executable (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: linux-x64 }
+          - { os: windows-latest, target: win-x64 }
+          - { os: macos-latest, target: darwin-arm64 }
+          - { os: macos-latest, target: darwin-x64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      # The SEA builder embeds the node binary it runs under, so each target
+      # gets an official Node ${SEA_NODE_VERSION} binary for its platform; the
+      # darwin-x64 build runs that binary under Rosetta on the arm64 runner.
+      - name: Download the target Node binary
+        shell: bash
+        run: |
+          mkdir -p .sea-node && cd .sea-node
+          if [ '${{ matrix.target }}' = 'win-x64' ]; then
+            curl -fsSLo node.zip "https://nodejs.org/dist/v${SEA_NODE_VERSION}/node-v${SEA_NODE_VERSION}-win-x64.zip"
+            unzip -q node.zip
+            mv node-v${SEA_NODE_VERSION}-win-x64 node
+          else
+            curl -fsSLo node.tar.xz "https://nodejs.org/dist/v${SEA_NODE_VERSION}/node-v${SEA_NODE_VERSION}-${{ matrix.target }}.tar.xz"
+            tar xf node.tar.xz
+            mv node-v${SEA_NODE_VERSION}-${{ matrix.target }} node
+          fi
+      - name: Install Rosetta for the darwin-x64 build
+        if: matrix.target == 'darwin-x64'
+        shell: bash
+        run: softwareupdate --install-rosetta --agree-to-license || true
+      - name: Build
+        run: npm ci
+      - name: Build apps
+        run: npm run build
+      - name: Prepare the SEA config
+        run: node scripts/build-sea.mjs
+      - name: Build the executable
+        shell: bash
+        run: |
+          SEANODE=".sea-node/node/${{ matrix.target == 'win-x64' && 'node.exe' || 'bin/node' }}"
+          "$SEANODE" --build-sea sea-config.json
+          OUT=dist-sea/fusion-office
+          if [ '${{ matrix.os }}' = 'macos-latest' ]; then
+            codesign --force --sign - "$OUT"
+          fi
+          if [ '${{ matrix.target }}' = 'win-x64' ]; then
+            mv "$OUT" dist-sea/fusion-office-windows-x64.exe
+          else
+            mv "$OUT" "dist-sea/fusion-office-${{ matrix.target }}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fusion-office-${{ matrix.target }}
+          path: dist-sea/fusion-office-*
+
+  release:
+    needs: executables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

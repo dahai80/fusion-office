@@ -1,11 +1,17 @@
-import { createServer } from 'node:http';
-import { Readable } from 'node:stream';
-import { readFile, stat } from 'node:fs/promises';
-import { createHash, createHmac } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { dirname, extname, join, normalize } from 'node:path';
+// Serves the five built apps on fixed ports (11485-11489) and registers them
+// with the union shell gateway. Runs two ways: as a plain script against the
+// repo checkout (npm run shell:serve, start.sh), and as a Node single
+// executable built by scripts/build-sea.mjs, where every dist file and
+// manifest rides inside the binary as a SEA asset and nothing is read from
+// disk. Same code both ways; only the file reader changes.
+const { createServer } = require('node:http');
+const { Readable } = require('node:stream');
+const { readFile, stat } = require('node:fs/promises');
+const { createHash, createHmac } = require('node:crypto');
+const { dirname, extname, join, normalize, relative, sep } = require('node:path');
+const { getRawAsset, isSea } = require('node:sea');
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const root = join(__dirname, '..');
 const apps = ['documents', 'spreadsheet', 'presentation', 'pdf', 'pm'];
 const gateway = process.env.FUSION_GATEWAY_URL || 'http://127.0.0.1:11432';
 // Fixed ports so a supervisor can probe the service; registered in
@@ -14,6 +20,24 @@ const BASE_PORT = Number(process.env.FUSION_OFFICE_SHELL_PORT) || 11485;
 const adminKey = process.env.FUSION_ADMIN_KEY;
 const masterKey = process.env.FUSION_GATEWAY_MASTER_KEY;
 const smoke = process.argv.includes('--smoke');
+
+// SEA assets are keyed by repo-relative forward-slash path (scripts/build-sea.mjs
+// generates them); on Windows path.relative answers backslashes, so normalize.
+function assetKey(absolutePath) {
+    return relative(root, absolutePath).split(sep).join('/');
+}
+
+async function readAny(absolutePath) {
+    if (isSea()) return Buffer.from(getRawAsset(assetKey(absolutePath)));
+    return readFile(absolutePath);
+}
+
+async function existsAny(absolutePath) {
+    if (isSea()) {
+        try { getRawAsset(assetKey(absolutePath)); return true; } catch { return false; }
+    }
+    try { await stat(absolutePath); return true; } catch { return false; }
+}
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
@@ -41,20 +65,16 @@ function log(message, ...args) {
 
 async function fileAt(dist, pathname) {
     const clean = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
-    let target = join(dist, clean);
-    try {
-        const info = await stat(target);
-        if (info.isDirectory()) target = join(target, 'index.html');
-        return { target, info: await stat(target) };
-    } catch (error) {
-        if (extname(clean)) return null;
-        const fallback = join(dist, 'index.html');
-        try {
-            return { target: fallback, info: await stat(fallback) };
-        } catch {
-            return null;
-        }
-    }
+    const withRoot = (rel) => join(dist, rel);
+    // Directory-style paths resolve to their index.html; anything with an
+    // extension must exist as-is. The SPA fallback is the app's own index.html.
+    let rel = clean;
+    if (clean.endsWith('/') || !extname(clean)) rel = join(clean, 'index.html');
+    if (await existsAny(withRoot(rel))) return { target: withRoot(rel) };
+    if (extname(clean)) return null;
+    const fallback = withRoot('index.html');
+    if (await existsAny(fallback)) return { target: fallback };
+    return null;
 }
 
 function serve(dist, port) {
@@ -102,14 +122,14 @@ function serve(dist, port) {
                 let headers = { 'Content-Type': type, 'Cache-Control': 'no-cache' };
                 if (acceptsGzip && !found.target.endsWith('.gz')) {
                     try {
-                        body = await readFile(found.target + '.gz');
+                        body = await readAny(found.target + '.gz');
                         headers['Content-Encoding'] = 'gzip';
                         headers.Vary = 'Accept-Encoding';
                     } catch {
                         body = null;
                     }
                 }
-                if (body === null) body = await readFile(found.target);
+                if (body === null) body = await readAny(found.target);
                 res.writeHead(200, headers);
                 res.end(body);
             } catch (error) {
@@ -224,10 +244,8 @@ async function main() {
     for (const app of apps) {
         const dist = join(root, 'apps', app, 'dist');
         const manifestPath = join(root, 'apps', app, 'web', 'manifest.json');
-        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-        try {
-            await stat(join(dist, 'index.html'));
-        } catch {
+        const manifest = JSON.parse((await readAny(manifestPath)).toString('utf8'));
+        if (!(await existsAny(join(dist, 'index.html')))) {
             console.error(`[shell-serve] ${app} has no dist; run npm run build first`);
             await stop();
             return;
@@ -237,7 +255,14 @@ async function main() {
         const port = smoke ? 0 : BASE_PORT + apps.indexOf(app);
         const server = await serve(dist, port);
         started.push({ app, manifest, server });
-        await register(manifest, `http://127.0.0.1:${server.address().port}`);
+        // A standalone executable often runs without the union shell gateway
+        // up; serving the apps is still useful, so a failed registration only
+        // warns instead of aborting the startup.
+        try {
+            await register(manifest, `http://127.0.0.1:${server.address().port}`);
+        } catch (error) {
+            log('gateway unreachable, serving without shell registration:', error.message);
+        }
         log('serving', app, `http://127.0.0.1:${port}`, `via /shell/${manifest.id}/`);
     }
 

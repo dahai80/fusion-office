@@ -34,7 +34,7 @@ function capMessages(messages) {
     return out
 }
 
-// The fixed ports scripts/shell-serve.mjs uses for the five apps. Served
+// The fixed ports scripts/shell-serve.cjs uses for the five apps. Served
 // there, AI calls go through its same-origin /__fusion_gateway relay, because
 // the gateway's CORS allowlist does not cover these origins.
 const OFFICE_PORTS = new Set(['11485', '11486', '11487', '11488', '11489'])

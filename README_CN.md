@@ -219,7 +219,7 @@ Shell 会话令牌，而不是 API Key。
 `id`、`path`、`entry` 保持不变，仍是稳定的接口契约。分组菜单需要支持清单 schema v2
 （`group`）的 Shell；旧版 Shell 仍按扁平列表展示。
 
-`scripts/shell-serve.mjs` 会为五个已构建应用各启动一个静态服务器，固定端口
+`scripts/shell-serve.cjs` 会为五个已构建应用各启动一个静态服务器，固定端口
 11485-11489（已登记 `architecture/port-registry.yaml`），注册清单、定时心跳，并在
 退出时注销。`start.sh` 按fusion-supervisor 生命周期协议封装，admin key 依次从环境
 变量、`.env.local`、网关配置解析：
@@ -236,7 +236,7 @@ Shell 会话令牌，而不是 API Key。
 直接运行（同样固定端口）：
 
 ```bash
-FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
+FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.cjs
 ```
 
 fusion-supervisor 在跑时，`fusion-sv up fusion-office` 即可托管：崩溃自动重启、健康
@@ -247,12 +247,31 @@ fusion-supervisor 在跑时，`fusion-sv up fusion-office` 即可托管：崩溃
 ```bash
 FUSION_ADMIN_KEY=<admin-key> \
 FUSION_GATEWAY_MASTER_KEY=<master-key> \
-node scripts/shell-serve.mjs --smoke
+node scripts/shell-serve.cjs --smoke
 ```
 
 冒烟流程会注册每个模块，用短期会话令牌请求 `/shell/fusion-office-<app>/`，校验
 HTML 应用根节点和一个带哈希的静态资源，然后注销全部清单并退出。两个 Key 只存在于
 环境变量中，不会写入仓库。
+
+### 独立可执行文件
+
+套件同时提供每个平台的单文件可执行程序（linux-x64、win-x64、darwin-arm64、
+darwin-x64）。`scripts/build-sea.mjs` 把五个已构建应用及其清单打包为 Node
+single-executable-application 资产；`scripts/shell-serve.cjs` 直接从二进制内部
+读取这些资产，无需任何其他文件即可在固定端口提供全部五个应用。
+
+```bash
+npm run build            # 先构建五个应用
+npm run sea:build        # 需要 Node >= 26.7；输出 dist-sea/fusion-office
+FUSION_ADMIN_KEY=<key> ./dist-sea/fusion-office
+```
+
+union shell 网关不可达时，可执行程序仍在 11485-11489 提供全部应用，并记录
+"未注册 shell" 的日志继续运行。推送 `v*` 标签会触发
+`.github/workflows/release.yml`，构建四个平台的可执行文件并附到 GitHub
+release。网关反代与 AI 调用仍要求可达的 `FUSION_GATEWAY_URL`（默认
+`http://127.0.0.1:11432`）。
 
 ### 来自其他 Fusion 模块的深链接交接
 
@@ -290,7 +309,7 @@ HTML 应用根节点和一个带哈希的静态资源，然后注销全部清单
 （`dev/strip-ttf-dist.mjs`），运行时只加载 `scripts/convert-fonts.py` 生成的 `.woff2`
 转换件（fontTools，无损转换——不裁剪字形，度量表不变）。`npm run build` 还会为 `dist`
 中所有大于 1 KB 的可压缩文件生成 `.gz` 伴生文件（`scripts/gzip-dist.mjs`），
-`scripts/shell-serve.mjs` 在客户端接受 gzip 时直接返回 `.gz` 伴生文件，
+`scripts/shell-serve.cjs` 在客户端接受 gzip 时直接返回 `.gz` 伴生文件，
 窄带宽链路只需传输压缩后的字节，服务端也无需逐请求压缩。重资源
 （`fixtures/`、`thesaurus/`、`dictionaries/`、`ocr/`）只在对应功能被使用时才拉取，
 不进入首次打开路径。

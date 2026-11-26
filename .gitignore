@@ -14,3 +14,8 @@ playwright-report/
 
 # runtime pid of the supervised shell host
 dev/*.pid
+
+# generated single-executable artifacts (scripts/build-sea.mjs)
+dist-sea/
+sea-config.json
+.sea-node/

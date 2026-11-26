@@ -266,7 +266,7 @@ PDF, and Projects beneath it in `sort` order 1 to 5. Module ids, paths, and entr
 unchanged wire contracts. The grouped menu appears in shells that support manifest schema
 v2 (`group`); older shells still list the modules flat.
 
-`scripts/shell-serve.mjs` starts a static server per built app on fixed ports
+`scripts/shell-serve.cjs` starts a static server per built app on fixed ports
 11485-11489 (registered in `architecture/port-registry.yaml`), registers all five
 manifests, heartbeats them, and unregisters on exit. `start.sh` wraps it with the
 fusion-supervisor lifecycle contract and resolves the admin key from the
@@ -285,7 +285,7 @@ warns (standalone deployments).
 Run directly (same fixed ports):
 
 ```bash
-FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.mjs
+FUSION_ADMIN_KEY=<admin-key> node scripts/shell-serve.cjs
 ```
 
 With fusion-supervisor running, `fusion-sv up fusion-office` starts and supervises
@@ -298,13 +298,34 @@ shell session secret:
 ```bash
 FUSION_ADMIN_KEY=<admin-key> \
 FUSION_GATEWAY_MASTER_KEY=<master-key> \
-node scripts/shell-serve.mjs --smoke
+node scripts/shell-serve.cjs --smoke
 ```
 
 The smoke run registers each module, requests `/shell/fusion-office-<app>/` with a minted
 short-lived session, verifies the HTML app root and one hashed asset, then unregisters
 everything and exits. Both keys stay in environment variables and are never written to
 the repository.
+
+### Standalone executable
+
+The suite also ships as a single self-contained executable per platform
+(linux-x64, win-x64, darwin-arm64, darwin-x64). `scripts/build-sea.mjs` turns the
+five built apps and their manifests into Node single-executable-application
+assets; `scripts/shell-serve.cjs` reads them from inside the binary, so nothing
+but the executable is needed to serve all five apps on the fixed ports.
+
+```bash
+npm run build            # the five apps must be built first
+npm run sea:build        # requires Node >= 26.7; writes dist-sea/fusion-office
+FUSION_ADMIN_KEY=<key> ./dist-sea/fusion-office
+```
+
+If the union shell gateway is unreachable, the executable still serves every app
+on 11485-11489 and logs that it started without shell registration. Pushing a
+`v*` tag runs `.github/workflows/release.yml`, which builds all four platform
+executables and attaches them to the GitHub release. The gateway relay and
+AI calls still require a reachable `FUSION_GATEWAY_URL` (default
+`http://127.0.0.1:11432`).
 
 ### Deep-link hand-off from other Fusion modules
 
@@ -346,7 +367,7 @@ build strips them from `dist` (`dev/strip-ttf-dist.mjs`), so runtime loads only 
 `.woff2` conversions produced by `scripts/convert-fonts.py` (fontTools, lossless —
 no glyph subsetting, metric tables unchanged). `npm run build` also emits a `.gz`
 sibling for every compressible `dist` file over 1 KB (`scripts/gzip-dist.mjs`), and
-`scripts/shell-serve.mjs` serves the `.gz` sibling when the client accepts gzip, so
+`scripts/shell-serve.cjs` serves the `.gz` sibling when the client accepts gzip, so
 a narrow pipe pays the compressed byte cost without per-request compression work.
 Heavy on-demand assets (`fixtures/`, `thesaurus/`, `dictionaries/`, `ocr/`) are
 fetched only when their feature is used, never on first open.
