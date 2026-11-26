@@ -187,7 +187,11 @@ AI surfaces by app:
   sheet functions such as `AI` and `TRANSLATE`. The error smart tag can ask the model
   to explain a failing formula (`#DIV/0!` and friends, with sampled cells), and the
   chart dialog can propose a chart type, orientation, and title from a sample of the
-  selected range before you confirm the insert.
+  selected range before you confirm the insert. The assistant also has a
+  cross-session memory tool (`grep_rollouts`, issue #45/#47): when the local
+  office-api service is reachable, it searches the outcomes past sessions reported
+  ("like last week's deck", "what was rejected before"); otherwise it says the memory
+  is unavailable and answers from the workbook.
 - Presentation: prompt-to-deck generation, assistant panel, and slide review. The
   speaker-notes pane has Generate-with-AI buttons for the current slide and for all
   slides (batched with an 8,000-character payload cap, written through the same
