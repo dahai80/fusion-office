@@ -238,7 +238,10 @@ appends it to a JSONL sink fusion-trainer's `rollout_ingest` reads unchanged. Si
 and default rewards match the trainer's map: `task_success`/`user_accepted` = 1.0,
 `user_edited` = 0.5, `user_rejected`/`error` = 0. The shared agent loop reports
 `user_accepted`/`user_rejected` on approvals and `task_success`/`error` at turn end;
-spreadsheet's plan-apply core reports the same. Reporting is fire-and-forget
+spreadsheet's plan-apply core reports the same, documents reports `user_edited` when
+the user undoes a turn's changes. Every agent turn mints one rollout id and sends it
+as the `X-Fusion-Rollout-Id` header on each chat request, so the gateway's rollout
+tap and these outcomes can be correlated per turn. Reporting is fire-and-forget
 (idempotent per rollout event, failures only logged) and never blocks the user action.
 Message content is redacted to `[redacted:N]` unless the reporter is built with
 `contentMode: "raw"`.

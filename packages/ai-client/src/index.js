@@ -171,8 +171,16 @@ function headers() {
     return h
 }
 
+// Issue #38: an agent turn carries one rollout id on every chat request it
+// makes, so the gateway's rollout tap can correlate its records with the
+// outcomes the app reports to office-api for the same turn. Unknown headers
+// are ignored until the gateway adopts the id (tracked upstream).
+function rolloutHeaders(rolloutId) {
+    return rolloutId ? { 'X-Fusion-Rollout-Id': String(rolloutId) } : {}
+}
+
 function fetchOpts(init) {
-    const opts = { ...init, headers: headers() }
+    const opts = { ...init, headers: { ...headers(), ...(init.headers || {}) } }
     if (inShell()) opts.credentials = 'include'
     return opts
 }
@@ -203,7 +211,7 @@ export async function chat(opts) {
     }
     warnStaticKey()
     const t0 = Date.now()
-    const res = await request(chatPath(), { method: 'POST', body: JSON.stringify(body) }, opts.timeoutMs)
+    const res = await request(chatPath(), { method: 'POST', body: JSON.stringify(body), headers: rolloutHeaders(opts.rolloutId) }, opts.timeoutMs)
     const data = await res.json()
     const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : ''
     log('ai', 'chat ok', (Date.now() - t0) + 'ms', text.length + ' chars')
@@ -224,6 +232,7 @@ export async function chatStream(opts, onDelta) {
     const res = await fetch(baseUrlFor() + chatPath(), fetchOpts({
         method: 'POST',
         body: JSON.stringify(body),
+        headers: rolloutHeaders(opts.rolloutId),
     }))
     if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -326,6 +335,7 @@ export async function* chatStreamEvents(opts) {
             ...fetchOpts({
                 method: 'POST',
                 body: JSON.stringify(body),
+                headers: rolloutHeaders(opts.rolloutId),
             }),
             signal: controller.signal,
         })

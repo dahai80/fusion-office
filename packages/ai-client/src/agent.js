@@ -104,7 +104,10 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
         // Issue #33: one rollout per turn; each emitted outcome is its own
         // record under a stable event id, so confirmations and the turn's end
         // state are reported separately and neither is dropped as a duplicate.
-        const rolloutId = outcomes ? newRolloutId() : null;
+        // Minted even without a reporter (#38): the id also rides on every
+        // chat request so the gateway tap can correlate its records with the
+        // app-reported outcomes for the same agent turn.
+        const rolloutId = newRolloutId();
         let eventSeq = 0;
         const transcriptForOutcome = () => transcript.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }));
         const report = (signal, detail) => {
@@ -117,7 +120,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 if (round) emit({ type: 'round' });
                 let said = '';
                 const calls = [];
-                const stream = chat(requestMessages(transcript, { system, changelog }), { model, tools, maxTokens: maxOutputTokens });
+                const stream = chat(requestMessages(transcript, { system, changelog }), { model, tools, maxTokens: maxOutputTokens, rolloutId });
                 const iter = stream[Symbol.asyncIterator]();
                 for (;;) {
                     const next = await Promise.race([iter.next(), stopped]);

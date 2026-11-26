@@ -10,7 +10,7 @@
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter } from '@fusion-office/ai-client';
+import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter, newRolloutId } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
@@ -36,6 +36,7 @@ const STATUS_TEXT = {
 
 export function createAssistantPane({ editor, pkg, error, available = () => P.canUseAi(), chat = (messages, options) => P.aiChatStream(messages, options) }) {
   let busy = false, currentTurn = null, refused = null;
+  const outcomes = createOutcomeReporter({ app: 'documents' });
 
   const pane = sidePane({ title: 'Assistant', label: 'Assistant pane', className: 'as-pane', onOpen: () => { renderContext(); renderEmpty(); fab.setAttribute('aria-expanded', 'true'); titleButton.setAttribute('aria-pressed', 'true'); }, onClose: () => { fab.setAttribute('aria-expanded', 'false'); titleButton.setAttribute('aria-pressed', 'false'); agent.stop(); editor()?.focus(); } });
   pane.heading.prepend(el('span.as-mark', { 'aria-hidden': 'true' }, commandIconEl('assistant', 16)));
@@ -84,7 +85,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       return runTool(engine, name, args);
     },
     approve: step => askApproval(step),
-    outcomes: createOutcomeReporter({ app: 'documents' }),
+    outcomes,
   });
 
   /* ---- What the person can see ---- */
@@ -193,7 +194,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
 
   function undoRow() {
     const applied = el('span.as-applied', { role: 'status' }, 'Changes made');
-    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { const engine = editor(); if (!engine) return; engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
+    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { const engine = editor(); if (!engine) return; engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; try { outcomes.report({ signal: 'user_edited', detail: 'the user undid the applied changes', model: '', messages: [{ role: 'assistant', content: 'the applied changes' }], rolloutId: `${newRolloutId()}:e1` }); } catch { /* reporting must not block undo */ } } }, 'Undo');
     return el('div.as-actions', {}, applied, undo);
   }
 
