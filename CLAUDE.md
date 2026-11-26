@@ -103,7 +103,7 @@ npm workspaces: `apps/*` and `packages/*`.
   rows in a database.
 - `packages/ai-client` owns model access. It defaults to
   `http://127.0.0.1:11432` (in dev, the same-origin `/__fusion_gateway` proxy from
-  `dev/gateway-proxy.mjs`; when served by `scripts/shell-serve.mjs` on the fixed ports
+  `dev/gateway-proxy.mjs`; when served by `scripts/shell-serve.cjs` on the fixed ports
   11485-11489, the same `/__fusion_gateway` path — relayed server-side by shell-serve,
   because the gateway's CORS allowlist covers neither),
   reads `VITE_FUSION_GATEWAY_URL`,
@@ -150,7 +150,7 @@ npm workspaces: `apps/*` and `packages/*`.
   `scripts/convert-fonts.py`; TTF originals stay in `public/fonts/` for tests and
   provenance, stripped from dist by `dev/strip-ttf-dist.mjs`). `npm run build` emits
   `.gz` siblings for compressible dist files over 1 KB (`scripts/gzip-dist.mjs`), and
-  `scripts/shell-serve.mjs` serves the `.gz` sibling when the client accepts gzip.
+  `scripts/shell-serve.cjs` serves the `.gz` sibling when the client accepts gzip.
   `fixtures/`, `thesaurus/`, `dictionaries/`, and `ocr/` are fetched on feature use,
   never on first open.
 - Shell traffic is session-gated (issue #10): inside the shell, `chat`/`chatStream`/
@@ -265,7 +265,7 @@ fragment; parsing lives in `apps/documents/src/lib/deeplink.js` and
 Each app has `web/manifest.json` with id `fusion-office-<app>`, path `/office/<app>`,
 and entry `/shell/fusion-office-<app>/`. All five carry `group` `fusion-office` with
 `group_title` `Fusion Office` and `sort` 1 to 5, so schema-v2 shells show one grouped
-menu; ids, paths, and entries stay unchanged. `scripts/shell-serve.mjs` serves each `dist`
+menu; ids, paths, and entries stay unchanged. `scripts/shell-serve.cjs` serves each `dist`
 on fixed ports 11485-11489 (registered in `architecture/port-registry.yaml`; entry
 `fusion-office` is the supervised one, the other four are `supervise: false`), registers
 manifests through the gateway admin API, heartbeats, and unregisters on exit. `start.sh`
@@ -275,6 +275,17 @@ the gateway config's `web_shell.admin_key`. Before serving, `start` self-checks 
 `fusion-office` entry in `port-registry.yaml` and refuses an unregistered port
 (`FUSION_SKIP_REGISTRY_CHECK=1` bypasses). The gateway proxies `/shell/<id>/` and
 requires a signed shell session, not an API key.
+
+The same server ships as a standalone Node single executable: `npm run sea:build`
+(Node >= 26.7) embeds the five dists and manifests as SEA assets via
+`scripts/build-sea.mjs`; `shell-serve.cjs` reads them with `getRawAsset` when
+running as a SEA (`node:sea`), from disk otherwise, and serves 11485-11489 even
+when the gateway is unreachable (registration degrades to a warning). Pushing a
+`v*` tag runs `.github/workflows/release.yml`, which builds linux-x64, win-x64,
+darwin-arm64, and darwin-x64 executables (the darwin-x64 build runs the official
+x64 Node binary under Rosetta; the postject injection path is avoided — it
+segfaults on current macOS — in favor of the native `node --build-sea`) and
+attaches them to the GitHub release.
 
 ## Verification Expectations
 

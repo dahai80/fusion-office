@@ -72,7 +72,7 @@ cmd_start() {
     mkdir -p "$SCRIPT_DIR/dev"
     : > "$LOG_FILE"
     FUSION_ADMIN_KEY="$key" FUSION_OFFICE_SHELL_PORT="$BASE_PORT" \
-        nohup node scripts/shell-serve.mjs >> "$LOG_FILE" 2>&1 &
+        nohup node scripts/shell-serve.cjs >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     log "started pid $(cat "$PID_FILE") on ports $BASE_PORT-$((BASE_PORT + 4)); log: $LOG_FILE"
     # Wait for the documents server so callers (and the supervisor probe) see
