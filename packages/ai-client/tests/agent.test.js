@@ -139,3 +139,34 @@ describe('createAgent outcome signals (#33)', () => {
         expect(roles).toEqual(['user', 'assistant', 'tool', 'assistant']);
     });
 });
+
+describe('createAgent rollout correlation (#38)', () => {
+    it('passes one rollout id per turn to every chat round', async () => {
+        const seenOpts = [];
+        const agent = createAgent({
+            chat: async function* (messages, opts) {
+                seenOpts.push(opts);
+                if (seenOpts.length === 1) yield { type: 'tool', id: 'c1', name: 'replace_selection', input: { text: 'hi' } };
+                yield { type: 'text', text: 'done' };
+            },
+            tools: [{ type: 'function', function: { name: 'replace_selection' } }],
+            runTool: () => ({ ok: true, changed: true, content: 'Done.' }),
+            describe: () => ({ label: 'Replaced the selection' }),
+        });
+        await agent.send('change something');
+        expect(seenOpts).toHaveLength(2);
+        for (const opts of seenOpts) expect(opts.rolloutId).toMatch(/^ro-[0-9a-f]{16}$/);
+        expect(seenOpts[1].rolloutId).toBe(seenOpts[0].rolloutId);
+    });
+
+    it('mints a fresh rollout id on the next turn', async () => {
+        const seenOpts = [];
+        const agent = createAgent({
+            chat: async function* (messages, opts) { seenOpts.push(opts); yield { type: 'text', text: 'done' }; },
+        });
+        await agent.send('first');
+        await agent.send('second');
+        expect(seenOpts[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}$/);
+        expect(seenOpts[1].rolloutId).not.toBe(seenOpts[0].rolloutId);
+    });
+});

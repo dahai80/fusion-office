@@ -289,8 +289,10 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     running = run;
     const steps = [];
     // Outcome signals for the rollout-tap plane (#33): one rollout per turn,
-    // each reported outcome its own record under a stable event id.
-    const rolloutId = outcomes ? newRolloutId() : null;
+    // each reported outcome its own record under a stable event id. Minted
+    // even without a reporter (#38): the id rides on every chat request so
+    // the gateway tap can correlate its records with the reported outcomes.
+    const rolloutId = newRolloutId();
     let eventSeq = 0;
     const report = (signal, detail) => {
       if (!outcomes) return;
@@ -308,7 +310,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
         let text = '';
         let cut = false; // the reply ran into MAX_OUTPUT_TOKENS
         const calls = [];
-        const iterable = chat(requestMessages(transcript, { changelog }), { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS });
+        const iterable = chat(requestMessages(transcript, { changelog }), { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS, rolloutId });
         const iter = iterable[Symbol.asyncIterator]();
         for (;;) {
           const next = await Promise.race([iter.next(), stopSignal]);

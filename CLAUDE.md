@@ -198,7 +198,11 @@ file; the only write is a bookmark).
   `user_accepted`/`user_rejected` on approvals and `task_success`/`error` at turn end
   (spreadsheet's `aiagent.js`/`aiplan.js` and presentation's `assistant.js` carry the
   same wiring in their own loops). Fire-and-forget, idempotent per rollout event,
-  content redacted unless `contentMode: "raw"`.
+  content redacted unless `contentMode: "raw"`. Rollout correlation (issue #38):
+  each agent turn mints one `ro-<16 hex>` id and sends it as `X-Fusion-Rollout-Id`
+  on every chat request (inert until the gateway adopts it — tracked upstream), so
+  the gateway tap's records and the app-reported outcomes can be joined per turn;
+  documents reports `user_edited` when the user undoes a turn's changes.
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool

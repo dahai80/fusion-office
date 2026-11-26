@@ -194,7 +194,10 @@ POST 到 office-api 的 `POST /v1/outcomes`，由其追加到 fusion-trainer
 一致：`task_success`/`user_accepted` = 1.0，`user_edited` = 0.5，
 `user_rejected`/`error` = 0。共享 agent 循环在确认时上报
 `user_accepted`/`user_rejected`，回合结束上报 `task_success`/`error`；
-spreadsheet 的 plan-apply 核心上报同样信号。上报为 fire-and-forget（按 rollout
+spreadsheet 的 plan-apply 核心上报同样信号，documents 在用户撤销回合改动时上报
+`user_edited`。每个 agent 回合铸造一个 rollout id，并随每条 chat 请求以
+`X-Fusion-Rollout-Id` 请求头发送，网关的 rollout tap 与应用上报的结果即可按回合
+关联。上报为 fire-and-forget（按 rollout
 事件幂等，失败只记日志），绝不阻塞用户操作。消息内容默认脱敏为 `[redacted:N]`，
 仅当 reporter 以 `contentMode: "raw"` 构建时保留原文。
 
