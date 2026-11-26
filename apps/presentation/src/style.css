@@ -2906,8 +2906,10 @@ body:has(.presenter[open]) #toast {
   line-height: 1.5;
   min-width: 0;
 }
+/* Prototype alignment (office-research/prototypes/02-agent-panel.html): the
+   user bubble sits on the left in quiet gray. */
 .ai-user {
-  align-self: flex-end;
+  align-self: flex-start;
   max-width: 88%;
 }
 .ai-bubble {
@@ -3035,12 +3037,16 @@ body:has(.presenter[open]) #toast {
 .slide-ref:hover {
   text-decoration: underline;
 }
-/* A tool call: what it does, and how it went. */
+/* A tool call: what it does, and how it went — its own quiet card. */
 .ai-step {
   display: grid;
   grid-template-columns: 16px 1fr;
   column-gap: 6px;
   align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
   font-size: 12.5px;
   line-height: 1.4;
   color: var(--muted);
@@ -3096,15 +3102,36 @@ body:has(.presenter[open]) #toast {
   color: var(--ink);
   font-weight: 600;
 }
+/* Destructive-change confirmation: the prototype's amber card. */
 .ai-approve {
+  --agent-approve-bg: #fffbeb;
+  --agent-approve-line: #fde68a;
+  --agent-approve-title: #92400e;
   grid-column: 1 / -1;
   margin-top: 6px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  background: var(--surface-2);
+  border: 1px solid var(--agent-approve-line);
+  border-radius: 10px;
+  background: var(--agent-approve-bg);
   color: var(--ink);
+}
+:root[data-theme="dark"] .ai-approve {
+  --agent-approve-bg: #382e14;
+  --agent-approve-line: #6b5416;
+  --agent-approve-title: #fbbf24;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .ai-approve {
+    --agent-approve-bg: #382e14;
+    --agent-approve-line: #6b5416;
+    --agent-approve-title: #fbbf24;
+  }
+}
+.ai-approve-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--agent-approve-title);
 }
 .ai-approve-detail {
   margin-bottom: 8px;

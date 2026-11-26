@@ -646,6 +646,7 @@ export function createAssistantPanel(env) {
         role: "group",
         "aria-label": "Allow this change?",
       },
+      el("p", { class: "ai-approve-title" }, `⚠ ${step.label || step.name}. Allow this change?`),
       step.detail && el("p", { class: "ai-approve-detail" }, step.detail),
       el("div", { class: "ai-approve-actions" }, allow, deny),
     );

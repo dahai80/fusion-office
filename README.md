@@ -120,6 +120,16 @@ own origin, and each Vite config proxies that prefix to the gateway
 ports, so a direct cross-origin call would fail the preflight and surface as
 `Failed to fetch`. Production builds still call `VITE_FUSION_GATEWAY_URL` directly.
 
+### Assistant panel look
+
+The five assistant panels (documents, spreadsheet, presentation, pdf, pm) follow the
+agent-panel prototype in `office-research/prototypes/02-agent-panel.html` and
+`03-spreadsheet-agent.html`: the user's message sits on the left in a quiet gray
+bubble, the reply in a tinted one, every tool call renders as its own card with the
+call's detail line, and a change that needs approval shows as an amber confirmation
+card with the action spelled out before Allow/Skip. Colors follow each app's theme,
+including dark mode.
+
 ### Choosing a model
 
 Each assistant panel shows a model picker that lists the models the gateway offers

@@ -1164,10 +1164,15 @@
 .ai-steps:not(:empty) {
   margin-bottom: 6px;
 }
+/* Tool calls render as their own quiet card (prototype 02-agent-panel). */
 .ai-step {
   display: flex;
   gap: 8px;
   justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
   font-size: 11.5px;
   color: var(--muted);
 }
