@@ -7,13 +7,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import zipfile
 from pathlib import Path
 from typing import Annotated
 
 import uvicorn
 from docx.opc.exceptions import PackageNotFoundError
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fusion_core.config import get_env, service_port
@@ -23,9 +24,9 @@ from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 from . import __version__
 from .docx import fill_document, parse_document
 from .markdown import parse_blocks, write_docx_from_markdown
-from .outcomes import append_record, default_sink, validate_record
+from .outcomes import append_record, default_sink, grep_sink, validate_record
 from .pptx import parse_deck, write_deck, write_deck_from_markdown
-from .xlsx import parse_workbook
+from .xlsx import parse_workbook, sketch_workbook
 
 logging.basicConfig(
     level=get_env("FUSION_OFFICE_API_LOG_LEVEL", "INFO"),
@@ -81,16 +82,46 @@ def readyz() -> dict[str, str]:
 
 
 @app.post("/v1/xlsx/parse")
-async def xlsx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+async def xlsx_parse(
+    file: Annotated[UploadFile, File()],
+    mode: Annotated[str, Form()] = "full",
+    sheet: Annotated[str, Form()] = "",
+    region: Annotated[str, Form()] = "",
+) -> JSONResponse:
     content = await _read_limited(file)
     if not content:
         raise HTTPException(status_code=422, detail="empty file")
     try:
-        parsed = parse_workbook(content)
+        # Issue #45, region-wise pattern: mode=sketch answers structure only
+        # (dimensions, block ranges, headers); mode=full with sheet+region
+        # reads one localized region, capped, with absolute range names.
+        if mode == "sketch":
+            parsed = sketch_workbook(content)
+        else:
+            parsed = parse_workbook(content, sheet=sheet or None, region=region or None)
     except (InvalidFileException, zipfile.BadZipFile, KeyError, ValueError) as error:
         raise _invalid("xlsx", error) from error
-    log.info("parsed xlsx %s: %d sheets", file.filename, len(parsed["sheets"]))
+    log.info("parsed xlsx %s (mode=%s): %d sheets", file.filename, mode, len(parsed["sheets"]))
     return JSONResponse(parsed)
+
+
+@app.get("/v1/rollouts/grep")
+def rollouts_grep(
+    q: Annotated[str, Query(min_length=1)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> dict[str, object]:
+    # Issue #45 (GrepMem pattern): regex retrieval over the append-only
+    # outcome sink — exact facts across sessions, no new storage.
+    sink = default_sink()
+    if not sink.exists():
+        return {"matches": [], "pattern": q, "truncated": False, "sink": str(sink), "exists": False}
+    try:
+        result = grep_sink(sink, q, limit=limit)
+    except re.error as error:
+        raise HTTPException(status_code=422, detail=f"invalid regex: {error}") from error
+    result["sink"] = str(sink)
+    result["exists"] = True
+    return result
 
 
 @app.post("/v1/docx/fill")

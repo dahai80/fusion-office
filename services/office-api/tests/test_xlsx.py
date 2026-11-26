@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from io import BytesIO
 
+import pytest
 from openpyxl import Workbook
 
-from office_api.xlsx import parse_workbook
+from office_api.xlsx import MAX_REGION_CELLS, parse_workbook, sketch_workbook
 
 
 def workbook_bytes(build) -> bytes:
@@ -93,3 +94,69 @@ def test_empty_sheet_reports_nothing() -> None:
     sheet = parse_workbook(workbook_bytes(build))["sheets"][0]
 
     assert sheet == {"name": "Empty", "tables": [], "unparsed_regions": []}
+
+
+def test_sketch_reports_structure_without_cell_data() -> None:
+    def build(workbook: Workbook) -> None:
+        sheet = workbook.active
+        sheet.title = "Big"
+        sheet.append(["pollutant", "conc_mg_l"])
+        sheet.append(["COD", 42.5])
+        sheet.append([])
+        sheet.append(["only", "header"])
+
+    sketch = sketch_workbook(workbook_bytes(build))
+
+    sheet = sketch["sheets"][0]
+    assert sheet["name"] == "Big"
+    assert sheet["rows"] == 4
+    assert sheet["cols"] == 2
+    assert sheet["blocks"] == [
+        {"range": "A1:B2", "rows": 2, "cols": 2, "headers": ["pollutant", "conc_mg_l"]},
+        {"range": "A4:B4", "rows": 1, "cols": 2, "unparsed": True},
+    ]
+
+
+def test_region_parse_answers_absolute_ranges() -> None:
+    def build(workbook: Workbook) -> None:
+        sheet = workbook.active
+        sheet.title = "Big"
+        sheet.append(["a", "b", "c"])
+        for row in range(2, 12):
+            sheet.append([row, row * 10, row * 100])
+
+    parsed = parse_workbook(workbook_bytes(build), sheet="Big", region="B1:C3")
+
+    table = parsed["sheets"][0]["tables"][0]
+    assert table["range"] == "B1:C3"
+    assert table["header_row"] == 0
+    assert table["headers"] == ["b", "c"]
+    assert table["rows"] == [[20, 200], [30, 300]]
+    assert parsed["sheets"][0]["unparsed_regions"] == []
+
+
+def test_region_parse_respects_the_cell_cap() -> None:
+    def build(workbook: Workbook) -> None:
+        sheet = workbook.active
+        sheet.append(["a", "b"])
+        sheet.append([1, 2])
+
+    with pytest.raises(ValueError) as error:
+        parse_workbook(workbook_bytes(build), sheet="Sheet", region="A1:ZZZ9", max_cells=10)
+
+    assert "10-cell cap" in str(error.value)
+
+
+def test_region_parse_rejects_a_bad_range() -> None:
+    def build(workbook: Workbook) -> None:
+        sheet = workbook.active
+        sheet.append(["a", "b"])
+        sheet.append([1, 2])
+
+    for bad in ("A0:B2", "B2:A1", "nonsense"):
+        with pytest.raises(ValueError):
+            parse_workbook(workbook_bytes(build), sheet="Sheet", region=bad)
+
+
+def test_region_cap_is_the_documented_default() -> None:
+    assert MAX_REGION_CELLS == 200000

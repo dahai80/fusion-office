@@ -65,6 +65,46 @@ def test_parse_endpoint_returns_tables(client: TestClient) -> None:
     assert sheets[0]["tables"][0]["rows"] == [["COD", 42.5]]
 
 
+def test_parse_endpoint_sketch_mode_reports_no_cell_data(client: TestClient) -> None:
+    response = client.post(
+        "/v1/xlsx/parse",
+        files={"file": ("monitoring.xlsx", xlsx_bytes())},
+        data={"mode": "sketch"},
+    )
+
+    assert response.status_code == 200
+    sheet = response.json()["sheets"][0]
+    assert sheet["rows"] == 2
+    assert sheet["blocks"] == [
+        {"range": "A1:B2", "rows": 2, "cols": 2, "headers": ["pollutant", "conc_mg_l"]}
+    ]
+
+
+def test_parse_endpoint_region_mode_answers_absolute_ranges(client: TestClient) -> None:
+    response = client.post(
+        "/v1/xlsx/parse",
+        files={"file": ("monitoring.xlsx", xlsx_bytes())},
+        data={"sheet": "Monitoring", "region": "B1:B2"},
+    )
+
+    assert response.status_code == 200
+    table = response.json()["sheets"][0]["tables"][0]
+    assert table["range"] == "B1:B2"
+    assert table["headers"] == ["conc_mg_l"]
+    assert table["rows"] == [[42.5]]
+
+
+def test_parse_endpoint_region_mode_over_cap_is_422(client: TestClient) -> None:
+    response = client.post(
+        "/v1/xlsx/parse",
+        files={"file": ("monitoring.xlsx", xlsx_bytes())},
+        data={"sheet": "Monitoring", "region": "A1:ZZZ100"},
+    )
+
+    assert response.status_code == 422
+    assert "cell cap" in response.json()["detail"]
+
+
 def test_fill_endpoint_returns_docx_with_headers(client: TestClient) -> None:
     response = client.post(
         "/v1/docx/fill",

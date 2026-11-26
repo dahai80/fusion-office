@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -61,3 +62,28 @@ def append_record(path: Path, record: dict[str, Any]) -> int:
     with open(path, "a", encoding="utf-8") as sink:
         sink.write(line)
     return len(line.encode("utf-8"))
+
+
+def grep_sink(path: Path, pattern: str, limit: int = 20) -> dict[str, Any]:
+    """Grep-style retrieval over the append-only rollout sink (issue #45, GrepMem).
+
+    Office tasks are strongly cross-session; the sink is a lossless log of
+    what the apps actually did, so a regex over its lines recovers exact
+    facts (model, rollout ids, signals, redacted transcript shapes) without
+    any new storage. Lines that fail to parse still match as raw text.
+    """
+    regex = re.compile(pattern)
+    matches: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as sink:
+        for line_number, line in enumerate(sink, 1):
+            if not regex.search(line):
+                continue
+            try:
+                record: Any = json.loads(line)
+            except json.JSONDecodeError:
+                record = None
+                log.warning("sink line %d is not valid JSON; matched as raw text", line_number)
+            matches.append({"line": line_number, "record": record})
+            if len(matches) >= limit:
+                break
+    return {"matches": matches, "pattern": pattern, "truncated": len(matches) >= limit}

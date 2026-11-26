@@ -424,6 +424,12 @@ contract in issue #1:
 
 - `POST /v1/xlsx/parse` — multipart `file`; returns sheets, tables, flattened merged
   cells, and `unparsed_regions` for blocks whose header cannot be inferred.
+  Large-sheet pattern (issue #45): with `mode=sketch` the response carries structure
+  only (per-sheet dimensions plus each block's absolute range, size, and headers —
+  no cell data); with `sheet` + `region` (e.g. `B3:F200`) it parses one localized
+  region, capped at 200,000 cells with an actionable `422` over cap, and answers
+  absolute range names so the two stages join. The high-level action surface stays
+  intact — no decomposition into primitive cell operations.
 - `POST /v1/docx/fill` — multipart `file` plus a `values` JSON object; fills
   `{{placeholder}}` markers in paragraphs, table cells, headers and footers and returns
   the filled binary with `X-Office-Doc-SHA256` and `X-Office-Unfilled`.
@@ -447,6 +453,10 @@ contract in issue #1:
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).
+- `GET /v1/rollouts/grep?q=<regex>&limit=<1-100>` — grep-style retrieval over the
+  same sink file: regex over JSONL lines, matches returned as parsed records (or
+  `record: null` for unparseable lines) with line numbers and a `truncated` flag;
+  the sink path and an `exists` flag ride along. No new storage (issue #45).
 - `GET /healthz`, `GET /readyz`.
 - Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
   loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.
