@@ -68,7 +68,8 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
         settings: () => ({ approval: 'never' }),
         changes: changesDocument,
         describe: (tool, args) => describeCall(commands, tool, args),
-        runTool: (tool, args) => runTool(commands, tool, args),
+        runTool: (tool, args, { turn }) => runTool(commands, tool, args,
+            () => outcomes.feedback(turn, 'Bookmark', 'user_edited')),
         outcomes,
     });
 

@@ -240,7 +240,8 @@ and default rewards match the trainer's map: `task_success`/`user_accepted` = 1.
 `user_accepted`/`user_rejected` on approvals and `task_success`/`error` at turn end;
 spreadsheet's plan-apply core reports the same. Documents and presentation report
 `user_edited` when the user undoes a reply's changes. PDF answers offer Helpful
-(`task_success`) / Not helpful (`user_rejected`); an unrated answer is not a vote. Every agent turn mints one rollout id and sends it
+(`task_success`) / Not helpful (`user_rejected`); an unrated answer is not a vote.
+Undoing an assistant-added PDF bookmark reports `user_edited` on its original turn. Every agent turn mints one rollout id and sends it
 as the `X-Fusion-Rollout-Id` header on each chat request, so the gateway's rollout
 tap can join `rollout_id` exactly. A separate `event_id` distinguishes multiple outcomes on the same turn. Reporting is fire-and-forget
 (idempotent per rollout event, failures only logged) and never blocks the user action.

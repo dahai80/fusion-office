@@ -195,7 +195,7 @@ POST 到 office-api 的 `POST /v1/outcomes`，由其追加到 fusion-trainer
 `user_rejected`/`error` = 0。共享 agent 循环在确认时上报
 `user_accepted`/`user_rejected`，回合结束上报 `task_success`/`error`；
 spreadsheet 的 plan-apply 核心上报同样信号。文档和幻灯片撤销回复所作的更改时上报
-`user_edited`；PDF 回复可标为有用（`task_success`）或无用（`user_rejected`），未评价不算接受。
+`user_edited`；PDF 回复可标为有用（`task_success`）或无用（`user_rejected`），未评价不算接受。撤销助手添加的 PDF 书签时，向原回合上报 `user_edited`。
 每个助手回合生成一个 `rollout_id`，每条聊天请求都用 `X-Fusion-Rollout-Id` 请求头携带它。
 网关记录和应用反馈按相同的 `rollout_id` 关联，同回合的不同事件用独立的 `event_id` 去重。
 上报为 fire-and-forget（失败只记日志），绝不阻塞用户操作。消息内容默认脱敏为 `[redacted:N]`，

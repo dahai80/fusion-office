@@ -55,14 +55,14 @@ export function describeCall(_commands, name, args = {}) {
     }
 }
 
-export function runTool(commands, name, args = {}) {
+export function runTool(commands, name, args = {}, onBookmarkUndo) {
     switch (name) {
         case 'get_document_info': return { ok: true, content: JSON.stringify(commands.info()) };
         case 'read_pages': return commands.readPages(args.from, args.count);
         case 'find_text': return commands.find(args.query, args.match_case);
         case 'go_to_page': return commands.goTo(args.page);
         case 'set_zoom': return commands.zoom(args.mode);
-        case 'add_bookmark': return commands.bookmark(args.title, args.page);
+        case 'add_bookmark': return commands.bookmark(args.title, args.page, onBookmarkUndo);
         default: return { ok: false, content: `Error: there is no tool called ${name}.` };
     }
 }

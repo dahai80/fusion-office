@@ -175,7 +175,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                             content = 'The user declined this change. Do not try it another way; say what you would have done.';
                         } else {
                             try {
-                                const result = await runTool(call.name, call.input, { stopped: () => run.stopped });
+                                const result = await runTool(call.name, call.input, { stopped: () => run.stopped, turn });
                                 const value = result && typeof result === 'object' ? result : { ok: true, content: String(result ?? '') };
                                 Object.assign(step, value.ok === false ? { status: 'error' } : { status: 'done' });
                                 if (value.changed) step.changed = true;

@@ -796,6 +796,7 @@ export function createEditor({
     const content = await page.getTextContent();
     return content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
   }
+  const bookmarkUndo = new WeakMap(); // keyed by the exact committed PDF history snapshot
   const aiCommands = {
     info: () => ({
       pages: pdf?.numPages ?? 0,
@@ -862,13 +863,20 @@ export function createEditor({
       }
       return { ok: true, content: `Zoom is now ${wanted}.` };
     },
-    bookmark: async (title, page) => {
+    bookmark: async (title, page, onUndo) => {
       const text = String(title || '').trim();
       if (!pdf) return { ok: false, content: 'Error: no PDF is open.' };
       if (!text) return { ok: false, content: 'Error: give the bookmark a title.' };
       const target = Math.trunc(Number(page ?? pageIndex + 1));
       if (!(target >= 1 && target <= pdf.numPages)) return { ok: false, content: `Error: the PDF has pages 1 to ${pdf.numPages}.` };
-      await mutate((doc) => addBookmark(doc, { title: text, pageIndex: target - 1 }), `Bookmark “${text}” added`, 'annotate');
+      let committed = false;
+      await mutate((doc) => addBookmark(doc, { title: text, pageIndex: target - 1 }), `Bookmark “${text}” added`, 'annotate', {
+        onCommit: () => {
+          committed = true;
+          if (onUndo) bookmarkUndo.set(session.bytes, onUndo);
+        },
+      });
+      if (!committed) return { ok: false, content: 'The bookmark was not added.' };
       return { ok: true, changed: true, content: `Bookmarked page ${target} as “${text}”.` };
     },
   };
@@ -3148,7 +3156,9 @@ export function createEditor({
     if (pageForms[action]()) return;
     if (pageForms.draft.dirty) return;
     await finishDrafts();
+    const previous = session.bytes;
     if (session[action]()) {
+      if (action === 'undo') bookmarkUndo.get(previous)?.();
       busy = true;
       updateStatus();
       try {

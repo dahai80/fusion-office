@@ -133,7 +133,11 @@ describe('PDF AI panel', () => {
         panel.el.querySelector('.btn.primary').click();
         await flush();
         await flush();
-        expect(c.bookmark).toHaveBeenCalledWith('Results', 1);
+        expect(c.bookmark).toHaveBeenCalledWith('Results', 1, expect.any(Function));
+        c.bookmark.mock.calls[0][2]();
+        const record = JSON.parse(fetch.mock.calls.at(-1)[1].body);
+        expect(record).toMatchObject({ rollout_id: state.calls[0].rolloutId,
+            model: 'picked-model', outcome: { signal: 'user_edited', score: 0.5 } });
         expect(panel.el.querySelector('.ai-answer-text').textContent).toContain('Bookmarked');
     });
 

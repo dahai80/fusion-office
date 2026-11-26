@@ -203,7 +203,8 @@ file; the only write is a bookmark).
   on each chat request, including stream recovery. Match `rollout_id` exactly to
   the gateway tap; use `event_id` to deduplicate individual events. Documents and
   presentation attribute Undo to the original reply. PDF reports explicit answer
-  feedback, not a success inferred from showing a read-only answer.
+  feedback, not a success inferred from showing a read-only answer. Undoing an
+  assistant bookmark reports `user_edited` only for its committed PDF snapshot.
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool
