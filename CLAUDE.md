@@ -32,7 +32,11 @@ MIT. Spreadsheet is AGPL-3.0-only and the root MIT license does not cover it.
 parsing, docx template fill + markdown parse/write per issue #35, pptx
 parse/write incl. a `format=markdown` mode per issues #32/#36) consumed by other
 Fusion projects. It implements the contract in issue #1, binds to
-`127.0.0.1:11492`, and holds no business logic.
+`127.0.0.1:11492`, and holds no business logic. Large-sheet pattern (issue #45):
+`/v1/xlsx/parse` takes `mode=sketch` (structure only) or `sheet`+`region`
+(bounded region read, 200,000-cell cap, absolute range names); the high-level
+action surface is the product — do not decompose it into primitive cell
+operations. `GET /v1/rollouts/grep` is regex retrieval over the outcome sink.
 
 ## Repository Rules
 

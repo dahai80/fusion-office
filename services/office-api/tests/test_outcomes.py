@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from office_api import main
-from office_api.outcomes import validate_record
+from office_api.outcomes import grep_sink, validate_record
 
 
 @pytest.fixture()
@@ -89,3 +89,87 @@ def test_non_json_body_is_422(client: TestClient) -> None:
 def test_validate_record_accepts_the_documented_shape() -> None:
     assert validate_record(record()) is None
     assert validate_record("nope") == "record must be a JSON object"
+
+
+def write_sink(path: Path, lines: list[str]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+    return path
+
+
+def test_grep_sink_matches_json_lines_as_records(tmp_path: Path) -> None:
+    sink = write_sink(
+        tmp_path / "rollout-outcomes.jsonl",
+        [
+            json.dumps(record()),
+            json.dumps({**record(), "rollout_id": "ro-ffff", "outcome": {"signal": "error"}}),
+        ],
+    )
+
+    result = grep_sink(sink, "task_success|error")
+
+    assert result["truncated"] is False
+    assert [match["record"]["rollout_id"] for match in result["matches"]] == ["ro-ffff"]
+
+
+def test_grep_sink_limits_and_flags_truncation(tmp_path: Path) -> None:
+    sink = write_sink(
+        tmp_path / "rollout-outcomes.jsonl",
+        [json.dumps(record()) for _ in range(3)],
+    )
+
+    result = grep_sink(sink, "rollout_id", limit=2)
+
+    assert len(result["matches"]) == 2
+    assert [match["line"] for match in result["matches"]] == [1, 2]
+    assert result["truncated"] is True
+
+
+def test_grep_sink_matches_unparseable_lines_as_raw_text(tmp_path: Path) -> None:
+    sink = write_sink(
+        tmp_path / "rollout-outcomes.jsonl",
+        ['{"schema_version": 1, "rollout_id": "ro-trunc', "unrelated"],
+    )
+
+    result = grep_sink(sink, "rollout_id")
+
+    assert result["matches"] == [{"line": 1, "record": None}]
+
+
+def test_grep_endpoint_reads_the_sink(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sink = write_sink(tmp_path / "rollout-outcomes.jsonl", [json.dumps(record())])
+    monkeypatch.setattr(main, "default_sink", lambda: sink)
+
+    response = client.get("/v1/rollouts/grep", params={"q": "user_accepted"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["exists"] is True
+    assert body["matches"][0]["record"]["outcome"]["signal"] == "user_accepted"
+
+
+def test_grep_endpoint_reports_a_missing_sink(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(main, "default_sink", lambda: Path("/nonexistent/sink.jsonl"))
+
+    response = client.get("/v1/rollouts/grep", params={"q": "anything"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "matches": [],
+        "pattern": "anything",
+        "truncated": False,
+        "sink": "/nonexistent/sink.jsonl",
+        "exists": False,
+    }
+
+
+def test_grep_endpoint_rejects_a_bad_regex(client: TestClient) -> None:
+    response = client.get("/v1/rollouts/grep", params={"q": "(unclosed"})
+
+    assert response.status_code == 422
+    assert "invalid regex" in response.json()["detail"]

@@ -12,13 +12,14 @@ in the consuming application (`dahai80/envipermit` is the first consumer).
 |--------|------|---------|
 | GET | `/healthz` | Liveness, returns the service version |
 | GET | `/readyz` | Readiness |
-| POST | `/v1/xlsx/parse` | Multipart `file` (.xlsx) → sheets, tables, merged cells, unparsed regions |
+| POST | `/v1/xlsx/parse` | Multipart `file` (.xlsx) → sheets, tables, merged cells, unparsed regions; `mode=sketch` returns structure only, `sheet`+`region` parse one bounded region (issue #45) |
 | POST | `/v1/docx/fill` | Multipart `file` (.docx) + `values` JSON → filled .docx |
 | POST | `/v1/docx/parse` | Multipart `file` (.docx) → blocks (headings, paragraphs, tables) |
 | POST | `/v1/docx/write` | `markdown` form field → .docx binary (issue #35) |
 | POST | `/v1/pptx/parse` | Multipart `file` (.pptx) → slides with title, body lines, speaker notes |
 | POST | `/v1/pptx/write` | Optional multipart `file` (.pptx) + `slides` JSON → updated .pptx |
 | POST | `/v1/outcomes` | Rollout-tap outcome record (schema v1) appended to the JSONL sink |
+| GET | `/v1/rollouts/grep` | Regex retrieval (`q`, `limit` 1-100) over the JSONL sink, zero new storage (issue #45) |
 
 Responses:
 
@@ -27,7 +28,14 @@ Responses:
   Tables are rectangular blocks split by fully empty rows and columns. Merged
   cells are flattened (every cell carries the anchor value). A block whose first
   row cannot serve as a unique, non-empty header lands in `unparsed_regions`
-  instead of being guessed.
+  instead of being guessed. Large-sheet pattern (issue #45): with `mode=sketch`
+  the response is `{"sheets": [{"name", "rows", "cols", "blocks": [{"range",
+  "rows", "cols", "headers"?} | {"range", "rows", "cols", "unparsed": true}]}]}`
+  — structure only, no cell data; with `sheet` + `region` (e.g. `B3:F200`,
+  optional `SheetName!` prefix) only that region is parsed, capped at 200,000
+  cells (over the cap: `422` with a split-it error), and every table's `range`
+  and `header_row` stay absolute so sketch and region reads join. The endpoint
+  keeps its high-level shape — it is not decomposed into primitive cell reads.
 - `/v1/docx/fill` returns the filled binary with `X-Office-Doc-SHA256`
   (hex SHA-256 of the body) and, when a placeholder had no value,
   `X-Office-Unfilled` (comma-separated names). Unknown placeholders become an

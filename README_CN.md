@@ -358,7 +358,11 @@ python -m pytest tests -q
 调用方：`dahai80/envipermit`），实现 issue #1 的契约：
 
 - `POST /v1/xlsx/parse` — `multipart` 字段 `file`；返回工作表、表格、展平后的合并
-  单元格，以及无法可靠识别表头而进入 `unparsed_regions` 的区块。
+  单元格，以及无法可靠识别表头而进入 `unparsed_regions` 的区块。大表模式
+  （issue #45）：`mode=sketch` 只返回结构（每表尺寸加各区块的绝对范围、大小、
+  表头，不含单元格数据）；传 `sheet` + `region`（如 `B3:F200`）则只解析一个
+  局部区域，上限 200,000 个单元格，超限返回可操作的 `422`，且回答绝对范围名
+  以便两阶段衔接。高层动作面保持不变 —— 不拆分为原始单元格操作。
 - `POST /v1/docx/fill` — `multipart` 字段 `file` 加 `values` JSON；替换段落、表格
   单元格、页眉页脚中的 `{{placeholder}}`，返回填充后的二进制，并带
   `X-Office-Doc-SHA256` 与 `X-Office-Unfilled` 响应头。
@@ -379,6 +383,10 @@ python -m pytest tests -q
 - `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
   `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
   fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。
+- `GET /v1/rollouts/grep?q=<正则>&limit=<1-100>` — 对同一 sink 文件的 grep 式
+  检索：对 JSONL 行做正则匹配，命中行返回解析后的记录（解析失败的行返回
+  `record: null`），带行号与 `truncated` 标记，并附 sink 路径与 `exists`
+  标志。零新增存储（issue #45）。
 - `GET /healthz`、`GET /readyz`。
 - 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
   外部请求。`/v1/docx/snapshot` 推迟到 v0.2。
