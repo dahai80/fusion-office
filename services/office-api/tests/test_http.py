@@ -13,11 +13,6 @@ from pptx import Presentation
 from office_api import main
 
 
-@pytest.fixture()
-def client() -> TestClient:
-    return TestClient(main.app)
-
-
 def xlsx_bytes() -> bytes:
     workbook = Workbook()
     sheet = workbook.active

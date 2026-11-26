@@ -32,7 +32,9 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     });
     const steps = el('div', { class: 'ai-steps' });
     const answer = el('div', { class: 'ai-answer-text' });
-    const answerBox = el('div', { class: 'ai-answer', role: 'region', 'aria-label': 'Answer' }, steps, answer);
+    const feedback = el('div', { role: 'group', 'aria-label': 'Answer feedback' });
+    const outcomes = createOutcomeReporter({ app: 'pdf' });
+    const answerBox = el('div', { class: 'ai-answer', role: 'region', 'aria-label': 'Answer' }, steps, answer, feedback);
     const status = el('p', { class: 'panel-note muted ai-status', role: 'status' });
     const askButton = el('button', { class: 'btn primary panel-action', type: 'button' }, 'Ask');
     const summarizeButton = el('button', { class: 'btn panel-action', type: 'button' }, 'Summarize');
@@ -59,7 +61,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
     let lastLanguage = '';
 
     const agent = createAgent({
-        chat: (messages, options) => AI.chatStreamEvents({ messages, tools: options.tools, model: options.model, maxTokens: options.maxTokens }),
+        chat: (messages, options) => AI.chatStreamEvents({ messages, ...options }),
         tools: TOOLS,
         system: SYSTEM_PROMPT,
         snapshot: () => pdfSnapshot(commands, { name: name() }),
@@ -67,7 +69,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
         changes: changesDocument,
         describe: (tool, args) => describeCall(commands, tool, args),
         runTool: (tool, args) => runTool(commands, tool, args),
-        outcomes: createOutcomeReporter({ app: 'pdf' }),
+        outcomes,
     });
 
     function setBusy(on) {
@@ -82,6 +84,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
 
     function startOneShot(note) {
         answer.textContent = '';
+        feedback.replaceChildren();
         steps.replaceChildren();
         answerBox.hidden = false;
         status.textContent = note;
@@ -109,6 +112,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
         setBusy(true);
         askButton.textContent = 'Stop';
         answer.textContent = '';
+        feedback.replaceChildren();
         steps.replaceChildren();
         answerBox.hidden = false;
         status.textContent = 'Reading…';
@@ -133,12 +137,39 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
             });
             if (result.error) status.textContent = aiError(result.error);
             else if (!answer.textContent.trim() && !rows.size) status.textContent = 'The assistant returned nothing. Try again.';
-            else if (question.value.trim() === text) question.value = '';
+            else {
+                if (!result.stopped && !result.empty && answer.textContent.trim()) offerFeedback(result.turn, answer.textContent);
+                if (question.value.trim() === text) question.value = '';
+            }
         } catch (error) {
             status.textContent = aiError(error);
         } finally {
             setBusy(false);
             askButton.textContent = 'Ask';
+        }
+    }
+
+    function offerFeedback(turn, reply) {
+        for (const [label, signal] of [['Helpful', 'task_success'], ['Not helpful', 'user_rejected']]) {
+            const button = el('button', { type: 'button', class: 'btn' }, label);
+            button.onclick = () => {
+                outcomes.feedback(turn, reply, signal);
+                feedback.replaceChildren();
+            };
+            feedback.append(button);
+        }
+    }
+
+    async function oneShot(options) {
+        const turn = { rolloutId: AI.newRolloutId(), model: '' };
+        try {
+            const reply = String(await AI.chat({ ...options, rolloutId: turn.rolloutId,
+                onModel: model => { turn.model = model; } }) || '').trim();
+            if (reply) offerFeedback(turn, reply);
+            return reply;
+        } catch (error) {
+            if (turn.model) outcomes.report({ ...turn, signal: 'error', messages: options.messages });
+            throw error;
         }
     }
 
@@ -181,7 +212,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
             const hitChars = used >= SUMMARY_CHAR_CAP;
             const truncated = hitChars || pageCap < info.pages;
             status.textContent = 'Summarizing…';
-            const reply = await AI.chat({
+            const reply = await oneShot({
                 messages: [
                     {
                         role: 'system',
@@ -250,7 +281,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
                 return;
             }
             status.textContent = 'Translating…';
-            const reply = await AI.chat({
+            const reply = await oneShot({
                 messages: [
                     {
                         role: 'system',
@@ -299,6 +330,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
             question.value = '';
             answer.textContent = '';
             steps.replaceChildren();
+            feedback.replaceChildren();
             answerBox.hidden = true;
             status.textContent = '';
         },

@@ -10,7 +10,7 @@
 import { el, isComposing, MOD_KEY, shortcutCode } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import * as P from '../lib/puter.js';
-import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter, newRolloutId } from '@fusion-office/ai-client';
+import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
 import { sidePane, hint } from './review-ui.js';
@@ -142,8 +142,8 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       });
       if (result.error) failure(answer, result.error);
       else if (!said.trim() && !steps.length) failure(answer, 'The assistant did not answer.');
-      if (steps.some(s => s.changed)) currentTurn.append(undoRow());
-      else offerApply(currentTurn, said);
+      if (steps.some(s => s.changed)) currentTurn.append(undoRow(result.turn, said));
+      else offerApply(currentTurn, said, result.turn);
     } catch (e) {
       failure(answer, e);
     } finally {
@@ -192,15 +192,20 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     if (step.error) row.title = step.error;
   }
 
-  function undoRow() {
+  function undoRow(turn, reply) {
     const applied = el('span.as-applied', { role: 'status' }, 'Changes made');
-    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { const engine = editor(); if (!engine) return; engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; try { outcomes.report({ signal: 'user_edited', detail: 'the user undid the applied changes', model: '', messages: [{ role: 'assistant', content: 'the applied changes' }], rolloutId: `${newRolloutId()}:e1` }); } catch { /* reporting must not block undo */ } } }, 'Undo');
+    const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => {
+      const engine = editor();
+      if (!engine) return;
+      engine.undo(); undo.disabled = true; applied.textContent = 'Undone';
+      outcomes.feedback(turn, reply, 'user_edited');
+    } }, 'Undo');
     return el('div.as-actions', {}, applied, undo);
   }
 
   /** A reply that only describes a change offers to apply it: a table goes
    *  in as a table, other rows as plain text. One click is one undo step. */
-  function offerApply(turnNode, said) {
+  function offerApply(turnNode, said, turn) {
     if (!turnNode || !said.trim()) return;
     let rows = null;
     try { rows = parseMarkdownTable(said); } catch (e) { console.warn('assistant: table parse failed', e); return; }
@@ -211,8 +216,12 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       if (pkg()?.readOnly || engine.viewOnly) { toast('The document is read-only.', { icon: 'info' }); return; }
       const result = runTool(engine, name, args);
       if (!result.ok) { toast('The change did not apply. Ask the assistant to try again.', { icon: 'alert' }); return; }
+      outcomes.feedback(turn, said, 'task_success');
       const applied = el('span.as-applied', { role: 'status' }, done);
-      const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => { engine.undo(); undo.disabled = true; applied.textContent = 'Undone'; } }, 'Undo');
+      const undo = el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => {
+        engine.undo(); undo.disabled = true; applied.textContent = 'Undone';
+        outcomes.feedback(turn, said, 'user_edited');
+      } }, 'Undo');
       actions.replaceChildren(applied, undo);
       engine.focus?.();
     };

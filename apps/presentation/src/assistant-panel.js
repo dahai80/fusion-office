@@ -122,6 +122,7 @@ export function createAssistantPanel(env) {
   let isOpen = false;
   let destroyed = false;
 
+  const outcomes = createOutcomeReporter({ app: "presentation" });
   const agent = createAgent({
     chat: (messages, options) =>
       cloud.aiChatStream(messages, { ...options, maxTokens: 8192 }),
@@ -140,7 +141,7 @@ export function createAssistantPanel(env) {
     },
     describe: (name, args) => describeCall(name, args, env),
     approve: (step) => askApproval(step),
-    outcomes: createOutcomeReporter({ app: "presentation" }),
+    outcomes,
     snapshot: () =>
       deckSnapshot(env.pres(), {
         slideIndex: env.slideIndex(),
@@ -767,11 +768,13 @@ export function createAssistantPanel(env) {
       if (outcome.stopped)
         reply.parts.append(el("p", { class: "ai-stopped" }, "Stopped."));
     }
-    renderFoot(reply, changed, !!outcome.error);
+    const turn = outcome.turn;
+    const feedback = (signal) => outcomes.feedback(turn, reply.fullText, signal);
+    renderFoot(reply, changed, !!outcome.error, feedback);
     // A reply that only described its content as a table offers to put it
     // on the slide: a small model often answers in prose, not tool calls.
     if (!changed.length && !outcome.error && !outcome.stopped)
-      offerInsert(reply);
+      offerInsert(reply, feedback);
     // Show what changed last, unless the user has moved on meanwhile (to
     // another slide or selection) or is typing.
     const last = [...changed].reverse().find((s) => s.target);
@@ -818,7 +821,7 @@ export function createAssistantPanel(env) {
   /** A reply that printed a markdown table but changed nothing offers to
    *  insert it on the current slide as a table, or as a text box. The
    *  click waits for slide typing to commit, as a tool call would. */
-  function offerInsert(reply) {
+  function offerInsert(reply, feedback) {
     let rows = null;
     try {
       rows = parseMarkdownTable(reply.fullText);
@@ -836,7 +839,7 @@ export function createAssistantPanel(env) {
         {
           type: "button",
           class: "btn ai-btn-sm",
-          onclick: () => applyInsert(offer, [
+          onclick: () => applyInsert(offer, feedback, [
             "add_table",
             { rows, x: 1, y: 1.2, w: 8 },
             "Table inserted",
@@ -849,7 +852,7 @@ export function createAssistantPanel(env) {
         {
           type: "button",
           class: "btn ai-btn-sm",
-          onclick: () => applyInsert(offer, [
+          onclick: () => applyInsert(offer, feedback, [
             "add_text",
             { text: rows.map((r) => r.join("\t")).join("\n"), x: 1, y: 1.2, w: 8, h: Math.max(1, rows.length * 0.4) },
             "Text inserted",
@@ -862,7 +865,7 @@ export function createAssistantPanel(env) {
     reply.foot.append(offer);
   }
 
-  async function applyInsert(offer, [name, args, done]) {
+  async function applyInsert(offer, feedback, [name, args, done]) {
     const idle = changesDeck(name) || name === "select" ? env.whenIdle?.() : null;
     if (idle) await idle;
     const result = await runTool(name, args, env);
@@ -876,6 +879,7 @@ export function createAssistantPanel(env) {
       );
       return;
     }
+    feedback("task_success");
     const turn = turnOf(result.history || []);
     const undoBtn = el(
       "button",
@@ -899,6 +903,7 @@ export function createAssistantPanel(env) {
       }
       undoBtn.disabled = true;
       await env.undoTurn(turn.first, turn.count);
+      feedback("user_edited");
       undoBtn.remove();
       say("The inserted content was undone.");
     });
@@ -910,7 +915,7 @@ export function createAssistantPanel(env) {
     );
     refresh();
   }
-  function renderFoot(reply, changed, error) {
+  function renderFoot(reply, changed, error, feedback) {
     const items = [];
     const text = reply.fullText;
     if (text && !error) {
@@ -967,6 +972,7 @@ export function createAssistantPanel(env) {
         retire();
         if (hadFocus) input.focus({ preventScroll: true });
         await env.undoTurn(turn.first, turn.count);
+        feedback("user_edited");
         summary.classList.add("ai-foot-undone");
         summary.textContent = `${count} change${count === 1 ? "" : "s"} undone`;
         say("The assistant's changes were undone.");

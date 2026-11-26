@@ -200,9 +200,10 @@ file; the only write is a bookmark).
   same wiring in their own loops). Fire-and-forget, idempotent per rollout event,
   content redacted unless `contentMode: "raw"`. Rollout correlation (issue #38):
   each agent turn mints one `ro-<16 hex>` id and sends it as `X-Fusion-Rollout-Id`
-  on every chat request (inert until the gateway adopts it — tracked upstream), so
-  the gateway tap's records and the app-reported outcomes can be joined per turn;
-  documents reports `user_edited` when the user undoes a turn's changes.
+  on each chat request, including stream recovery. Match `rollout_id` exactly to
+  the gateway tap; use `event_id` to deduplicate individual events. Documents and
+  presentation attribute Undo to the original reply. PDF reports explicit answer
+  feedback, not a success inferred from showing a read-only answer.
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool

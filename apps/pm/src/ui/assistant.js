@@ -53,7 +53,7 @@ export function openProjectAssistant(projectId) {
     let busy = false, turn = null, refuse = null;
 
     const agent = createAgent({
-        chat: (messages, options) => AI.chatStreamEvents({ messages, tools: options.tools, model: options.model, maxTokens: options.maxTokens }),
+        chat: (messages, options) => AI.chatStreamEvents({ messages, ...options }),
         tools: TOOLS,
         system: SYSTEM_PROMPT,
         snapshot: () => projectSnapshot(store, projectId),

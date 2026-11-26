@@ -42,15 +42,16 @@ function rawContent(content) {
  * content (capped) for SFT/GRPO quality — opt in per build.
  */
 export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/v1/outcomes', fetchImpl = globalThis.fetch?.bind(globalThis), contentMode = 'redact' } = {}) {
-    const reported = new Set(); // rollout ids already emitted — a second report for one is dropped
+    const reported = new Set(); // event ids already emitted; many events may belong to one turn
     let warned = 0;
 
-    function buildRecord({ signal, detail, model, messages = [], rolloutId }) {
+    function buildRecord({ signal, detail, model, messages = [], rolloutId, eventId }) {
         const maxMessages = contentMode === 'raw' ? RAW_MAX_MESSAGES : REDACT_MAX_MESSAGES;
         const shape = contentMode === 'raw' ? rawContent : redactContent;
         const record = {
             schema_version: 1,
             rollout_id: rolloutId || newRolloutId(),
+            ...(eventId ? { event_id: eventId } : {}),
             source: `fusion-office/${app || 'unknown'}`,
             created_at: new Date().toISOString(),
             messages: messages.slice(-maxMessages).map(m => ({ role: String(m.role || 'user'), content: shape(m.content) })),
@@ -61,28 +62,31 @@ export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/
     }
 
     /**
-     * Emit one outcome. Idempotent per rolloutId, never throws, never blocks:
+     * Emit one outcome. Idempotent per eventId (or rolloutId for single-event callers), never throws, never blocks:
      * the caller awaits nothing and a failed POST only logs.
      */
-    function report({ signal, detail, model, messages = [], rolloutId } = {}) {
+    function report({ signal, detail, model, messages = [], rolloutId, eventId } = {}) {
         if (!Object.prototype.hasOwnProperty.call(OUTCOME_SIGNALS, signal)) {
             console.warn(`[ai-client] dropped unknown outcome signal "${signal}"`);
             return;
         }
-        if (rolloutId && reported.has(rolloutId)) return;
-        if (rolloutId) reported.add(rolloutId);
+        const key = eventId || rolloutId;
+        if (key && reported.has(key)) return;
+        if (key) reported.add(key);
         if (reported.size > 500) {
             for (const id of reported) { reported.delete(id); if (reported.size <= 250) break; }
         }
         if (!fetchImpl) return;
-        const record = buildRecord({ signal, detail, model, messages, rolloutId });
+        const record = buildRecord({ signal, detail, model, messages, rolloutId, eventId });
         try {
             Promise.resolve(fetchImpl(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(record),
                 keepalive: true,
-            })).catch((err) => {
+            })).then((res) => {
+                if (res?.ok === false) throw new Error(`HTTP ${res.status}`);
+            }).catch((err) => {
                 // One warning per streak, not per dropped record: an offline
                 // session must not flood the console.
                 warned += 1;
@@ -95,5 +99,12 @@ export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/
         }
     }
 
-    return { report, buildRecord, OUTCOME_SIGNALS };
+    // Bind late feedback to the reply, not whichever turn is active on click.
+    function feedback(turn, reply, signal) {
+        if (!turn?.rolloutId) return;
+        report({ ...turn, signal, eventId: `${turn.rolloutId}:feedback:${signal}`,
+            messages: [{ role: 'assistant', content: reply }] });
+    }
+
+    return { report, feedback, buildRecord, OUTCOME_SIGNALS };
 }

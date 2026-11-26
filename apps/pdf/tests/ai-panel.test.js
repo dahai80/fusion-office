@@ -17,11 +17,13 @@ vi.mock('@fusion-office/ai-client', async (importOriginal) => ({
     createModelPicker: () => null,
     chat: vi.fn(async (options) => {
         state.chats.push(options);
+        options.onModel?.('picked-model');
         if (state.fail) throw state.fail;
         return state.chatReplies.shift() || '';
     }),
     chatStreamEvents: vi.fn(async function* (options) {
         state.calls.push(options);
+        options.onModel?.('picked-model');
         for (const part of state.replies.shift() || []) yield part;
         if (state.fail) throw state.fail;
     }),
@@ -47,6 +49,7 @@ function mount(c = commands()) {
 }
 
 beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 202 }));
     state.configured = true;
     state.calls = [];
     state.replies = [];
@@ -57,10 +60,25 @@ beforeEach(() => {
 
 afterEach(() => {
     document.body.replaceChildren();
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
 });
 
 describe('PDF AI panel', () => {
+    it.each([['Helpful', 'task_success', 1], ['Not helpful', 'user_rejected', 0]])(
+        'reports %s once with the model and exact request id', async (label, signal, score) => {
+            state.replies = [[{ type: 'text', text: 'Example answer.' }]];
+            const { panel } = mount();
+            await panel.ask('Question?');
+            expect(fetch).not.toHaveBeenCalled();
+            [...panel.el.querySelectorAll('button')].find(b => b.textContent === label).click();
+            expect(fetch).toHaveBeenCalledTimes(1);
+            const record = JSON.parse(fetch.mock.calls[0][1].body);
+            expect(record).toMatchObject({ rollout_id: state.calls[0].rolloutId, model: 'picked-model',
+                source: 'fusion-office/pdf', outcome: { signal, score } });
+            expect(panel.el.querySelector('[aria-label="Answer feedback"]').childElementCount).toBe(0);
+        });
+
     it('streams an answer and sends the document state with the question', async () => {
         state.replies = [[{ type: 'text', text: 'Revenue grew ' }, { type: 'text', text: '12 percent.' }]];
         const { panel } = mount();

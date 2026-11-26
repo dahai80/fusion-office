@@ -302,6 +302,7 @@ export function createAgent({
     // even without a reporter (#38): the id rides on every chat request so
     // the gateway tap can correlate its records with the reported outcomes.
     const rolloutId = newRolloutId();
+    const turn = { rolloutId, model: AI_MODEL };
     let eventSeq = 0;
     const report = (signal, detail) => {
       if (!outcomes) return;
@@ -309,12 +310,12 @@ export function createAgent({
         outcomes.report({
           signal,
           detail,
-          model: AI_MODEL,
+          ...turn,
           messages: transcript.map((m) => ({
             role: m.role,
             content: typeof m.content === "string" ? m.content : "",
           })),
-          rolloutId: `${rolloutId}:e${++eventSeq}`,
+          eventId: `${rolloutId}:e${++eventSeq}`,
         });
       } catch (err) {
         console.error(err);
@@ -354,7 +355,7 @@ export function createAgent({
           // Calls whose reply was cut off are dropped with it; what was said
           // stays.
           if (text) transcript.push({ role: "assistant", content: text });
-          return { stopped: true, steps };
+          return { stopped: true, steps, turn };
         }
         // A reply with neither text nor calls is kept as the words shown for
         // it: an empty assistant message is refused by some models.
@@ -379,7 +380,7 @@ export function createAgent({
         if (!calls.length) {
           if (empty) emit({ type: "text", text });
           if (steps.some((s) => s.changed)) report("task_success", "the turn ended with changes applied");
-          return { stopped: false, steps };
+          return { stopped: false, steps, turn };
         }
         for (const call of calls) {
           const step = {
@@ -468,16 +469,16 @@ export function createAgent({
           emit({ type: "step", step: { ...step } });
           transcript.push({ role: "tool", tool_call_id: call.id, content });
         }
-        if (run.stopped) return { stopped: true, steps };
+        if (run.stopped) return { stopped: true, steps, turn };
       }
       const note = `\n\nI stopped after ${MAX_ROUNDS} steps. Say "continue" if you want me to carry on.`;
       transcript.push({ role: "assistant", content: note.trim() });
       emit({ type: "text", text: note });
       report("error", `the assistant stopped after ${MAX_ROUNDS} rounds without finishing`);
-      return { stopped: false, steps };
+      return { stopped: false, steps, turn };
     } catch (error) {
       report("error", String(error?.message || error).slice(0, 500));
-      return { stopped: run.stopped, error, steps };
+      return { stopped: run.stopped, error, steps, turn };
     } finally {
       if (running === run) running = null;
     }

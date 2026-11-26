@@ -38,6 +38,19 @@ describe('outcome reporter', () => {
         expect(record.messages).toEqual([{ role: 'user', content: '[redacted:5]' }]);
     });
 
+    it('keeps multiple distinct events joinable to one request and deduplicates a repeated event', () => {
+        const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+        const reporter = createOutcomeReporter({ app: 'documents', fetchImpl });
+        const turn = { model: 'test', rolloutId: 'ro-1234' };
+        reporter.report({ ...turn, eventId: 'ro-1234:e1', signal: 'task_success' });
+        reporter.feedback(turn, 'original reply', 'user_edited');
+        reporter.feedback(turn, 'original reply', 'user_edited');
+        const records = fetchImpl.mock.calls.map(([, init]) => JSON.parse(init.body));
+        expect(records.map(r => r.rollout_id)).toEqual(['ro-1234', 'ro-1234']);
+        expect(new Set(records.map(r => r.event_id)).size).toBe(2);
+        expect(records[1].outcome).toEqual({ signal: 'user_edited', score: 0.5 });
+    });
+
     it('is idempotent: a second report for the same rollout id is dropped', () => {
         const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
         const reporter = createOutcomeReporter({ app: 'pm', fetchImpl });

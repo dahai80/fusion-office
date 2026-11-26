@@ -293,14 +293,16 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     // even without a reporter (#38): the id rides on every chat request so
     // the gateway tap can correlate its records with the reported outcomes.
     const rolloutId = newRolloutId();
+    let requestModel = "";
+    const onModel = value => { requestModel = value; };
     let eventSeq = 0;
     const report = (signal, detail) => {
       if (!outcomes) return;
       try {
         outcomes.report({
-          signal, detail, model: '',
+          signal, detail, model: requestModel,
           messages: transcript.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' })),
-          rolloutId: `${rolloutId}:e${++eventSeq}`,
+          rolloutId, eventId: `${rolloutId}:e${++eventSeq}`,
         });
       } catch (err) { console.error(err); }
     };
@@ -310,7 +312,7 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
         let text = '';
         let cut = false; // the reply ran into MAX_OUTPUT_TOKENS
         const calls = [];
-        const iterable = chat(requestMessages(transcript, { changelog }), { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS, rolloutId });
+        const iterable = chat(requestMessages(transcript, { changelog }), { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS, rolloutId, onModel });
         const iter = iterable[Symbol.asyncIterator]();
         for (;;) {
           const next = await Promise.race([iter.next(), stopSignal]);

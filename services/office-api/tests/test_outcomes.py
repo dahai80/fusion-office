@@ -20,7 +20,8 @@ def sink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def record() -> dict:
     return {
         "schema_version": 1,
-        "rollout_id": "ro-abcd1234abcd1234:e1",
+        "rollout_id": "ro-abcd1234abcd1234",
+        "event_id": "ro-abcd1234abcd1234:e1",
         "source": "fusion-office/documents",
         "model": "mlx-community--Qwen3.5-4B-MLX-4bit",
         "created_at": "2026-11-25T12:00:00Z",
@@ -36,7 +37,7 @@ def test_valid_record_is_appended_to_the_sink(client: TestClient, sink: Path) ->
     response = client.post("/v1/outcomes", json=record())
 
     assert response.status_code == 202
-    assert response.json()["accepted"] == "ro-abcd1234abcd1234:e1"
+    assert response.json()["accepted"] == "ro-abcd1234abcd1234"
     lines = sink.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0])["outcome"]["signal"] == "user_accepted"
@@ -45,11 +46,13 @@ def test_valid_record_is_appended_to_the_sink(client: TestClient, sink: Path) ->
 def test_each_report_is_one_new_line(client: TestClient, sink: Path) -> None:
     client.post("/v1/outcomes", json=record())
     second = record()
-    second["rollout_id"] = "ro-abcd1234abcd1234:e2"
+    second["event_id"] = "ro-abcd1234abcd1234:e2"
     second["outcome"] = {"signal": "task_success", "score": 1.0}
     client.post("/v1/outcomes", json=second)
 
     lines = sink.read_text(encoding="utf-8").splitlines()
+    assert {json.loads(line)["rollout_id"] for line in lines} == {second["rollout_id"]}
+    assert len({json.loads(line)["event_id"] for line in lines}) == 2
     assert [json.loads(line)["outcome"]["signal"] for line in lines] == [
         "user_accepted",
         "task_success",

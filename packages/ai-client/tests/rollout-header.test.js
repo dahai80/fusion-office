@@ -37,6 +37,22 @@ describe('X-Fusion-Rollout-Id correlation header (issue #38)', () => {
         expect(headers['X-Fusion-Rollout-Id']).toBeUndefined();
     });
 
+    it('carries the same id and resolved model through a non-stream tool recovery', async () => {
+        const onModel = vi.fn();
+        globalThis.fetch = vi.fn().mockResolvedValueOnce(streamResponse([
+            { choices: [{ delta: { content: 'Looking.' } }], usage: { completion_tokens: 1 } },
+        ])).mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: 'Done' } }] }) });
+        const rolloutId = 'ro-abc1234567890abc';
+        const stream = chatStreamEvents({ messages: [{ role: 'user', content: 'hello' }],
+            tools: [{ type: 'function', function: { name: 'lookup' } }], rolloutId, onModel });
+        for await (const _ of stream) { /* consume both requests */ }
+        expect(fetch.mock.calls).toHaveLength(2);
+        for (const [, init] of fetch.mock.calls) {
+            expect(init.headers['X-Fusion-Rollout-Id']).toBe(rolloutId);
+            expect(onModel).toHaveBeenCalledWith(JSON.parse(init.body).model);
+        }
+    });
+
     it('chatStreamEvents sends the header on the streaming request', async () => {
         globalThis.fetch = vi.fn(async () => streamResponse([
             { choices: [{ delta: { content: 'hi' } }] },

@@ -110,6 +110,8 @@ async function* streamParts(messages, options) {
     model: options?.model,
     tools: options?.tools,
     maxTokens: options?.max_tokens,
+    rolloutId: options?.rolloutId,
+    onModel: options?.onModel,
   })) {
     if (event.type === 'tool')
       yield { type: 'tool_use', id: event.id, name: event.name, input: event.input };
@@ -878,10 +880,10 @@ export async function aiChat(prompt, { feature = 'formula' } = {}) {
  * A reply the SDK hands back whole, rather than streamed, is yielded in the same pieces. A
  * failure throws an Error whose message is the service's own, as far as it gives one.
  */
-export async function* aiChatStream(messages, { model, tools, maxTokens } = {}) {
+export async function* aiChatStream(messages, { model, tools, maxTokens, rolloutId, onModel } = {}) {
   const p = sdk();
   if (!p?.ai?.chat) throw new Error('AI is not available here');
-  const options = { stream: true, ...(model ? { model } : {}), ...(tools?.length ? { tools } : {}), ...(maxTokens ? { max_tokens: maxTokens } : {}) };
+  const options = { stream: true, rolloutId, onModel, ...(model ? { model } : {}), ...(tools?.length ? { tools } : {}), ...(maxTokens ? { max_tokens: maxTokens } : {}) };
   let res;
   try { res = await p.ai.chat(messages, options); } catch (e) { throw aiError(e); }
   if (res && typeof res[Symbol.asyncIterator] === 'function') {

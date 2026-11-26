@@ -109,10 +109,12 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
         // app-reported outcomes for the same agent turn.
         const rolloutId = newRolloutId();
         let eventSeq = 0;
+        const turn = { rolloutId, model };
+        const onModel = value => { turn.model = value; };
         const transcriptForOutcome = () => transcript.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }));
         const report = (signal, detail) => {
             if (!outcomes) return;
-            try { outcomes.report({ signal, detail, model, messages: transcriptForOutcome(), rolloutId: `${rolloutId}:e${++eventSeq}` }); } catch { /* reporting must not stop the turn */ }
+            try { outcomes.report({ signal, detail, ...turn, messages: transcriptForOutcome(), eventId: `${rolloutId}:e${++eventSeq}` }); } catch { /* reporting must not stop the turn */ }
         };
         transcript.push({ role: 'user', content: userContent(text, snapshot()) });
         try {
@@ -120,7 +122,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 if (round) emit({ type: 'round' });
                 let said = '';
                 const calls = [];
-                const stream = chat(requestMessages(transcript, { system, changelog }), { model, tools, maxTokens: maxOutputTokens, rolloutId });
+                const stream = chat(requestMessages(transcript, { system, changelog }), { model, tools, maxTokens: maxOutputTokens, rolloutId, onModel });
                 const iter = stream[Symbol.asyncIterator]();
                 for (;;) {
                     const next = await Promise.race([iter.next(), stopped]);
@@ -132,7 +134,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 }
                 if (run.stopped) {
                     if (said.trim()) transcript.push({ role: 'assistant', content: said });
-                    return { stopped: true, steps };
+                    return { stopped: true, steps, turn };
                 }
                 const empty = !said.trim() && !calls.length;
                 if (empty) said = 'I have nothing to add.';
@@ -143,7 +145,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 if (!calls.length) {
                     if (empty) emit({ type: 'text', text: said });
                     if (steps.some(step => step.changed)) report('task_success', 'the turn ended with changes applied');
-                    return { stopped: false, steps, ...(empty ? { empty: true } : {}) };
+                    return { stopped: false, steps, turn, ...(empty ? { empty: true } : {}) };
                 }
                 for (const call of calls) {
                     const info = safe(describe, call.name, call.input);
@@ -196,10 +198,10 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                 }
             }
             report('error', `the assistant stopped after ${maxRounds} replies without finishing`);
-            return { stopped: false, steps, error: `The assistant stopped after ${maxRounds} replies without finishing.` };
+            return { stopped: false, steps, turn, error: `The assistant stopped after ${maxRounds} replies without finishing.` };
         } catch (err) {
             report('error', String(err?.message || err).slice(0, 500));
-            return { stopped: false, steps, error: err?.message || String(err) };
+            return { stopped: false, steps, turn, error: err?.message || String(err) };
         } finally {
             if (running === run) running = null;
         }

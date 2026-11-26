@@ -521,7 +521,7 @@ export async function* aiChatStream(messages, options = {}) {
     log('documents', 'aiChatStream ok through the dev harness', text.length, 'chars');
     return;
   }
-  yield* AI.chatStreamEvents({ messages, tools: options.tools, toolChoice: options.toolChoice, model: options.model, maxTokens: options.maxTokens });
+  yield* AI.chatStreamEvents({ messages, ...options });
 }
 
 export function canMakeImages() {

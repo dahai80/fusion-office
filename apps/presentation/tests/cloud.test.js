@@ -289,6 +289,7 @@ describe("AI through fusion-gateway", () => {
       model: "m",
       tools: [1],
       maxTokens: 10,
+      rolloutId: "ro-0123456789abcdef",
     }))
       parts.push(part);
     expect(ai.calls[0]).toEqual({
@@ -296,6 +297,7 @@ describe("AI through fusion-gateway", () => {
       model: "m",
       tools: [1],
       maxTokens: 10,
+      rolloutId: "ro-0123456789abcdef",
     });
     expect(parts).toEqual([
       { type: "text", text: "Hi" },

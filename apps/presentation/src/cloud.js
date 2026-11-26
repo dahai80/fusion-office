@@ -455,7 +455,7 @@ export const canAI = () => {
     return ai ? typeof ai.chat === "function" : true;
 };
 
-export async function* aiChatStream(messages, { model, tools, maxTokens } = {}) {
+export async function* aiChatStream(messages, { model, tools, maxTokens, rolloutId } = {}) {
     const ai = aiSdk();
     if (ai) {
         yield* sdkChatStream(ai, messages, { model, tools, maxTokens });
@@ -467,6 +467,7 @@ export async function* aiChatStream(messages, { model, tools, maxTokens } = {}) 
             model,
             tools,
             maxTokens,
+            rolloutId,
         })) {
             if (event.type === "text" && event.text)
                 yield { type: "text", text: event.text };

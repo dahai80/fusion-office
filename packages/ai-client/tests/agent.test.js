@@ -108,8 +108,8 @@ describe('createAgent outcome signals (#33)', () => {
         await agentWith(reporter).send('change something');
         expect(signalsOf(reporter)).toEqual(['user_accepted', 'task_success']);
         expect(reporter.reports[0].detail).toBe('Replaced the selection');
-        expect(reporter.reports[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
-        expect(reporter.reports[1].rolloutId).toMatch(/:e2$/);
+        expect(reporter.reports[0].eventId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
+        expect(reporter.reports[1].eventId).toMatch(/:e2$/);
     });
 
     it('reports user_rejected for a declined change and no task_success', async () => {

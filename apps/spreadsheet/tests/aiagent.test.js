@@ -417,8 +417,8 @@ describe('outcome signals (#33)', () => {
     const { agent } = setup([[...write, { type: 'text', text: 'done' }]], { approval: 'always', outcomes });
     await agent.send('put 1 in B1');
     expect(outcomes.reports.map((r) => r.signal)).toEqual(['user_accepted', 'task_success']);
-    expect(outcomes.reports[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
-    expect(outcomes.reports[1].rolloutId).toMatch(/:e2$/);
+    expect(outcomes.reports[0].eventId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
+    expect(outcomes.reports[1].eventId).toMatch(/:e2$/);
     expect(outcomes.reports[1].messages[0].role).toBe('user');
   });
 

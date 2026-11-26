@@ -68,7 +68,7 @@ describe("assistant outcome signals (#33)", () => {
     });
     await agent.send("add a slide");
     expect(outcomes.reports.map((r) => r.signal)).toEqual(["user_accepted", "task_success"]);
-    expect(outcomes.reports[0].rolloutId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
+    expect(outcomes.reports[0].eventId).toMatch(/^ro-[0-9a-f]{16}:e1$/);
   });
 
   it("reports user_rejected for a declined change and nothing else", async () => {

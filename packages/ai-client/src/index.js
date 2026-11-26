@@ -159,6 +159,7 @@ export function createModelPicker(options) {
 async function modelFor(opts) {
     const model = await resolvedModel(opts)
     if (!model) throw new Error('No AI model is available for this app. Ask your administrator to allow a model for it in the AI settings.')
+    opts.onModel?.(model)
     return model
 }
 
@@ -173,8 +174,8 @@ function headers() {
 
 // Issue #38: an agent turn carries one rollout id on every chat request it
 // makes, so the gateway's rollout tap can correlate its records with the
-// outcomes the app reports to office-api for the same turn. Unknown headers
-// are ignored until the gateway adopts the id (tracked upstream).
+// outcomes the app reports to office-api for the same turn. Gateway PR #726 adopts
+// this header on its rollout tap.
 function rolloutHeaders(rolloutId) {
     return rolloutId ? { 'X-Fusion-Rollout-Id': String(rolloutId) } : {}
 }
@@ -274,11 +275,12 @@ export async function chatStream(opts, onDelta) {
 /** One non-streaming chat, yielded in the same event shape as the stream:
  *  text first, then the message's tool calls. The empty-stream fallback uses
  *  it, and it is the shape every event consumer already understands. */
-async function* nonStreamEvents(body) {
+async function* nonStreamEvents(body, rolloutId) {
     warnStaticKey()
     const res = await fetch(baseUrlFor() + chatPath(), fetchOpts({
         method: 'POST',
         body: JSON.stringify({ ...body, stream: false }),
+        headers: rolloutHeaders(rolloutId),
     }))
     if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -396,7 +398,7 @@ export async function* chatStreamEvents(opts) {
         // shows the model really did answer in prose.
         if (opts.tools && opts.tools.length && calls.size === 0 && completionTokens > 0 && full.length < 400) {
             let sawTool = false
-            for await (const part of nonStreamEvents(body)) {
+            for await (const part of nonStreamEvents(body, opts.rolloutId)) {
                 if (part.type === 'tool') {
                     sawTool = true
                     toolCount++
