@@ -220,7 +220,13 @@ file; the only write is a bookmark).
   AI panel, translation, thesaurus, and `AI`/`TRANSLATE`/`DETECTLANGUAGE` sheet
   functions. `src/ui/error-smarttag.js` has an Explain-with-AI action (formula, error
   code, ~20 sampled cells) and `src/ui/chartdialog.js` a Suggest-with-AI action
-  (50-cell sample, reply constrained to the supported chart types).
+  (50-cell sample, reply constrained to the supported chart types). Cross-session
+  memory (issue #45/#47): the agent tool `grep_rollouts` (defined in `aitools.js`,
+  dispatched in `src/core/rollouts.js` outside the synchronous runTool registry,
+  intercepted in the panel's runTool wrapper) searches office-api's outcome sink
+  via `GET /v1/rollouts/grep`; base URL `VITE_FUSION_OFFICE_API_URL`
+  (default `http://127.0.0.1:11492`); unreachable service answers with actionable
+  text so the model falls back to the workbook.
 - Presentation: `src/cloud.js` `aiChat` and `aiChatStream` (tool-event stream); used by
   prompt-to-deck, the assistant panel, and slide review. `src/notes-ai.js` adds
   Generate-with-AI buttons in the speaker-notes pane (per slide and all slides,

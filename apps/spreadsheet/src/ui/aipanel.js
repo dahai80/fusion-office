@@ -26,6 +26,7 @@ import { trackEvent } from '../lib/analytics.js';
 import { createAgent, workbookSnapshot, suggestions, userText, APPROVAL_MODES, DEFAULT_APPROVAL } from '../core/aiagent.js';
 import { createModelPicker, parseMarkdownTable, createOutcomeReporter } from '@fusion-office/ai-client';
 import { runTool, describeCall, callTarget, changesWorkbook, qualified } from '../core/aitools.js';
+import { isAsyncTool, runAsyncTool } from '../core/rollouts.js';
 import { attachmentProblem, attachmentKind, attachmentsTooLarge, formatSize, ATTACH_ACCEPT, MAX_ATTACHMENTS } from '../core/aiattach.js';
 import { readAttachment } from './aiattachments.js';
 import { recordPrompt, readPromptLog, clearPromptLog, exportPromptLog } from '../core/aitelemetry.js';
@@ -132,6 +133,10 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
   const agent = createAgent({
     chat: (messages, options) => P.aiChatStream(messages, options),
     runTool: async (name, args, control) => {
+      // The network-backed tools (cross-session memory, #47) run outside the
+      // synchronous runTool registry: runTool stringifies a runner's return
+      // synchronously, which a fetch-backed runner would report as {}.
+      if (isAsyncTool(name)) return runAsyncTool(name, args);
       // A change waits for the entry the user is typing to end: committing it for them would cut their typing
       // short, and the keys they press next would start a new entry over the cell. So does a selection, which
       // commits the entry when it goes to another sheet.

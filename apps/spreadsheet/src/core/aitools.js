@@ -215,10 +215,14 @@ export const TOOLS = [
   fn('select_range', 'Select a range in the user\'s view (switching sheets if needed) to point them at something. Changes nothing.', {
     range: RANGE,
   }, ['range']),
+  fn('grep_rollouts', 'Search cross-session memory: the outcomes past sessions of this app reported (what was done, accepted, edited or rejected, with redacted transcript shapes), by regex over the outcome log. Use it for exact facts from earlier sessions ("like last week\'s deck", "the report conventions", "what was rejected before"), not for semantic recall. Needs the local office-api service; when it is unreachable, answer from the workbook and say the memory is unavailable.', {
+    query: str('Text or regular expression to look for, e.g. "deck" or "rollout_id.*\\\\"rejected\\\\"".'),
+    limit: int('How many matching lines to return at most (1-100, default 20).'),
+  }, ['query']),
 ];
 
 export const TOOL_NAMES = new Set(TOOLS.map((t) => t.function.name));
-const READ_TOOLS = new Set(['get_workbook_info', 'read_range', 'calculate', 'find', 'select_range']);
+const READ_TOOLS = new Set(['get_workbook_info', 'read_range', 'calculate', 'find', 'select_range', 'grep_rollouts']);
 
 /** Does this tool change the workbook? */
 export const changesWorkbook = (name) => TOOL_NAMES.has(name) && !READ_TOOLS.has(name);
@@ -1237,6 +1241,7 @@ export function describeCall(wb, name, args = {}, env) {
     case 'read_range': return { label: `Read ${at(args.range).text}` };
     case 'calculate': return { label: `Calculate ${clip(String(args.formula ?? ''), 80)}` };
     case 'find': return { label: `Search for “${clip(String(args.query ?? ''), 40)}”` };
+    case 'grep_rollouts': return { label: `Search past-session memory for “${clip(String(args.query ?? ''), 40)}”` };
     case 'select_range': return { label: `Select ${at(args.range).text}` };
     case 'write_cells': {
       const start = at(args.start_cell);
