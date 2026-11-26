@@ -3,9 +3,9 @@
 // scripts/shell-serve.cjs is the entry. Pair with Node's native builder
 // (node >= 26.7): node --build-sea sea-config.json — the postject injection
 // path segfaults on current macOS and is not used. Run npm run build first.
-import { readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const root = join(require.resolve('../package.json'), '..');
@@ -44,5 +44,6 @@ const config = {
     disableExperimentalSEAWarning: true,
     assets,
 };
+await mkdir(join(root, config.output, '..'), { recursive: true });
 await writeFile(join(root, 'sea-config.json'), JSON.stringify(config, null, 4));
 console.log(`[build-sea] ${Object.keys(assets).length} assets from ${apps.length} apps; run: node --build-sea sea-config.json (Node >= 26.7)`);

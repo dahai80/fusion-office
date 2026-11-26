@@ -37,6 +37,8 @@ for (const app of apps) {
         cwd: join(root, 'apps', app),
         stdio: 'inherit',
         env: process.env,
+        // npm is npm.cmd on Windows; spawnSync cannot exec it without a shell.
+        shell: process.platform === 'win32',
     });
     const ms = Date.now() - started;
     if (result.status !== 0) {
