@@ -25,6 +25,12 @@ SIGNAL_SCORES: dict[str, float] = {
 
 VALID_ROLES = ("user", "assistant", "system", "tool")
 
+# Validator records (#48, fusion-trainer#111): a generated OOXML-level checker
+# rides with the trajectory as a versioned, re-runnable record instead of
+# staying ephemeral. Status is the validator's own test status against the
+# known-valid corpus (issue #49); the trainer's audit gate reads it.
+VALIDATOR_STATUSES = ("untested", "passing", "failing")
+
 
 def default_sink() -> Path:
     return Path.home() / ".fusion-office" / "rollout-outcomes.jsonl"
@@ -34,8 +40,8 @@ def validate_record(record: Any) -> str | None:
     """The one invalid shape worth naming, or None when the record can be appended."""
     if not isinstance(record, dict):
         return "record must be a JSON object"
-    if record.get("schema_version") != 1:
-        return "schema_version must be 1"
+    if record.get("schema_version") not in (1, 2):
+        return "schema_version must be 1 or 2"
     for key in ("rollout_id", "model"):
         value = record.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -53,6 +59,20 @@ def validate_record(record: Any) -> str | None:
     outcome = record.get("outcome")
     if not isinstance(outcome, dict) or outcome.get("signal") not in SIGNAL_SCORES:
         return f"outcome.signal must be one of {sorted(SIGNAL_SCORES)}"
+    # schema_version 2 additive fields (#48); tolerated as absent on version 1.
+    env_state = record.get("env_state")
+    if env_state is not None and not isinstance(env_state, dict):
+        return "env_state must be an object (file paths, hashes, working dir)"
+    validator = record.get("validator")
+    if validator is not None:
+        if not isinstance(validator, dict):
+            return "validator must be an object with name, version and status"
+        for key in ("name", "version"):
+            value = validator.get(key)
+            if not isinstance(value, str) or not value.strip():
+                return f"validator.{key} must be a non-empty string"
+        if validator.get("status") not in VALIDATOR_STATUSES:
+            return f"validator.status must be one of {list(VALIDATOR_STATUSES)}"
     return None
 
 

@@ -457,10 +457,21 @@ contract in issue #1:
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).
+  `schema_version` 2 records (#48, fusion-trainer#111) add two optional
+  fields: `env_state` (an object with the file paths/hashes and working dir
+  needed to replay or reset the task environment) and `validator` (a
+  versioned OOXML-level checker: `{name, version, status}` with status
+  `untested`/`passing`/`failing` — the trainer's validator audit gate reads
+  it). Version 1 records stay valid; both versions append unchanged.
 - `GET /v1/rollouts/grep?q=<regex>&limit=<1-100>` — grep-style retrieval over the
   same sink file: regex over JSONL lines, matches returned as parsed records (or
   `record: null` for unparseable lines) with line numbers and a `truncated` flag;
   the sink path and an `exists` flag ride along. No new storage (issue #45).
+- `GET /v1/graph` — the entity-tool graph over the endpoint registry (#50,
+  fusion-trainer#111 CrossEnv): nodes are the endpoints with the artifact types
+  they consume and produce, edges join producers to consumers (deterministic,
+  re-runnable — no LLM in the loop) and carry the curriculum stage; the trainer
+  synthesizes cross-app tasks on the edges.
 - `GET /healthz`, `GET /readyz`.
 - Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
   loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.

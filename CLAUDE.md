@@ -37,6 +37,12 @@ Fusion projects. It implements the contract in issue #1, binds to
 (bounded region read, 200,000-cell cap, absolute range names); the high-level
 action surface is the product — do not decompose it into primitive cell
 operations. `GET /v1/rollouts/grep` is regex retrieval over the outcome sink.
+Outcome records accept `schema_version` 2 (#48): optional `env_state`
+(restorable environment snapshot) and `validator` (`{name, version, status}`
+versioned checker for the trainer's audit gate); v1 stays valid.
+`GET /v1/graph` derives the entity-tool graph (#50) from a static endpoint
+registry — deterministic producer→consumer artifact edges for the trainer's
+cross-app task synthesis.
 
 ## Repository Rules
 
