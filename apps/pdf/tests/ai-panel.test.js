@@ -75,7 +75,7 @@ describe('PDF AI panel', () => {
             expect(fetch).toHaveBeenCalledTimes(1);
             const record = JSON.parse(fetch.mock.calls[0][1].body);
             expect(record).toMatchObject({ rollout_id: state.calls[0].rolloutId, model: 'picked-model',
-                source: 'fusion-office/pdf', outcome: { signal, score } });
+                app_source: 'fusion-office/pdf', outcome: { signal, score } });
             expect(panel.el.querySelector('[aria-label="Answer feedback"]').childElementCount).toBe(0);
         });
 

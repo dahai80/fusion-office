@@ -52,7 +52,9 @@ export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/
             schema_version: 1,
             rollout_id: rolloutId || newRolloutId(),
             ...(eventId ? { event_id: eventId } : {}),
-            source: `fusion-office/${app || 'unknown'}`,
+            // Trainer's dashboard treats records with `source` as trajectories.
+            // Correlated events are sidecars; keep app provenance without double-counting.
+            [eventId ? 'app_source' : 'source']: `fusion-office/${app || 'unknown'}`,
             created_at: new Date().toISOString(),
             messages: messages.slice(-maxMessages).map(m => ({ role: String(m.role || 'user'), content: shape(m.content) })),
             outcome: { signal, score: outcomeScore(signal), ...(detail ? { detail: String(detail).slice(0, 500) } : {}) },

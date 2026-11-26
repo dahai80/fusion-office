@@ -169,7 +169,7 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
             if (reply) offerFeedback(turn, reply);
             return reply;
         } catch (error) {
-            if (turn.model) outcomes.report({ ...turn, signal: 'error', messages: options.messages });
+            if (turn.model) outcomes.report({ ...turn, eventId: `${turn.rolloutId}:error`, signal: 'error', messages: options.messages });
             throw error;
         }
     }

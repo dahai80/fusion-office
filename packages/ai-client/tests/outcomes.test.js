@@ -48,6 +48,10 @@ describe('outcome reporter', () => {
         const records = fetchImpl.mock.calls.map(([, init]) => JSON.parse(init.body));
         expect(records.map(r => r.rollout_id)).toEqual(['ro-1234', 'ro-1234']);
         expect(new Set(records.map(r => r.event_id)).size).toBe(2);
+        for (const r of records) {
+            expect(r.source).toBeUndefined();
+            expect(r.app_source).toBe('fusion-office/documents');
+        }
         expect(records[1].outcome).toEqual({ signal: 'user_edited', score: 0.5 });
     });
 

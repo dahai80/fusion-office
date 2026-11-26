@@ -198,6 +198,7 @@ spreadsheet 的 plan-apply 核心上报同样信号。文档和幻灯片撤销�
 `user_edited`；PDF 回复可标为有用（`task_success`）或无用（`user_rejected`），未评价不算接受。撤销助手添加的 PDF 书签时，向原回合上报 `user_edited`。
 每个助手回合生成一个 `rollout_id`，每条聊天请求都用 `X-Fusion-Rollout-Id` 请求头携带它。
 网关记录和应用反馈按相同的 `rollout_id` 关联，同回合的不同事件用独立的 `event_id` 去重。
+关联事件把套件名记在 `app_source` 而非网关专用的 `source`，防止训练面板把反馈重复计为独立轨迹。
 上报为 fire-and-forget（失败只记日志），绝不阻塞用户操作。消息内容默认脱敏为 `[redacted:N]`，
 仅当 reporter 以 `contentMode: "raw"` 构建时保留原文。
 

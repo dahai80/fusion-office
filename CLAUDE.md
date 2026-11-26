@@ -201,7 +201,8 @@ file; the only write is a bookmark).
   content redacted unless `contentMode: "raw"`. Rollout correlation (issue #38):
   each agent turn mints one `ro-<16 hex>` id and sends it as `X-Fusion-Rollout-Id`
   on each chat request, including stream recovery. Match `rollout_id` exactly to
-  the gateway tap; use `event_id` to deduplicate individual events. Documents and
+  the gateway tap; use `event_id` to deduplicate individual events. A correlated
+  sidecar uses `app_source` for suite provenance, never the tap-only `source`. Documents and
   presentation attribute Undo to the original reply. PDF reports explicit answer
   feedback, not a success inferred from showing a read-only answer. Undoing an
   assistant bookmark reports `user_edited` only for its committed PDF snapshot.

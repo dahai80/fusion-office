@@ -22,7 +22,7 @@ def record() -> dict:
         "schema_version": 1,
         "rollout_id": "ro-abcd1234abcd1234",
         "event_id": "ro-abcd1234abcd1234:e1",
-        "source": "fusion-office/documents",
+        "app_source": "fusion-office/documents",
         "model": "mlx-community--Qwen3.5-4B-MLX-4bit",
         "created_at": "2026-11-25T12:00:00Z",
         "messages": [
