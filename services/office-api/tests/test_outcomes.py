@@ -59,7 +59,7 @@ def test_each_report_is_one_new_line(client: TestClient, sink: Path) -> None:
 @pytest.mark.parametrize(
     "mutate",
     [
-        lambda r: r.update(schema_version=2),
+        lambda r: r.update(schema_version=3),
         lambda r: r.update(rollout_id=""),
         lambda r: r.pop("model"),
         lambda r: r.update(messages=[]),
@@ -89,6 +89,51 @@ def test_non_json_body_is_422(client: TestClient) -> None:
 def test_validate_record_accepts_the_documented_shape() -> None:
     assert validate_record(record()) is None
     assert validate_record("nope") == "record must be a JSON object"
+
+
+def versioned_record() -> dict:
+    payload = record()
+    payload["schema_version"] = 2
+    payload["env_state"] = {
+        "working_dir": "/tmp/task-42",
+        "files": {"report.docx": {"sha256": "ab" * 32}},
+    }
+    payload["validator"] = {"name": "table-check", "version": "3", "status": "passing"}
+    return payload
+
+
+def test_versioned_record_with_env_state_and_validator_is_accepted(
+    client: TestClient, sink: Path
+) -> None:
+    assert validate_record(versioned_record()) is None
+    response = client.post("/v1/outcomes", json=versioned_record())
+
+    assert response.status_code == 202
+    stored = json.loads(sink.read_text(encoding="utf-8").splitlines()[0])
+    assert stored["validator"]["status"] == "passing"
+    assert stored["env_state"]["working_dir"] == "/tmp/task-42"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda r: r.update(env_state="report.docx"),
+        lambda r: r.update(validator="table-check"),
+        lambda r: r.update(validator={"name": "", "version": "3", "status": "passing"}),
+        lambda r: r.update(validator={"name": "check", "version": "", "status": "passing"}),
+        lambda r: r.update(validator={"name": "check", "version": "3", "status": "green"}),
+    ],
+)
+def test_invalid_versioned_fields_are_422_and_write_nothing(
+    client: TestClient, sink: Path, mutate
+) -> None:
+    payload = versioned_record()
+    mutate(payload)
+
+    response = client.post("/v1/outcomes", json=payload)
+
+    assert response.status_code == 422
+    assert not sink.exists()
 
 
 def write_sink(path: Path, lines: list[str]) -> Path:

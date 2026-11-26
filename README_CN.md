@@ -386,6 +386,11 @@ python -m pytest tests -q
 - `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
   `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
   fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。
+  `schema_version` 2 记录（#48，fusion-trainer#111）新增两个可选字段：
+  `env_state`（对象：可重放/重置任务环境的文件路径/哈希与工作目录）和
+  `validator`（带版本的 OOXML 级校验器 `{name, version, status}`，status 取
+  `untested`/`passing`/`failing` —— trainer 的 validator 审计门读取）。
+  v1 记录仍然有效，两个版本原样追加。
 - `GET /v1/rollouts/grep?q=<正则>&limit=<1-100>` — 对同一 sink 文件的 grep 式
   检索：对 JSONL 行做正则匹配，命中行返回解析后的记录（解析失败的行返回
   `record: null`），带行号与 `truncated` 标记，并附 sink 路径与 `exists`

@@ -457,6 +457,12 @@ contract in issue #1:
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).
+  `schema_version` 2 records (#48, fusion-trainer#111) add two optional
+  fields: `env_state` (an object with the file paths/hashes and working dir
+  needed to replay or reset the task environment) and `validator` (a
+  versioned OOXML-level checker: `{name, version, status}` with status
+  `untested`/`passing`/`failing` — the trainer's validator audit gate reads
+  it). Version 1 records stay valid; both versions append unchanged.
 - `GET /v1/rollouts/grep?q=<regex>&limit=<1-100>` — grep-style retrieval over the
   same sink file: regex over JSONL lines, matches returned as parsed records (or
   `record: null` for unparseable lines) with line numbers and a `truncated` flag;
