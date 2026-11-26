@@ -146,7 +146,9 @@
 @media (hover: hover) { .ai-suggestion:hover { background: var(--surface-3); } }
 
 .ai-msg { font-size: 13.5px; line-height: 1.5; min-width: 0; }
-.ai-user { align-self: flex-end; max-width: 88%; }
+/* Prototype alignment (office-research/prototypes/03-spreadsheet-agent.html):
+   the user bubble sits on the left in quiet gray. */
+.ai-user { align-self: flex-start; max-width: 88%; }
 .ai-bubble {
   background: var(--surface-2);
   border-radius: 14px 14px 4px 14px;
@@ -155,9 +157,9 @@
   overflow-wrap: anywhere;
 }
 .ai-assistant { align-self: stretch; }
-/* The files a message carried, over its text, at its right edge as the text is. */
-.ai-user { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.ai-user-files { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; list-style: none; max-width: 100%; }
+/* The files a message carried, above its text, on the bubble's side. */
+.ai-user { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.ai-user-files { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px; margin: 0; padding: 0; list-style: none; max-width: 100%; }
 .ai-user-file { display: flex; min-width: 0; max-width: 100%; }
 .ai-user-thumb { display: block; max-width: 160px; max-height: 120px; border-radius: var(--r-md); border: 1px solid var(--hairline); object-fit: cover; background: var(--surface-2); }
 .ai-user-chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 220px; padding: 6px 10px; border-radius: var(--r-md); background: var(--surface-2); color: var(--ink-2); font-size: 12.5px; }
@@ -216,14 +218,20 @@
 .md .md-inline .cell-ref { font-family: var(--mono); background: transparent; padding: 0; }
 
 /* A tool call: what it does, and how it went. */
+/* Tool calls render as their own card (prototype 02/03): quiet card, icon +
+   label, then the muted note below. */
 .ai-step {
   display: grid;
   grid-template-columns: 16px 1fr;
   column-gap: 6px;
   align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
   font-size: 12.5px;
   line-height: 1.4;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .ai-step-icon { display: inline-flex; margin-top: 1px; color: var(--ink-3); }
 .ai-step-change .ai-step-label { color: var(--ink-2); font-weight: 500; }
@@ -238,16 +246,32 @@
 .ai-step-note { grid-column: 2; min-width: 0; margin-top: 2px; overflow-wrap: anywhere; }
 .ai-step-waiting .ai-step-label { color: var(--ink); font-weight: 600; }
 
+/* Destructive-change confirmation: the prototype's amber card. */
 .ai-approve {
+  --agent-approve-bg: #fffbeb;
+  --agent-approve-line: #fde68a;
+  --agent-approve-title: #92400e;
   grid-column: 1 / -1;
   margin-top: 6px;
   padding: 10px 12px;
-  border: 1px solid var(--hairline-strong);
-  border-left: 3px solid var(--warn);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  border: 1px solid var(--agent-approve-line);
+  border-radius: 10px;
+  background: var(--agent-approve-bg);
   color: var(--ink);
 }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .ai-approve {
+    --agent-approve-bg: #382e14;
+    --agent-approve-line: #6b5416;
+    --agent-approve-title: #fbbf24;
+  }
+}
+:root[data-theme="dark"] .ai-approve {
+  --agent-approve-bg: #382e14;
+  --agent-approve-line: #6b5416;
+  --agent-approve-title: #fbbf24;
+}
+.ai-approve-title { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--agent-approve-title); }
 .ai-approve-detail { margin: 0 0 8px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
 .ai-approve-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 /* The card is filled as a plain button is: Don't allow is outlined on the page's own colour, or it shows as bare text. */

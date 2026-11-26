@@ -96,7 +96,7 @@ export function openProjectAssistant(projectId) {
         return new Promise(resolve => {
             if (!turn) { resolve(false); return; }
             const card = el('div', { class: 'pm-as-approval' },
-                el('p', {}, `${step.label || step.name}. Allow this?`),
+                el('p', { class: 'pm-as-approval-title' }, `⚠ ${step.label || step.name}. Allow this change?`),
                 el('div', { class: 'pm-as-actions' },
                     el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => done(true) }, 'Allow'),
                     el('button', { class: 'btn btn-sm', type: 'button', onclick: () => done(false) }, 'Skip')));
@@ -120,7 +120,7 @@ export function openProjectAssistant(projectId) {
         })).filter(task => task.title);
         if (!tasks.length) return;
         const card = el('div', { class: 'pm-as-approval' },
-            el('p', {}, `The reply lists ${tasks.length} task${tasks.length === 1 ? '' : 's'}. Create them?`),
+            el('p', { class: 'pm-as-approval-title' }, `⚠ The reply lists ${tasks.length} task${tasks.length === 1 ? '' : 's'}. Create them?`),
             el('div', { class: 'pm-as-actions' },
                 el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => createAll(card) }, 'Create'),
                 el('button', { class: 'btn btn-sm', type: 'button', onclick: () => card.remove() }, 'Skip')));

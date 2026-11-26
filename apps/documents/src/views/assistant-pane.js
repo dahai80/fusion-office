@@ -39,6 +39,7 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
 
   const pane = sidePane({ title: 'Assistant', label: 'Assistant pane', className: 'as-pane', onOpen: () => { renderContext(); renderEmpty(); fab.setAttribute('aria-expanded', 'true'); titleButton.setAttribute('aria-pressed', 'true'); }, onClose: () => { fab.setAttribute('aria-expanded', 'false'); titleButton.setAttribute('aria-pressed', 'false'); agent.stop(); editor()?.focus(); } });
   pane.heading.prepend(el('span.as-mark', { 'aria-hidden': 'true' }, commandIconEl('assistant', 16)));
+  pane.body.prepend(el('p.as-pane-sub', {}, 'Tool calls are fully visible · destructive changes ask first'));
   const newChat = el('button.btn.btn-ghost.btn-sm.as-new', { type: 'button', onclick: () => newChatNow() }, 'New chat');
   pane.heading.after(newChat);
   const modelPicker = createModelPicker();
@@ -178,7 +179,8 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     return el('div.as-step', { 'data-step': step.id },
       el('span.as-step-icon', { 'aria-hidden': 'true' }, step.status === 'running' ? '•' : step.status === 'error' ? '!' : '✓'),
       el('span.as-step-label', {}, step.label || step.name),
-      el('span.as-step-status', { role: 'status' }, STATUS_TEXT[step.status] || step.status));
+      el('span.as-step-status', { role: 'status' }, STATUS_TEXT[step.status] || step.status),
+      step.detail ? el('div.as-step-detail', {}, step.detail) : null);
   }
 
   function updateStep(row, step) {
@@ -227,7 +229,8 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
       if (!turn) { resolve(false); return; }
       const answer = ok => { card.remove(); refused = null; resolve(ok); };
       const card = el('div.as-approval', {},
-        el('p', {}, `${step.label || step.name}. Allow this change?`),
+        el('p.as-approval-title', {}, `⚠ ${step.label || step.name}. Allow this change?`),
+        step.detail ? el('p.as-pane-sub', {}, step.detail) : null,
         el('div.as-actions', {},
           el('button.btn.btn-primary.btn-sm', { type: 'button', onclick: () => answer(true) }, 'Allow'),
           el('button.btn.btn-ghost.btn-sm', { type: 'button', onclick: () => answer(false) }, 'Skip')));

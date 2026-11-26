@@ -111,6 +111,14 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 开发端口，直连会因预检被拒而表现为 `Failed to fetch`。生产构建仍直接访问
 `VITE_FUSION_GATEWAY_URL`。
 
+### 助手面板外观
+
+五个应用的助手面板（documents、spreadsheet、presentation、pdf、pm）遵循
+`office-research/prototypes/02-agent-panel.html` 与 `03-spreadsheet-agent.html`
+的 agent 面板原型：用户消息在左侧灰色气泡中，回复在着色气泡中，每次工具调用
+渲染为独立卡片并带细节行，需要确认的写入以琥珀色确认卡呈现（先说明动作再
+允许/跳过）。配色跟随各应用主题，含暗色模式。
+
 ### 选择模型
 
 每个助手面板都有模型下拉框，列出网关提供的模型（`GET /v1/models`，已加载的排在前面）。

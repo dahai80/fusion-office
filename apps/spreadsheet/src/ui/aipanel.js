@@ -505,6 +505,7 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
     const allow = el('button.btn.btn-sm.btn-primary', { type: 'button', onclick: () => answer(true) }, 'Allow');
     const deny = el('button.btn.btn-sm', { type: 'button', onclick: () => answer(false) }, 'Don’t allow');
     const card = el('div.ai-approve', { role: 'group', 'aria-label': 'Allow this change?' },
+      el('p.ai-approve-title', {}, `⚠ ${step.label || step.name}. Allow this change?`),
       step.detail && el('p.ai-approve-detail', {}, step.detail),
       el('div.ai-approve-actions', {}, allow, deny));
     card.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); answer(false); } });
