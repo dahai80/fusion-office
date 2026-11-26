@@ -467,6 +467,11 @@ contract in issue #1:
   same sink file: regex over JSONL lines, matches returned as parsed records (or
   `record: null` for unparseable lines) with line numbers and a `truncated` flag;
   the sink path and an `exists` flag ride along. No new storage (issue #45).
+- `GET /v1/graph` — the entity-tool graph over the endpoint registry (#50,
+  fusion-trainer#111 CrossEnv): nodes are the endpoints with the artifact types
+  they consume and produce, edges join producers to consumers (deterministic,
+  re-runnable — no LLM in the loop) and carry the curriculum stage; the trainer
+  synthesizes cross-app tasks on the edges.
 - `GET /healthz`, `GET /readyz`.
 - Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
   loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.

@@ -395,6 +395,9 @@ python -m pytest tests -q
   检索：对 JSONL 行做正则匹配，命中行返回解析后的记录（解析失败的行返回
   `record: null`），带行号与 `truncated` 标记，并附 sink 路径与 `exists`
   标志。零新增存储（issue #45）。
+- `GET /v1/graph` — 端点注册表之上的实体-工具图（#50，fusion-trainer#111
+  CrossEnv）：节点为各端点及其消费/产出的工件类型，边为"产出→消费"的确定性
+  连接（可重跑，不经 LLM），并带课程阶段；trainer 在边上合成跨应用任务。
 - `GET /healthz`、`GET /readyz`。
 - 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
   外部请求。`/v1/docx/snapshot` 推迟到 v0.2。

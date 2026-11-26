@@ -23,6 +23,7 @@ from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 
 from . import __version__
 from .docx import fill_document, parse_document
+from .graph import derive_graph
 from .markdown import parse_blocks, write_docx_from_markdown
 from .outcomes import append_record, default_sink, grep_sink, validate_record
 from .pptx import parse_deck, write_deck, write_deck_from_markdown
@@ -69,6 +70,13 @@ async def _read_limited(upload: UploadFile) -> bytes:
 def _invalid(kind: str, error: Exception) -> HTTPException:
     log.warning("invalid %s upload: %s", kind, error)
     return HTTPException(status_code=422, detail=f"invalid {kind}: {error}")
+
+
+@app.get("/v1/graph")
+def graph() -> dict[str, object]:
+    # Issue #50 (CrossEnv): deterministic entity-tool graph over the endpoint
+    # registry — cross-app task synthesis consumes this, not an LLM.
+    return derive_graph()
 
 
 @app.get("/healthz")
