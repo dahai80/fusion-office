@@ -206,6 +206,16 @@ file; the only write is a bookmark).
   dahai80/fusion-gateway#580), `chatStreamEvents` replays the request once without
   streaming — the non-stream path returns `tool_calls` intact — and yields them;
   if the retry confirms the answer is prose, the text is kept once, not duplicated.
+- Plan-consistency selection (issue #57, `packages/ai-client/src/consistency.js`):
+  documents and spreadsheet agent loops take `consistency: N` — write-class rounds
+  (`changes` predicate true) get N extra chat samples at temperature 0.7, the
+  proposed plans are compared with order-insensitive signatures, and the verdict
+  (`selection` event + `consistency k=… samples=… agreement=…` folded into the
+  turn's outcome detail) feeds the tap jsonl. The greedy plan always executes —
+  no workspace sandbox exists, so this is plan-level consistency, not
+  execution-level. Panels pass `consistency: 2`, gated off under
+  `MODE === 'test'` (panel tests script multi-round chat sequences by call
+  count); read-only rounds keep single-sample latency.
 - Outcome signals (issue #33): `createOutcomeReporter`
   (`packages/ai-client/src/outcomes.js`) posts rollout-tap schema v1 records to
   office-api's `POST /v1/outcomes`, which appends them to the JSONL sink

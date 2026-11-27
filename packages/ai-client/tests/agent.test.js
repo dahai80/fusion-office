@@ -170,3 +170,78 @@ describe('createAgent rollout correlation (#38)', () => {
         expect(seenOpts[1].rolloutId).not.toBe(seenOpts[0].rolloutId);
     });
 });
+
+describe('createAgent plan-consistency selection (#57)', () => {
+    it('resamples a write-class round, emits the verdict, and folds it into the outcome detail', async () => {
+        const requests = [];
+        const chat = async function* (messages, opts) {
+            requests.push(opts);
+            if (requests.length <= 3) yield { type: 'tool', id: `c${requests.length}`, name: 'replace_selection', input: { text: 'hi' } };
+            yield { type: 'text', text: 'done' };
+        };
+        const events = [];
+        const reporter = { report: (call) => reporter.reports.push(call), reports: [] };
+        const agent = createAgent({
+            chat,
+            tools: [{ type: 'function', function: { name: 'replace_selection' } }],
+            runTool: () => ({ ok: true, changed: true, target: 'Paragraph 2', content: 'Done.' }),
+            describe: () => ({ label: 'Replaced the selection', destructive: true }),
+            changes: () => true,
+            approve: async () => true,
+            outcomes: reporter,
+            consistency: 2,
+        });
+        await agent.send('change something', event => events.push(event));
+        // The greedy round plus two resamples, then the closing round.
+        expect(requests).toHaveLength(4);
+        expect(requests[1].temperature).toBe(0.7);
+        expect(requests[2].temperature).toBe(0.7);
+        expect(requests[3].temperature).toBeUndefined();
+        const selection = events.find(event => event.type === 'selection');
+        expect(selection.selection).toEqual({ samples: 2, agreement: true, agreeCount: 2 });
+        const turnEnd = reporter.reports.find(r => r.signal === 'task_success');
+        expect(turnEnd.detail).toContain('consistency k=3 samples=2 agreement=true');
+    });
+
+    it('keeps single-sample latency on a read-only round', async () => {
+        let requests = 0;
+        const agent = createAgent({
+            chat: async function* () { requests++; if (requests === 1) yield { type: 'tool', id: 'c1', name: 'read_document', input: {} }; yield { type: 'text', text: 'done' }; },
+            tools: [{ type: 'function', function: { name: 'read_document' } }],
+            runTool: () => ({ ok: true, content: 'The document.' }),
+            describe: () => ({ label: 'Read the document' }),
+            changes: () => false,
+            consistency: 2,
+        });
+        const events = [];
+        await agent.send('read it', event => events.push(event));
+        expect(requests).toBe(2);
+        expect(events.some(event => event.type === 'selection')).toBe(false);
+    });
+
+    it('executes the greedy plan and still reports the turn when samples disagree', async () => {
+        const runCalls = [];
+        let round = 0;
+        const chat = async function* () {
+            round++;
+            if (round === 1) yield { type: 'tool', id: 'c1', name: 'replace_selection', input: { text: 'greedy' } };
+            else if (round === 2) yield { type: 'tool', id: 'c2', name: 'replace_selection', input: { text: 'other' } };
+            yield { type: 'text', text: 'done' };
+        };
+        const reporter = { report: (call) => reporter.reports.push(call), reports: [] };
+        const agent = createAgent({
+            chat,
+            tools: [{ type: 'function', function: { name: 'replace_selection' } }],
+            runTool: (name, args) => { runCalls.push(args); return { ok: true, changed: true, content: 'Done.' }; },
+            describe: () => ({ label: 'Replaced the selection', destructive: true }),
+            changes: () => true,
+            approve: async () => true,
+            outcomes: reporter,
+            consistency: 1,
+        });
+        await agent.send('change something');
+        expect(runCalls).toEqual([{ text: 'greedy' }]);
+        const turnEnd = reporter.reports.find(r => r.signal === 'task_success');
+        expect(turnEnd.detail).toContain('agreement=false');
+    });
+});

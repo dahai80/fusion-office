@@ -87,6 +87,9 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     },
     approve: step => askApproval(step),
     outcomes,
+    // Issue #57: two extra samples on write-class rounds; the plans are
+    // compared for consistency and the greedy plan still executes.
+    consistency: 2,
   });
 
   /* ---- What the person can see ---- */

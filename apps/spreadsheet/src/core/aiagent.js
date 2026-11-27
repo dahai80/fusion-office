@@ -15,6 +15,7 @@ import { dataBounds, describeRange } from './aiformula.js';
 import { TOOLS, TOOL_NAMES, changesWorkbook, qualified } from './aitools.js';
 import { attachmentsIntro, attachmentsGone, attachmentWeight, attachmentsFit, sentBytes } from './aiattach.js';
 import { newRolloutId } from './aioutcomes.js';
+import { consistencyVerdict, sampleToolPlan } from '@fusion-office/ai-client';
 
 /** The model the assistant runs on is left to the chat adapter (the model
  *  picker, the shell's model policy, then the build-time default): a hard
@@ -245,7 +246,7 @@ const newCallId = () => `call_${Date.now().toString(36)}_${(++callSeq).toString(
  * and resolves to { stopped, error, cut, steps, empty } once the model has finished (or failed, or was stopped); `cut`: its
  * last reply ran into MAX_OUTPUT_TOKENS and ends unfinished.
  */
-export function createAgent({ chat, runTool, describe, approve, ready = null, snapshot = () => '', settings = () => ({}) , outcomes = null }) {
+export function createAgent({ chat, runTool, describe, approve, ready = null, snapshot = () => '', settings = () => ({}) , outcomes = null, consistency = 0 }) {
   let messages = [];
   let running = null; // { stop(), stopped }
   const changelog = []; // one line per change the assistant made, oldest first
@@ -295,6 +296,10 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
     // the gateway tap can correlate its records with the reported outcomes.
     const rolloutId = newRolloutId();
     let eventSeq = 0;
+    // Issue #57: plan-consistency verdict for write-class rounds, folded into
+    // the turn's outcome detail so the tap jsonl records it.
+    let selection = null;
+    const selSuffix = () => selection ? `; consistency k=${consistency + 1} samples=${selection.samples} agreement=${selection.agreement}` : '';
     const report = (signal, detail) => {
       if (!outcomes) return;
       try {
@@ -340,9 +345,32 @@ export function createAgent({ chat, runTool, describe, approve, ready = null, sn
           role: 'assistant', content: text.trim() ? text : null,
           ...(calls.length ? { tool_calls: calls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.input) } })) } : {}),
         });
+        // Issue #57: write-class rounds get k extra samples at temperature >
+        // 0; the plans are compared, never executed. Read-only rounds keep
+        // single-sample latency.
+        if (consistency > 0 && calls.some((c) => changesWorkbook(c.name))) {
+          const samples = [];
+          for (let i = 0; i < consistency && !run.stopped; i++) {
+            const sample = await sampleToolPlan(
+              chat,
+              requestMessages(transcript, { changelog }),
+              { tools: TOOLS, maxTokens: MAX_OUTPUT_TOKENS, rolloutId, temperature: 0.7 },
+              stopSignal,
+            );
+            if (sample.stopped) break;
+            samples.push(sample);
+          }
+          selection = consistencyVerdict(calls, samples);
+          if (selection) {
+            emit({ type: 'selection', selection });
+            if (!selection.agreement) {
+              console.warn('[aiagent] write-plan disagreement across', consistency + 1, 'samples:', selection.agreeCount, 'of', selection.samples, 'agree with the greedy plan');
+            }
+          }
+        }
         if (!calls.length) {
           if (empty) emit({ type: 'text', text });
-          if (steps.some((s) => s.changed)) report('task_success', 'the turn ended with changes applied');
+          if (steps.some((s) => s.changed)) report('task_success', `the turn ended with changes applied${selSuffix()}`);
           return { stopped: false, cut, steps, ...(empty ? { empty: true } : {}) };
         }
         for (const call of calls) {

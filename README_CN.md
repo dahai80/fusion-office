@@ -401,6 +401,13 @@ python -m pytest tests -q
 - `GET /v1/graph` — 端点注册表之上的实体-工具图（#50，fusion-trainer#111
   CrossEnv）：节点为各端点及其消费/产出的工件类型，边为"产出→消费"的确定性
   连接（可重跑，不经 LLM），并带课程阶段；trainer 在边上合成跨应用任务。
+- 计划一致性选择（issue #57，SheetAlign arXiv 2611.26069）：documents 与
+  spreadsheet 的 agent 循环对写入类回合额外采样 2 次（temperature 0.7），比较
+  各候选提出的工具计划（键序与顺序不敏感的签名）。一致或不一致都会发出
+  `selection` 事件，不一致时打日志，并折入该回合 `task_success`/`error` 的
+  outcome detail，tap jsonl 里可见 `consistency k=3 samples=N agreement=<bool>`；
+  贪心计划始终执行（尚无工作区沙箱，候选只比较不执行），只读回合保持单次采样
+  延迟。面板测试中采样器关闭（与 puter 桩相同的 `MODE === 'test'` 门）。
 - `GET /healthz`、`GET /readyz`。
 - 工件信封（issue #53）：每个文档端点都接受可选的 `artifact_mode` 表单字段。
   默认响应保持上面的二进制/内容形态不变。传 `artifact_mode=index+preview` 时，
