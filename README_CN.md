@@ -117,7 +117,10 @@ Vite 配置把它代理到网关（`dev/gateway-proxy.mjs`）。网关的 CORS �
 `office-research/prototypes/02-agent-panel.html` 与 `03-spreadsheet-agent.html`
 的 agent 面板原型：用户消息在左侧灰色气泡中，回复在着色气泡中，每次工具调用
 渲染为独立卡片并带细节行，需要确认的写入以琥珀色确认卡呈现（先说明动作再
-允许/跳过）。配色跟随各应用主题，含暗色模式。
+允许/跳过）。配色跟随各应用主题，含暗色模式。documents 面板对可见步骤列表做了
+展示层过滤（issue #55）：零效果编辑（空 `insert_text`）直接隐藏，连续相同的
+读取折叠为一条并带 ×N 计数徽标 —— 完整记录保留在控制台与 agent 步骤日志中，
+仅影响展示。
 
 ### 选择模型
 
