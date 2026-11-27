@@ -6,6 +6,7 @@
 // touches a page.
 
 import { newRolloutId } from './outcomes.js';
+import { consistencyVerdict, sampleToolPlan } from './consistency.js';
 
 const OLD_RESULT_CHARS = 1500;
 const DEFAULT_BUDGET = 240000;
@@ -79,7 +80,7 @@ export function requestMessages(messages, { system = '', budget = DEFAULT_BUDGET
  * send(text, onEvent) reports { type: 'text' }, { type: 'step' } and
  * { type: 'round' }, and resolves to { stopped, error, steps, empty }.
  */
-export function createAgent({ chat, tools = [], runTool, describe = () => ({}), changes = () => false, approve = async () => true, snapshot = () => '', settings = () => ({}), system = '', model = '', maxRounds = 12, maxOutputTokens = 8192, outcomes = null }) {
+export function createAgent({ chat, tools = [], runTool, describe = () => ({}), changes = () => false, approve = async () => true, snapshot = () => '', settings = () => ({}), system = '', model = '', maxRounds = 12, maxOutputTokens = 8192, outcomes = null, consistency = 0 }) {
     const names = new Set(tools.map(tool => tool.function?.name).filter(Boolean));
     let messages = [];
     let running = null;
@@ -101,6 +102,10 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
         const run = { stopped: false, stop() { if (!this.stopped) { this.stopped = true; release(true); } } };
         running = run;
         const steps = [];
+        // Issue #57: plan-consistency verdict for write-class rounds, folded
+        // into the turn's outcome detail so the tap jsonl records it.
+        let selection = null;
+        const selSuffix = () => selection ? `; consistency k=${consistency + 1} samples=${selection.samples} agreement=${selection.agreement}` : '';
         // Issue #33: one rollout per turn; each emitted outcome is its own
         // record under a stable event id, so confirmations and the turn's end
         // state are reported separately and neither is dropped as a duplicate.
@@ -140,9 +145,32 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                     role: 'assistant', content: said.trim() ? said : null,
                     ...(calls.length ? { tool_calls: calls.map(call => ({ id: call.id, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.input) } })) } : {}),
                 });
+                // Issue #57: write-class rounds get k extra samples at
+                // temperature > 0; the plans are compared, never executed.
+                // Read-only rounds keep single-sample latency.
+                if (consistency > 0 && calls.some(call => changes(call.name, call.input))) {
+                    const samples = [];
+                    for (let i = 0; i < consistency && !run.stopped; i++) {
+                        const sample = await sampleToolPlan(
+                            chat,
+                            requestMessages(transcript, { system, changelog }),
+                            { model, tools, maxTokens: maxOutputTokens, rolloutId, temperature: 0.7 },
+                            stopped,
+                        );
+                        if (sample.stopped) break;
+                        samples.push(sample);
+                    }
+                    selection = consistencyVerdict(calls, samples);
+                    if (selection) {
+                        emit({ type: 'selection', selection });
+                        if (!selection.agreement) {
+                            console.warn('[agent] write-plan disagreement across', consistency + 1, 'samples:', selection.agreeCount, 'of', selection.samples, 'agree with the greedy plan');
+                        }
+                    }
+                }
                 if (!calls.length) {
                     if (empty) emit({ type: 'text', text: said });
-                    if (steps.some(step => step.changed)) report('task_success', 'the turn ended with changes applied');
+                    if (steps.some(step => step.changed)) report('task_success', `the turn ended with changes applied${selSuffix()}`);
                     return { stopped: false, steps, ...(empty ? { empty: true } : {}) };
                 }
                 for (const call of calls) {
@@ -195,7 +223,7 @@ export function createAgent({ chat, tools = [], runTool, describe = () => ({}), 
                     transcript.push({ role: 'tool', tool_call_id: call.id, content });
                 }
             }
-            report('error', `the assistant stopped after ${maxRounds} replies without finishing`);
+            report('error', `the assistant stopped after ${maxRounds} replies without finishing${selSuffix()}`);
             return { stopped: false, steps, error: `The assistant stopped after ${maxRounds} replies without finishing.` };
         } catch (err) {
             report('error', String(err?.message || err).slice(0, 500));

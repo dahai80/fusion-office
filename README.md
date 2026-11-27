@@ -476,6 +476,16 @@ contract in issue #1:
   re-runnable — no LLM in the loop) and carry the curriculum stage; the trainer
   synthesizes cross-app tasks on the edges.
 - `GET /healthz`, `GET /readyz`.
+- Plan-consistency selection (issue #57, SheetAlign arXiv 2611.26069): the documents
+  and spreadsheet agent loops re-sample a write-class round 2 extra times at
+  temperature 0.7 and compare the proposed tool plans (key-order- and
+  order-insensitive signatures). Agreement or disagreement is emitted as a
+  `selection` event, logged on disagreement, and folded into the turn's
+  `task_success`/`error` outcome detail so the tap jsonl records `consistency
+  k=3 samples=N agreement=<bool>`; the greedy plan always executes (no
+  workspace sandbox exists yet, so candidates are compared, never run), and
+  read-only rounds keep single-sample latency. Panel tests run with the
+  sampler off (same `MODE === 'test'` gate as the puter stub).
 - Artifact envelope (issue #53): every document endpoint takes an optional
   `artifact_mode` form field. The default responses stay byte- or content-shaped as
   above. With `artifact_mode=index+preview`, write endpoints answer JSON instead of

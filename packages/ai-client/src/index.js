@@ -479,6 +479,7 @@ export async function listModels() {
 }
 
 export { createAgent, requestMessages, userContent, userText } from './agent.js'
+export { argSignature, planSignature, sampleToolPlan, consistencyVerdict } from './consistency.js'
 export { parseMarkdownTable, parseMarkdownTableParts } from './markdown-table.js'
 export { createOutcomeReporter, newRolloutId, outcomeScore, OUTCOME_SIGNALS } from './outcomes.js'
 

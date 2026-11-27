@@ -132,6 +132,11 @@ export function createAiPanel(ctx, env, { onToggle, onBusy } = {}) {
 
   const agent = createAgent({
     chat: (messages, options) => P.aiChatStream(messages, options),
+    // Issue #57: two extra samples on write-class rounds; the plans are
+    // compared for consistency and the greedy plan still executes. Panel
+    // tests count chat calls to script multi-round scenarios, so the sampler
+    // runs only outside the test mode (same gate as the puter stub).
+    consistency: import.meta.env?.MODE === 'test' ? 0 : 2,
     runTool: async (name, args, control) => {
       // The network-backed tools (cross-session memory, #47) run outside the
       // synchronous runTool registry: runTool stringifies a runner's return
