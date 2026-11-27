@@ -13,6 +13,7 @@ import * as P from '../lib/puter.js';
 import { createAgent, createModelPicker, parseMarkdownTable, createOutcomeReporter, newRolloutId } from '@fusion-office/ai-client';
 import { SUGGESTIONS } from '../lib/assistant.js';
 import { TOOLS, SYSTEM_PROMPT, changesDocument, describeCallFor, documentSnapshot, runTool } from '../lib/assistant-tools.js';
+import { isNoopEdit, readGroupKey } from '../lib/assistant-steps.js';
 import { sidePane, hint } from './review-ui.js';
 import { commandIconEl } from '../ui/ribbon.js';
 
@@ -128,6 +129,8 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
     let said = '';
     const steps = [];
     const rows = new Map();
+    const readCounts = new Map();
+    let lastReadKey = null;
     busy = true; syncSend();
     try {
       const result = await agent.send(request, event => {
@@ -136,8 +139,35 @@ export function createAssistantPane({ editor, pkg, error, available = () => P.ca
           answer.replaceChildren(...paragraphs(said));
         } else if (event.type === 'step') {
           const known = steps.findIndex(s => s.id === event.step.id);
-          if (known < 0) { steps.push(event.step); rows.set(event.step.id, stepRow(event.step)); currentTurn.append(rows.get(event.step.id)); }
-          else { steps[known] = event.step; updateStep(rows.get(event.step.id), event.step); }
+          if (known < 0) steps.push(event.step);
+          else steps[known] = event.step;
+          // Issue #55: presentation-layer filter — the transcript keeps every
+          // step; the pane hides zero-effect edits and collapses back-to-back
+          // identical reads into one entry with a count badge.
+          const step = event.step;
+          if (isNoopEdit(step)) console.info('[assistant-pane] hidden no-op step:', step.name, step.args);
+          else {
+            const key = readGroupKey(step);
+            if (key && key === lastReadKey && readCounts.has(key)) {
+              if (known < 0) {
+                const badge = readCounts.get(key);
+                badge.count += 1;
+                badge.node.textContent = `×${badge.count}`;
+                badge.node.hidden = false;
+              }
+            } else {
+              const row = stepRow(step);
+              if (key) {
+                const node = el('span.as-step-count', { hidden: true });
+                row.querySelector('.as-step-label').after(node);
+                readCounts.set(key, { count: 1, node });
+                lastReadKey = key;
+              } else lastReadKey = null;
+              rows.set(step.id, row);
+              currentTurn.append(row);
+            }
+            updateStep(rows.get(step.id), step);
+          }
         }
       });
       if (result.error) failure(answer, result.error);

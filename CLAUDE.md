@@ -221,7 +221,10 @@ file; the only write is a bookmark).
 - Documents: the assistant pane (`src/views/assistant-pane.js`) drives
   `src/lib/assistant-tools.js` over the canvas engine: read, find, insert, replace the
   selection (asks approval), format, insert a table or page break, add a link. Each tool
-  call is one undo step. `src/lib/puter.js` also carries the language tools, grammar
+  call is one undo step. The pane's visible step list is a presentation-layer
+  filter (issue #55, `src/lib/assistant-steps.js`): empty `insert_text` calls are
+  hidden and consecutive identical reads collapse into one entry with a ×N badge —
+  the agent's step log keeps every step. `src/lib/puter.js` also carries the language tools, grammar
   checks, smart lookup, and drawing through `aiChat`; `assistantPrompt` /
   `readReply` in `src/lib/assistant.js` remain for those JSON-shaped calls. One-shot
   AI features live in `src/lib/thesaurus-ai.js` (thesaurus pane, static WordNet

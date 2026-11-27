@@ -128,7 +128,10 @@ agent-panel prototype in `office-research/prototypes/02-agent-panel.html` and
 bubble, the reply in a tinted one, every tool call renders as its own card with the
 call's detail line, and a change that needs approval shows as an amber confirmation
 card with the action spelled out before Allow/Skip. Colors follow each app's theme,
-including dark mode.
+including dark mode. The documents pane filters the visible step list (issue #55):
+zero-effect edits (empty `insert_text`) are hidden, and back-to-back identical reads
+collapse into one entry with a ×N count badge — the full transcript stays in the
+console and the agent's step log; it is a presentation-layer filter only.
 
 ### Choosing a model
 
