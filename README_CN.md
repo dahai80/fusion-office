@@ -399,6 +399,14 @@ python -m pytest tests -q
   CrossEnv）：节点为各端点及其消费/产出的工件类型，边为"产出→消费"的确定性
   连接（可重跑，不经 LLM），并带课程阶段；trainer 在边上合成跨应用任务。
 - `GET /healthz`、`GET /readyz`。
+- 工件信封（issue #53）：每个文档端点都接受可选的 `artifact_mode` 表单字段。
+  默认响应保持上面的二进制/内容形态不变。传 `artifact_mode=index+preview` 时，
+  写端点改答 JSON —— `{"ok": true, "artifact": {"kind", "name", "size",
+  "sha256", "preview": {"type": "text", "content"}}}`，`preview.content` 为重解析
+  后前 500 个归一化字符；解析端点保留原有内容并追加同一 `artifact` 块，描述来源
+  上传文件。其他取值一律忽略（保持原始行为）。消费方：fusion-link 把
+  `response.artifact` 映射为任务结果的 `artifact_refs`，fusion-ops 上行，fusion-site
+  控制台据此渲染工件库。
 - 超过 100 MB 的上传返回 `413`，格式错误返回 `422`。服务只监听回环地址，不发起
   外部请求。`/v1/docx/snapshot` 推迟到 v0.2。
 

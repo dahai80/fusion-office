@@ -473,6 +473,15 @@ contract in issue #1:
   re-runnable — no LLM in the loop) and carry the curriculum stage; the trainer
   synthesizes cross-app tasks on the edges.
 - `GET /healthz`, `GET /readyz`.
+- Artifact envelope (issue #53): every document endpoint takes an optional
+  `artifact_mode` form field. The default responses stay byte- or content-shaped as
+  above. With `artifact_mode=index+preview`, write endpoints answer JSON instead of
+  binary — `{"ok": true, "artifact": {"kind", "name", "size", "sha256", "preview":
+  {"type": "text", "content"}}}` with the first 500 normalized characters of a
+  reparse — and parse endpoints keep their content and add the same `artifact` block
+  describing the source upload. Any other value is ignored (raw behavior). Consumers:
+  fusion-link maps `response.artifact` to task-outcome `artifact_refs`, fusion-ops
+  uplinks it, and the fusion-site console renders the artifact library from it.
 - Uploads over 100 MB return `413`; malformed input returns `422`. The service binds to
   loopback only and makes no outbound calls. `/v1/docx/snapshot` is deferred to v0.2.
 

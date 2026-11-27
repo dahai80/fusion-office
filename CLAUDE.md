@@ -42,7 +42,12 @@ Outcome records accept `schema_version` 2 (#48): optional `env_state`
 versioned checker for the trainer's audit gate); v1 stays valid.
 `GET /v1/graph` derives the entity-tool graph (#50) from a static endpoint
 registry — deterministic producer→consumer artifact edges for the trainer's
-cross-app task synthesis.
+cross-app task synthesis. Every document endpoint accepts an optional
+`artifact_mode` form field (issue #53): `index+preview` makes write endpoints
+answer `{"ok", "artifact": {kind, name, size, sha256, preview}}` instead of raw
+bytes and parse endpoints add the same block describing the source upload; any
+other value keeps the default raw behavior. fusion-link maps the block to
+task-outcome `artifact_refs`.
 
 ## Repository Rules
 

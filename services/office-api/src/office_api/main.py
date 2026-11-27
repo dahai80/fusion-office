@@ -22,6 +22,14 @@ from openpyxl.utils.exceptions import InvalidFileException
 from pptx.exc import PackageNotFoundError as PptxPackageNotFoundError
 
 from . import __version__
+from .artifact import (
+    artifact_block,
+    docx_preview_text,
+    envelope,
+    pptx_preview_text,
+    wants_envelope,
+    xlsx_preview_text,
+)
 from .docx import fill_document, parse_document
 from .graph import derive_graph
 from .markdown import parse_blocks, write_docx_from_markdown
@@ -95,6 +103,7 @@ async def xlsx_parse(
     mode: Annotated[str, Form()] = "full",
     sheet: Annotated[str, Form()] = "",
     region: Annotated[str, Form()] = "",
+    artifact_mode: Annotated[str, Form()] = "",
 ) -> JSONResponse:
     content = await _read_limited(file)
     if not content:
@@ -109,6 +118,11 @@ async def xlsx_parse(
             parsed = parse_workbook(content, sheet=sheet or None, region=region or None)
     except (InvalidFileException, zipfile.BadZipFile, KeyError, ValueError) as error:
         raise _invalid("xlsx", error) from error
+    if wants_envelope(artifact_mode):
+        # Issue #53: describe the source document for the artifact index.
+        parsed["artifact"] = artifact_block(
+            "xlsx", file.filename or "workbook.xlsx", content, xlsx_preview_text(parsed)
+        )
     log.info("parsed xlsx %s (mode=%s): %d sheets", file.filename, mode, len(parsed["sheets"]))
     return JSONResponse(parsed)
 
@@ -136,6 +150,7 @@ def rollouts_grep(
 async def docx_fill(
     file: Annotated[UploadFile, File()],
     values: Annotated[str, Form()],
+    artifact_mode: Annotated[str, Form()] = "",
 ) -> Response:
     try:
         replacements = json.loads(values)
@@ -150,6 +165,16 @@ async def docx_fill(
         filled, unfilled = fill_document(content, replacements)
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError, ValueError) as error:
         raise _invalid("docx", error) from error
+    if wants_envelope(artifact_mode):
+        # Issue #53: the artifact index consumes the envelope, not the bytes.
+        preview = docx_preview_text(parse_document(filled))
+        log.info(
+            "filled docx %s: %d bytes, unfilled=%s (envelope)",
+            file.filename,
+            len(filled),
+            ",".join(unfilled) or "-",
+        )
+        return JSONResponse(envelope("docx", file.filename or "filled.docx", filled, preview))
     headers: dict[str, str] = {
         "X-Office-Doc-SHA256": hashlib.sha256(filled).hexdigest(),
         "Content-Disposition": 'attachment; filename="filled.docx"',
@@ -166,7 +191,10 @@ async def docx_fill(
 
 
 @app.post("/v1/docx/parse")
-async def docx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+async def docx_parse(
+    file: Annotated[UploadFile, File()],
+    artifact_mode: Annotated[str, Form()] = "",
+) -> JSONResponse:
     content = await _read_limited(file)
     if not content:
         raise HTTPException(status_code=422, detail="empty file")
@@ -174,16 +202,28 @@ async def docx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
         parsed = parse_document(content)
     except (PackageNotFoundError, zipfile.BadZipFile, KeyError, ValueError) as error:
         raise _invalid("docx", error) from error
+    if wants_envelope(artifact_mode):
+        parsed["artifact"] = artifact_block(
+            "docx", file.filename or "document.docx", content, docx_preview_text(parsed)
+        )
     log.info("parsed docx %s: %d blocks", file.filename, len(parsed["blocks"]))
     return JSONResponse(parsed)
 
 
 @app.post("/v1/docx/write")
-async def docx_write(markdown: Annotated[str, Form()]) -> Response:
+async def docx_write(
+    markdown: Annotated[str, Form()],
+    artifact_mode: Annotated[str, Form()] = "",
+) -> Response:
     try:
         written = write_docx_from_markdown(markdown)
     except (KeyError, ValueError) as error:
         raise _invalid("docx", error) from error
+    if wants_envelope(artifact_mode):
+        # Issue #53: the artifact index consumes the envelope, not the bytes.
+        preview = docx_preview_text(parse_document(written))
+        log.info("wrote docx from markdown: %d bytes (envelope)", len(written))
+        return JSONResponse(envelope("docx", "document.docx", written, preview))
     headers: dict[str, str] = {
         "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
         "Content-Disposition": 'attachment; filename="document.docx"',
@@ -193,7 +233,10 @@ async def docx_write(markdown: Annotated[str, Form()]) -> Response:
 
 
 @app.post("/v1/pptx/parse")
-async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
+async def pptx_parse(
+    file: Annotated[UploadFile, File()],
+    artifact_mode: Annotated[str, Form()] = "",
+) -> JSONResponse:
     content = await _read_limited(file)
     if not content:
         raise HTTPException(status_code=422, detail="empty file")
@@ -207,6 +250,10 @@ async def pptx_parse(file: Annotated[UploadFile, File()]) -> JSONResponse:
         ValueError,
     ) as error:
         raise _invalid("pptx", error) from error
+    if wants_envelope(artifact_mode):
+        parsed["artifact"] = artifact_block(
+            "pptx", file.filename or "deck.pptx", content, pptx_preview_text(parsed)
+        )
     log.info("parsed pptx %s: %d slides", file.filename, len(parsed["slides"]))
     return JSONResponse(parsed)
 
@@ -216,6 +263,7 @@ async def pptx_write(
     file: Annotated[UploadFile | None, File()] = None,
     slides: Annotated[str, Form()] = "",
     format: Annotated[str, Form()] = "ops",
+    artifact_mode: Annotated[str, Form()] = "",
 ) -> Response:
     if format == "markdown":
         # Markdown mode regenerates a fresh deck (#36); the file part is not read.
@@ -247,6 +295,11 @@ async def pptx_write(
         slide_count = len(ops)
     else:
         raise HTTPException(status_code=422, detail="format must be 'ops' or 'markdown'")
+    if wants_envelope(artifact_mode):
+        # Issue #53: the artifact index consumes the envelope, not the bytes.
+        preview = pptx_preview_text(parse_deck(written))
+        log.info("wrote pptx: %d bytes, %d slides (envelope)", len(written), slide_count)
+        return JSONResponse(envelope("pptx", "deck.pptx", written, preview))
     headers: dict[str, str] = {
         "X-Office-Doc-SHA256": hashlib.sha256(written).hexdigest(),
         "Content-Disposition": 'attachment; filename="deck.pptx"',

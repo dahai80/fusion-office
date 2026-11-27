@@ -18,7 +18,7 @@ in the consuming application (`dahai80/envipermit` is the first consumer).
 | POST | `/v1/docx/write` | `markdown` form field → .docx binary (issue #35) |
 | POST | `/v1/pptx/parse` | Multipart `file` (.pptx) → slides with title, body lines, speaker notes |
 | POST | `/v1/pptx/write` | Optional multipart `file` (.pptx) + `slides` JSON → updated .pptx |
-| POST | `/v1/outcomes` | Rollout-tap outcome record (schema v1) appended to the JSONL sink |
+| POST | `/v1/outcomes` | Rollout-tap outcome record (schema v1 or v2) appended to the JSONL sink |
 | GET | `/v1/rollouts/grep` | Regex retrieval (`q`, `limit` 1-100) over the JSONL sink, zero new storage (issue #45) |
 
 Responses:
@@ -70,6 +70,20 @@ Responses:
   styles at the same level, paragraphs become body paragraphs, pipe tables
   become Word tables (short rows padded with empty cells). `parse` and
   `write` round-trip blocks exactly.
+- Artifact envelope (issue #53): every document endpoint accepts an optional
+  `artifact_mode` form field. The default stays byte- or content-shaped exactly
+  as above. With `artifact_mode=index+preview`:
+  - write endpoints (`/v1/docx/write`, `/v1/docx/fill`, `/v1/pptx/write`)
+    answer `application/json` instead of binary:
+    `{"ok": true, "artifact": {"kind", "name", "size", "sha256", "preview": {"type": "text", "content"}}}`
+    where `sha256`/`size` describe the produced bytes and `preview.content` is
+    the first 500 whitespace-normalized characters of a reparse;
+  - parse endpoints (`/v1/xlsx/parse`, `/v1/docx/parse`, `/v1/pptx/parse`)
+    keep their full content and add the same `artifact` block describing the
+    *source* upload (`sha256` of the uploaded bytes, the upload's filename);
+  - any other `artifact_mode` value is ignored (raw behavior). Consumers:
+    fusion-link maps `response.artifact` to task-outcome `artifact_refs`, and
+    fusion-ops uplinks it to the artifact index fusion-site renders.
 - Files over `FUSION_OFFICE_API_MAX_BYTES` (default 100 MB) get `413`. Malformed input
   gets `422` with FastAPI's `{"detail": ...}` shape. The uploaded template is
   never modified.
