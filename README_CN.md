@@ -393,6 +393,15 @@ python -m pytest tests -q
   run 与范围外内容不受影响（`tests/test_markdown.py`、`tests/test_docx.py`）。
   在线 office-bench 回归门（基线 71.9%）依赖本机引擎 `127.0.0.1:11432`，
   发布前在 fusion-bench checkout 下跑 `fusion-bench office-bench`，不进 CI。
+- 黄金语料门（issue #66 Leg 2）：120 个真实 OOXML 文件
+  （`fixtures/office-corpus/`，来自 apache/poi 与 plutext/docx4j 的
+  Apache-2.0 测试语料，文件名带 `poi-`/`docx4j-` 前缀，`SHA256SUMS` 锁哈希，
+  LFS 存储）每个都必须无错解析且解析结果确定（`tests/test_golden_corpus.py`）。
+  带密码的旧版 OLE 工作簿在构建期排除——它们不是 OOXML 包。语料还揪出
+  `parse_deck` 不读 `.ppsx` 放映包的缺口，已修复。重建语料：
+  `python scripts/build-office-corpus.py <poi-checkout> <docx4j-checkout>`；
+  来源与许可见语料内 `SOURCES.md`。LibreOffice 重序列化 oracle 继续推迟，
+  等有引擎可跑的环境再上。
 - `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
   `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
   fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。

@@ -11,6 +11,7 @@ from typing import Any
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.opc.package import OpcPackage
 from pptx.util import Inches, Pt
 
 from .markdown import parse_blocks
@@ -19,6 +20,26 @@ log = logging.getLogger(__name__)
 
 EMPTY_DECK_WIDTH = Inches(10)
 EMPTY_DECK_HEIGHT = Inches(7.5)
+
+# python-pptx only opens the presentation main content type; a .ppsx
+# slideshow package carries the slideshow variant but is still a deck.
+SLIDESHOW_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml"
+)
+
+
+def _load_deck(content: bytes):
+    try:
+        return Presentation(BytesIO(content))
+    except ValueError as error:
+        if "not a PowerPoint file" not in str(error):
+            raise
+        package = OpcPackage.open(BytesIO(content))
+        part = package.main_document_part
+        if part.content_type != SLIDESHOW_CONTENT_TYPE:
+            raise
+        log.info("opened slideshow package (ppsx content type)")
+        return part.presentation
 
 
 def _paragraph_lines(text_frame: Any) -> list[str]:
@@ -41,7 +62,7 @@ def _collect_text(shapes: Any, lines: list[str], skip: Any) -> None:
 
 
 def parse_deck(content: bytes) -> dict[str, Any]:
-    deck = Presentation(BytesIO(content))
+    deck = _load_deck(content)
     slides: list[dict[str, Any]] = []
     for index, slide in enumerate(deck.slides, start=1):
         title = ""
