@@ -127,7 +127,12 @@ npm workspaces: `apps/*` and `packages/*`.
   File System Access API directory picker first, OPFS fallback (including a dismissed or
   gesture-less aborted picker), IndexedDB as a best-effort listing index. Exports include `readFile`, `writeFile`, `readdir`,
   `deleteFile`, and KV helpers (`get`, `set`, `del`). Files remain real documents, not
-  rows in a database.
+  rows in a database. Optional remote leg (issue #71): `configureRemote({fetchImpl, kvGet, kvSet})`
+  enables a fail-soft write-through mirror to the artifacts-engine store of record via the
+  gateway session-authed JSON-RPC proxy (`POST /api/v1/artifacts`, `artifact.create/update/
+  get_content/delete`, idempotency_key = path + content digest); `readRemoteFile` rehydrates a
+  file whose blob is gone but whose index record carries an artifact id. Remote work is always
+  fail-soft — local-first behavior is unchanged when the transport is absent.
 - `packages/ai-client` owns model access. It is an installable package
   (issue #65: not `private`, published to npm as `@fusion-office/ai-client`;
   contract documented in `packages/ai-client/README.md`; downstream consumers

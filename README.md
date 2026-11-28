@@ -29,7 +29,7 @@ union web shell through `fusion-gateway`.
 | `apps/presentation` | Slide editor with `.pptx` support and AI deck generation | MIT, migrated from HeyPuter/everything |
 | `apps/pdf` | PDF viewer, annotation, form filling, OCR, AI assistant | MIT, migrated from HeyPuter/everything |
 | `apps/pm` | Local project management with tasks, boards, timeline | MIT, migrated from HeyPuter/everything |
-| `packages/storage` | Local-first file storage: File System Access API, OPFS fallback, IndexedDB index | First-party |
+| `packages/storage` | Local-first file storage: File System Access API, OPFS fallback, IndexedDB index, optional write-through mirror to the artifacts-engine store of record (`configureRemote`, fail-soft; `readRemoteFile` rehydrates evicted files, issue #71) | First-party |
 | `packages/ai-client` | OpenAI-compatible client for `fusion-gateway` with streaming, tools, JSON helpers, and the shared agent loop | First-party |
 
 Every application runs as a static Vite build. There is no server component, no account

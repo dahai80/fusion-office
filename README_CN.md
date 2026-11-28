@@ -30,7 +30,7 @@ source_of_truth:
 | `apps/presentation` | 幻灯片编辑，支持 `.pptx` 和 AI 生成演示文稿 | MIT，迁移自 HeyPuter/everything |
 | `apps/pdf` | PDF 阅读、批注、表单填写、OCR、AI 助手 | MIT，迁移自 HeyPuter/everything |
 | `apps/pm` | 本地项目管理，包含任务、看板、时间线 | MIT，迁移自 HeyPuter/everything |
-| `packages/storage` | 本地优先文件存储：File System Access API、OPFS 回退、IndexedDB 索引 | 本项目 |
+| `packages/storage` | 本地优先文件存储：File System Access API、OPFS 回退、IndexedDB 索引，可选 artifacts-engine 写穿镜像（`configureRemote`，fail-soft；`readRemoteFile` 可回拉被逐出的文件，issue #71） | 本项目 |
 | `packages/ai-client` | 面向 `fusion-gateway` 的 OpenAI 兼容客户端，支持流式、工具调用、JSON、共享 agent 循环 | 本项目 |
 
 每个应用都是纯静态 Vite 构建产物。没有服务端组件，没有账号系统，也不依赖云服务。
