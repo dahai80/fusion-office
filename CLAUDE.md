@@ -32,7 +32,10 @@ MIT. Spreadsheet is AGPL-3.0-only and the root MIT license does not cover it.
 parsing, docx template fill + markdown parse/write per issue #35, pptx
 parse/write incl. a `format=markdown` mode per issues #32/#36) consumed by other
 Fusion projects. It implements the contract in issue #1, binds to
-`127.0.0.1:11492`, and holds no business logic. Large-sheet pattern (issue #45):
+`127.0.0.1:11492`, and holds no business logic. Docx write/fill roundtrips are
+anchor-checked against the office-bench fidelity semantics (issue #65,
+fusion-bench#67/#68); the live office-bench gate (baseline 71.9%) runs
+pre-release from the fusion-bench checkout — it needs the local engine. Large-sheet pattern (issue #45):
 `/v1/xlsx/parse` takes `mode=sketch` (structure only) or `sheet`+`region`
 (bounded region read, 200,000-cell cap, absolute range names); the high-level
 action surface is the product — do not decompose it into primitive cell
@@ -119,7 +122,10 @@ npm workspaces: `apps/*` and `packages/*`.
   gesture-less aborted picker), IndexedDB as a best-effort listing index. Exports include `readFile`, `writeFile`, `readdir`,
   `deleteFile`, and KV helpers (`get`, `set`, `del`). Files remain real documents, not
   rows in a database.
-- `packages/ai-client` owns model access. It defaults to
+- `packages/ai-client` owns model access. It is an installable package
+  (issue #65: not `private`, published to npm as `@fusion-office/ai-client`;
+  contract documented in `packages/ai-client/README.md`; downstream consumers
+  extend the shell-served port set via `VITE_FUSION_SHELL_PORTS`). It defaults to
   `http://127.0.0.1:11432` (in dev, the same-origin `/__fusion_gateway` proxy from
   `dev/gateway-proxy.mjs`; when served by `scripts/shell-serve.cjs` on the fixed ports
   11485-11489, the same `/__fusion_gateway` path — relayed server-side by shell-serve,
@@ -210,9 +216,11 @@ file; the only write is a bookmark).
   streaming — the non-stream path returns `tool_calls` intact — and yields them;
   if the retry confirms the answer is prose, the text is kept once, not duplicated.
 - Plan-consistency selection (issue #57, `packages/ai-client/src/consistency.js`):
-  documents and spreadsheet agent loops take `consistency: N` — write-class rounds
+  documents, spreadsheet, and pdf agent loops take `consistency: N` — write-class rounds
   (`changes` predicate true) get N extra chat samples at temperature 0.7, the
-  proposed plans are compared with order-insensitive signatures, and the verdict
+  proposed plans are compared with order-insensitive signatures (scalar strings
+  are canonicalized first so `42` vs `"42"` and `=A1*2` vs `A1*2` count as
+  agreement, issue #61), and the verdict
   (`selection` event + `consistency k=… samples=… agreement=…` folded into the
   turn's outcome detail) feeds the tap jsonl. The greedy plan always executes —
   no workspace sandbox exists, so this is plan-level consistency, not

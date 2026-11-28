@@ -61,7 +61,9 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   目录下的路径返回 `null`，首次启动不会记录 not-found 错误。
 - `packages/ai-client` 是访问模型的唯一通道。它调用 OpenAI 兼容的
   `/v1/chat/completions`，默认地址为 `http://127.0.0.1:11432`，不在应用内嵌入模型逻辑。
-  同包的 `createAgent` 提供文档、PDF、项目三个助手共用的工具循环。
+  它是可安装的包（issue #65）：以 `@fusion-office/ai-client` 发布到 npm，
+  网关契约见 `packages/ai-client/README.md`；下游包通过 `VITE_FUSION_SHELL_PORTS`
+  扩展 shell 托管端口集合。同包的 `createAgent` 提供文档、PDF、项目三个助手共用的工具循环。
   当带工具的流式响应结束时没有任何工具调用（部分 Anthropic 协议中转层会丢弃
   工具调用增量），`chatStreamEvents` 会以非流式方式重试一次并恢复工具调用。
 - AI 请求由网关 API Key 管控。浏览器构建在编译期读取 `VITE_FUSION_GATEWAY_KEY`。
@@ -386,6 +388,11 @@ python -m pytest tests -q
 - `POST /v1/docx/write` — `markdown` 表单字段；返回 .docx 二进制并带
   `X-Office-Doc-SHA256`，标题/段落/表格按 markdown 块映射，与
   `/v1/docx/parse` 精确往返（issue #35）。
+- 保真门（issue #65）：write/fill 往返按 office-bench 保真语义
+  （fusion-bench#67/#68）做锚点校验——所有锚点字符串原样保留，带样式的
+  run 与范围外内容不受影响（`tests/test_markdown.py`、`tests/test_docx.py`）。
+  在线 office-bench 回归门（基线 71.9%）依赖本机引擎 `127.0.0.1:11432`，
+  发布前在 fusion-bench checkout 下跑 `fusion-bench office-bench`，不进 CI。
 - `POST /v1/outcomes` — 应用上报的结果信号记录（rollout-tap schema v1：
   `rollout_id`、`model`、`messages`、`outcome.signal`），追加到
   fusion-trainer `rollout_ingest` 消费的 JSONL sink（issue #33）。
@@ -403,9 +410,10 @@ python -m pytest tests -q
 - `GET /v1/graph` — 端点注册表之上的实体-工具图（#50，fusion-trainer#111
   CrossEnv）：节点为各端点及其消费/产出的工件类型，边为"产出→消费"的确定性
   连接（可重跑，不经 LLM），并带课程阶段；trainer 在边上合成跨应用任务。
-- 计划一致性选择（issue #57，SheetAlign arXiv 2611.26069）：documents 与
-  spreadsheet 的 agent 循环对写入类回合额外采样 2 次（temperature 0.7），比较
-  各候选提出的工具计划（键序与顺序不敏感的签名）。一致或不一致都会发出
+- 计划一致性选择（issue #57，SheetAlign arXiv 2611.26069）：documents、
+  spreadsheet 与 pdf 的 agent 循环对写入类回合额外采样 2 次（temperature 0.7），比较
+  各候选提出的工具计划（键序与顺序不敏感的签名；签名前先做标量规范化——
+  `42` 与 `"42"`、`=A1*2` 与 `A1*2` 属良性漂移而非不一致，#61）。一致或不一致都会发出
   `selection` 事件，不一致时打日志，并折入该回合 `task_success`/`error` 的
   outcome detail，tap jsonl 里可见 `consistency k=3 samples=N agreement=<bool>`；
   贪心计划始终执行（尚无工作区沙箱，候选只比较不执行），只读回合保持单次采样

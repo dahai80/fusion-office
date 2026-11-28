@@ -62,11 +62,14 @@ apps/documents  apps/spreadsheet  apps/presentation  apps/pdf  apps/pm
   under a missing folder yields `null`, so a first boot never logs a not-found error.
 - `packages/ai-client` is the only path to a model. It calls an OpenAI-compatible
   `/v1/chat/completions` endpoint, defaults to `http://127.0.0.1:11432`, and never
-  embeds model logic. `createAgent` in the same package runs the tool loop shared by the
-  documents, PDF, and project assistants. When a tool-bearing stream ends with no
-  tool calls despite the model spending tokens (some Anthropic-protocol relays drop
-  the tool-call deltas), `chatStreamEvents` retries the request once without
-  streaming and recovers the tool calls.
+  embeds model logic. It is an installable package (issue #65): published to npm as
+  `@fusion-office/ai-client`, gateway contract documented in
+  `packages/ai-client/README.md`; downstream packages extend the shell-served port
+  set via `VITE_FUSION_SHELL_PORTS`. `createAgent` in the same package runs the tool
+  loop shared by the documents, PDF, and project assistants. When a tool-bearing
+  stream ends with no tool calls despite the model spending tokens (some
+  Anthropic-protocol relays drop the tool-call deltas), `chatStreamEvents` retries
+  the request once without streaming and recovers the tool calls.
 - AI traffic is gated by the gateway API key. Browser builds read the key at build time
   from `VITE_FUSION_GATEWAY_KEY`. PDF and project AI surfaces check `isConfigured()` and
   explain what is missing before sending anything; the other apps surface the gateway's
@@ -457,6 +460,13 @@ contract in issue #1:
 - `POST /v1/docx/write` — a `markdown` form field; returns the .docx binary with
   `X-Office-Doc-SHA256`, headings/paragraphs/tables mapped from the markdown
   blocks, round-tripping with `/v1/docx/parse` (issue #35).
+- Fidelity gate (issue #65): write/fill roundtrips are anchor-checked against
+  the office-bench fidelity semantics (fusion-bench#67/#68) — every pinned
+  anchor string survives and styled runs plus out-of-scope content stay intact
+  (`tests/test_markdown.py`, `tests/test_docx.py`). The live office-bench
+  regression gate (baseline 71.9%) needs the local engine on
+  `127.0.0.1:11432`, so it runs pre-release via
+  `fusion-bench office-bench` from the fusion-bench checkout, not in CI.
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).
@@ -479,10 +489,12 @@ contract in issue #1:
   re-runnable — no LLM in the loop) and carry the curriculum stage; the trainer
   synthesizes cross-app tasks on the edges.
 - `GET /healthz`, `GET /readyz`.
-- Plan-consistency selection (issue #57, SheetAlign arXiv 2611.26069): the documents
-  and spreadsheet agent loops re-sample a write-class round 2 extra times at
+- Plan-consistency selection (issue #57, SheetAlign arXiv 2611.26069): the documents,
+  spreadsheet, and pdf agent loops re-sample a write-class round 2 extra times at
   temperature 0.7 and compare the proposed tool plans (key-order- and
-  order-insensitive signatures). Agreement or disagreement is emitted as a
+  order-insensitive signatures; scalar strings are canonicalized first — `42`
+  vs `"42"` and `=A1*2` vs `A1*2` are benign drift, not disagreement, #61).
+  Agreement or disagreement is emitted as a
   `selection` event, logged on disagreement, and folded into the turn's
   `task_success`/`error` outcome detail so the tap jsonl records `consistency
   k=3 samples=N agreement=<bool>`; the greedy plan always executes (no

@@ -36,8 +36,13 @@ function capMessages(messages) {
 
 // The fixed ports scripts/shell-serve.cjs uses for the five apps. Served
 // there, AI calls go through its same-origin /__fusion_gateway relay, because
-// the gateway's CORS allowlist does not cover these origins.
-const OFFICE_PORTS = new Set(['11485', '11486', '11487', '11488', '11489'])
+// the gateway's CORS allowlist does not cover these origins. Downstream
+// packages hosting apps on other fixed ports extend the set through
+// VITE_FUSION_SHELL_PORTS (comma-separated) instead of forking the module.
+const OFFICE_PORTS = new Set([
+    '11485', '11486', '11487', '11488', '11489',
+    ...(env.VITE_FUSION_SHELL_PORTS || '').split(',').map((p) => p.trim()).filter(Boolean),
+])
 
 let config = { ...DEFAULTS }
 

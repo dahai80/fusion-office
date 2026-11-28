@@ -46,6 +46,33 @@ def test_write_docx_from_markdown_roundtrips_through_parse() -> None:
     ]
 
 
+def test_write_docx_from_markdown_preserves_every_fidelity_anchor() -> None:
+    # office-bench fidelity semantics (fusion-bench#67): every anchor string a
+    # grader pins must survive the write->parse roundtrip verbatim.
+    anchors = [
+        "Executive summary",
+        "Budget is approved for Q3",
+        "line item",
+        "compute",
+        "Signed by the comptroller",
+    ]
+    content = (
+        "# Executive summary\nBudget is approved for Q3\n\n"
+        "| line item | amount |\n|---|---|\n| compute | 42 |\n\nSigned by the comptroller"
+    )
+
+    parsed = parse_document(BytesIO(write_docx_from_markdown(content)).read())
+    text_parts: list[str] = []
+    for block in parsed["blocks"]:
+        if "text" in block:
+            text_parts.append(block["text"])
+        text_parts.extend(" ".join(row) for row in block.get("rows", []))
+    text = "\n".join(text_parts)
+
+    for anchor in anchors:
+        assert anchor in text
+
+
 def test_parse_document_reads_headings_paragraphs_and_tables_in_order() -> None:
     document = Document()
     document.add_heading("Overview", level=1)

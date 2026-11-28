@@ -167,16 +167,24 @@ describe("radar value-axis minimum is the automatic lattice origin", () => {
     const worker = new Worker(
       `
       const { parentPort, workerData } = require('node:worker_threads');
+      const os = require('node:os');
+      const fs = require('node:fs');
+      const nodePath = require('node:path');
       (async () => {
         const {createServer} = await import(workerData.vite);
-        const server = await createServer({root:workerData.root, configFile:false, server:{middlewareMode:true,hmr:false}, appType:'custom'});
+        // The inline config differs from the vitest server's hash; sharing the
+        // default cacheDir made every boot re-optimize dependencies and race
+        // the running suite's optimizer lock (intermittent boot hangs, plus
+        // suite-wide "config has changed" invalidation). Isolate it.
+        const cacheDir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'vite-radar-tick-'));
+        const server = await createServer({root:workerData.root, configFile:false, cacheDir, server:{middlewareMode:true,hmr:false}, appType:'custom'});
         try {
           const {P,preview} = await server.ssrLoadModule('/src/model.js');
           const {chartRadarGridDeck} = await server.ssrLoadModule('/tests/chart-radar-grid-fixture.js');
           const f=chartRadarGridDeck({valueAxis:{min:1e12,max:1e12+0.0001220703125}});
           const before=P.getShapeChartSpec(f.shape),src=preview(f.p,f.slide);
           parentPort.postMessage({src,before,after:P.getShapeChartSpec(f.shape)});
-        } finally {await server.close();}
+        } finally { await server.close(); fs.rmSync(cacheDir, { recursive: true, force: true }); }
       })().catch(e=>{throw e;});
     `,
       {
@@ -197,7 +205,7 @@ describe("radar value-axis minimum is the automatic lattice origin", () => {
             reject(
               new Error("Automatic radar tick enumeration did not terminate"),
             ),
-          25000,
+          100000,
         );
       });
       const r = paint(result.src, 5);
@@ -215,6 +223,8 @@ describe("radar value-axis minimum is the automatic lattice origin", () => {
       await worker.terminate();
     }
     // The worker boots a whole Vite SSR server; under a busy machine that
-    // alone can pass 10 seconds, so allow for it.
-  }, 30000);
+    // alone can pass 10 seconds (observed >30s while the full suite runs in
+    // parallel), so allow for it. A real termination regression never posts
+    // a message, so the worker timer still catches it.
+  }, 120000);
 });
