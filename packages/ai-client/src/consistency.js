@@ -6,12 +6,25 @@
 // consistency: agreement across samples is recorded, disagreement is logged
 // and reported into the tap jsonl, and the greedy plan still executes.
 
+// Issue #61: small models drift benignly between 42 and "42" and between
+// "=A1*2" and "A1*2"; the plans are the same write. Canonicalize scalar
+// strings before signing so type drift and formula-prefix omission do not
+// count as disagreement — plain text is untouched.
+const NUMERIC = /^-?\d+(?:\.\d+)?$/;
+
+const canonicalScalar = (value) => {
+    if (typeof value !== 'string') return value;
+    let text = value.trim();
+    while (text.startsWith('=')) text = text.slice(1).trim();
+    return NUMERIC.test(text) ? Number(text) : text;
+};
+
 const stable = (value) => {
     if (Array.isArray(value)) return value.map(stable);
     if (value && typeof value === 'object') {
         return Object.keys(value).sort().map(key => [key, stable(value[key])]);
     }
-    return value;
+    return canonicalScalar(value);
 };
 
 /** A key-order-insensitive signature of one tool call's arguments. */

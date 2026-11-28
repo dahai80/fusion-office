@@ -65,6 +65,9 @@ export function createAiPanel({ commands, name = () => '', isConfigured = () => 
         snapshot: () => pdfSnapshot(commands, { name: name() }),
         settings: () => ({ approval: 'never' }),
         changes: changesDocument,
+        // Issue #62: re-sample write rounds like the documents panel; tests
+        // script chat sequences by call count, so sampling stays off there.
+        consistency: import.meta.env?.MODE === 'test' ? 0 : 2,
         describe: (tool, args) => describeCall(commands, tool, args),
         runTool: (tool, args) => runTool(commands, tool, args),
         outcomes: createOutcomeReporter({ app: 'pdf' }),

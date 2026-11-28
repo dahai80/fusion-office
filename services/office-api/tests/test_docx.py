@@ -69,6 +69,29 @@ def test_unknown_placeholder_is_empty_and_reported() -> None:
     assert unfilled == ["missing"]
 
 
+def test_fill_preserves_styled_sections_and_out_of_scope_anchors() -> None:
+    # office-bench fidelity semantics (fusion-bench#67/#68): filling the
+    # placeholder region must leave run formatting (bold/italic) and every
+    # out-of-scope anchor intact.
+    def build(document) -> None:
+        styled = document.add_paragraph()
+        bold = styled.add_run("Status: {{status}}")
+        bold.bold = True
+        styled.add_run(" (auto-generated)").italic = True
+        document.add_paragraph("Unrelated anchor stays put")
+
+    filled, unfilled = fill_document(template_bytes(build), {"status": "shipped"})
+
+    document = Document(BytesIO(filled))
+    paragraph = document.paragraphs[0]
+    assert paragraph.runs[0].text == "Status: shipped"
+    assert paragraph.runs[0].bold is True
+    assert paragraph.runs[1].text == " (auto-generated)"
+    assert paragraph.runs[1].italic is True
+    assert "Unrelated anchor stays put" in document_text(filled)
+    assert unfilled == []
+
+
 def test_input_bytes_are_not_modified() -> None:
     def build(document) -> None:
         document.add_paragraph("{{name}}")

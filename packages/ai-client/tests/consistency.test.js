@@ -10,6 +10,19 @@ describe('argSignature', () => {
         expect(argSignature({ a: 1 })).not.toBe(argSignature({ a: 2 }));
         expect(argSignature(undefined)).toBe(argSignature({}));
     });
+
+    it('treats a numeric string and its number as the same value (#61)', () => {
+        expect(argSignature({ value: 42 })).toBe(argSignature({ value: '42' }));
+        expect(argSignature({ value: ' 42 ' })).toBe(argSignature({ value: 42 }));
+        expect(argSignature({ a: 1 })).not.toBe(argSignature({ a: '1x' }));
+    });
+
+    it('treats formula values with an optional leading = as the same (#61)', () => {
+        expect(argSignature({ value: '=A1*2' })).toBe(argSignature({ value: 'A1*2' }));
+        expect(argSignature({ value: '==A1*2' })).toBe(argSignature({ value: 'A1*2' }));
+        expect(argSignature({ value: '=42' })).toBe(argSignature({ value: 42 }));
+        expect(argSignature({ text: '=A1*2' })).not.toBe(argSignature({ text: '=B1*2' }));
+    });
 });
 
 describe('planSignature', () => {
@@ -70,5 +83,14 @@ describe('consistencyVerdict', () => {
     it('records disagreement when a sample proposes a different plan', () => {
         const other = { stopped: false, calls: [{ id: 'z', name: 'write_cells', input: { region: 'C1:D2', values: [[1, 2]] } }] };
         expect(consistencyVerdict(greedy, [other])).toEqual({ samples: 1, agreement: false, agreeCount: 0 });
+    });
+
+    it('agrees across benign type and formula-prefix drift (#61)', () => {
+        const greedy = [{ id: 'c1', name: 'write_cells', input: { cells: [{ ref: 'A1', value: 42 }, { ref: 'B1', value: '=A1*2' }] } }];
+        const drifted = {
+            stopped: false,
+            calls: [{ id: 'z', name: 'write_cells', input: { cells: [{ ref: 'A1', value: '42' }, { ref: 'B1', value: 'A1*2' }] } }],
+        };
+        expect(consistencyVerdict(greedy, [drifted])).toEqual({ samples: 1, agreement: true, agreeCount: 1 });
     });
 });
