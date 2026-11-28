@@ -465,7 +465,10 @@ contract in issue #1:
   needed to replay or reset the task environment) and `validator` (a
   versioned OOXML-level checker: `{name, version, status}` with status
   `untested`/`passing`/`failing` — the trainer's validator audit gate reads
-  it). Version 1 records stay valid; both versions append unchanged.
+  it). Records on either version may carry an optional `outcome.task_id`
+  (#59, fusion-trainer#116/#117) — the registry id of the office task the run
+  belongs to; the trainer's `from-rollouts` groups paired co-rollouts by it.
+  Version 1 records stay valid; both versions append unchanged.
 - `GET /v1/rollouts/grep?q=<regex>&limit=<1-100>` — grep-style retrieval over the
   same sink file: regex over JSONL lines, matches returned as parsed records (or
   `record: null` for unparseable lines) with line numbers and a `truncated` flag;

@@ -393,7 +393,9 @@ python -m pytest tests -q
   `env_state`（对象：可重放/重置任务环境的文件路径/哈希与工作目录）和
   `validator`（带版本的 OOXML 级校验器 `{name, version, status}`，status 取
   `untested`/`passing`/`failing` —— trainer 的 validator 审计门读取）。
-  v1 记录仍然有效，两个版本原样追加。
+  两个版本的记录还可携带可选的 `outcome.task_id`（#59，fusion-trainer#116/#117）
+  —— 本次运行所属 office 任务的注册表 id，trainer 的 `from-rollouts` 按它
+  分组配对 co-rollout。v1 记录仍然有效，两个版本原样追加。
 - `GET /v1/rollouts/grep?q=<正则>&limit=<1-100>` — 对同一 sink 文件的 grep 式
   检索：对 JSONL 行做正则匹配，命中行返回解析后的记录（解析失败的行返回
   `record: null`），带行号与 `truncated` 标记，并附 sink 路径与 `exists`

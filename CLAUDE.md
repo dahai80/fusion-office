@@ -39,7 +39,10 @@ action surface is the product — do not decompose it into primitive cell
 operations. `GET /v1/rollouts/grep` is regex retrieval over the outcome sink.
 Outcome records accept `schema_version` 2 (#48): optional `env_state`
 (restorable environment snapshot) and `validator` (`{name, version, status}`
-versioned checker for the trainer's audit gate); v1 stays valid.
+versioned checker for the trainer's audit gate); v1 stays valid. Records on
+either version may carry an optional `outcome.task_id` (#59) — the office
+task registry id, stamped by ai-client's reporter from an explicit `taskId`
+or the `?task=` query param a task runner appends.
 `GET /v1/graph` derives the entity-tool graph (#50) from a static endpoint
 registry — deterministic producer→consumer artifact edges for the trainer's
 cross-app task synthesis. Every document endpoint accepts an optional

@@ -59,6 +59,11 @@ def validate_record(record: Any) -> str | None:
     outcome = record.get("outcome")
     if not isinstance(outcome, dict) or outcome.get("signal") not in SIGNAL_SCORES:
         return f"outcome.signal must be one of {sorted(SIGNAL_SCORES)}"
+    # Task tag (#59, fusion-trainer#116/#117): optional registry id of the office
+    # task the run belongs to; the trainer groups paired co-rollouts by it.
+    task_id = outcome.get("task_id")
+    if task_id is not None and (not isinstance(task_id, str) or not task_id.strip()):
+        return "outcome.task_id must be a non-empty string when present"
     # schema_version 2 additive fields (#48); tolerated as absent on version 1.
     env_state = record.get("env_state")
     if env_state is not None and not isinstance(env_state, dict):

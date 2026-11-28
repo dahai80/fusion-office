@@ -115,4 +115,45 @@ describe('outcome reporter', () => {
     it('mints ids in the gateway shape', () => {
         expect(newRolloutId()).toMatch(/^ro-[0-9a-f]{16}$/);
     });
+
+    it('stamps outcome.task_id from an explicit reporter option (#59)', () => {
+        const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+        const reporter = createOutcomeReporter({ app: 'pm', taskId: 'office-t-7', fetchImpl });
+
+        reporter.report({ signal: 'task_success', rolloutId: 'ro-x:e1' });
+
+        expect(recordOf(fetchImpl).outcome.task_id).toBe('office-t-7');
+    });
+
+    it('reads outcome.task_id from the ?task= query param a task runner appends', () => {
+        window.history.replaceState(null, '', '/?task=office-t-9');
+        try {
+            const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+            const reporter = createOutcomeReporter({ app: 'documents', fetchImpl });
+
+            reporter.report({ signal: 'task_success', rolloutId: 'ro-x:e1' });
+
+            expect(recordOf(fetchImpl).outcome.task_id).toBe('office-t-9');
+        } finally {
+            window.history.replaceState(null, '', '/');
+        }
+    });
+
+    it('lets a per-report taskId override the reporter default', () => {
+        const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+        const reporter = createOutcomeReporter({ app: 'pm', taskId: 'office-t-7', fetchImpl });
+
+        reporter.report({ signal: 'task_success', rolloutId: 'ro-x:e1', taskId: 'office-t-8' });
+
+        expect(recordOf(fetchImpl).outcome.task_id).toBe('office-t-8');
+    });
+
+    it('omits outcome.task_id when no task tag is resolvable', () => {
+        const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+        const reporter = createOutcomeReporter({ app: 'pm', taskId: '   ', fetchImpl });
+
+        reporter.report({ signal: 'task_success', rolloutId: 'ro-x:e1' });
+
+        expect(recordOf(fetchImpl).outcome).not.toHaveProperty('task_id');
+    });
 });
