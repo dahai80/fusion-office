@@ -1,6 +1,8 @@
 import { log } from './log.js'
+import { configureRemote, deleteRemote, pullFile, pushFile, remoteEnabled } from './remote.js'
 
 export { log } from './log.js'
+export { configureRemote, remoteEnabled } from './remote.js'
 
 const IDB_NAME = 'fusion-office-storage'
 const IDB_VERSION = 1
@@ -88,7 +90,19 @@ export async function writeFile(path, data) {
     const writable = await handle.createWritable()
     await writable.write(data)
     await writable.close()
-    await idbOp(INDEX_STORE, 'readwrite', (s) => s.put({ path, size: data && data.size, at: Date.now() }, path)).catch(() => {})
+    const record = { path, size: data && data.size, at: Date.now() }
+    // Issue #66: write-through to the artifacts-engine store of record.
+    // Fail-soft: a missing or refusing proxy leaves the local write intact.
+    if (remoteEnabled()) {
+        try {
+            const prior = await idbOp(INDEX_STORE, 'readonly', (s) => s.get(path)).catch(() => null)
+            const artifactId = await pushFile(path, data, prior && prior.artifactId)
+            if (artifactId) record.artifactId = artifactId
+        } catch (err) {
+            log('storage', 'remote push failed (local write kept)', path, String(err))
+        }
+    }
+    await idbOp(INDEX_STORE, 'readwrite', (s) => s.put(record, path)).catch(() => {})
     log('storage', 'writeFile ok', path)
 }
 
@@ -97,6 +111,31 @@ export async function readFile(path) {
     const handle = await dir.getFileHandle(fileName)
     const file = await handle.getFile()
     return file
+}
+
+/**
+ * Issue #66: read a file that exists only in the store of record (another
+ * device, or this browser's local copy evicted). Pulls from the engine via
+ * the recorded artifact id, caches the blob locally, and returns it as a
+ * File so callers cannot tell the two origins apart. Throws the same
+ * NotFoundError-shaped error as a local miss when there is no remote copy.
+ */
+export async function readRemoteFile(path) {
+    const record = await idbOp(INDEX_STORE, 'readonly', (s) => s.get(path))
+    if (!record || !record.artifactId) {
+        const miss = new Error('could not be found')
+        miss.name = 'NotFoundError'
+        throw miss
+    }
+    try {
+        const blob = await pullFile(record.artifactId)
+        await writeFile(path, blob)
+        log('storage', 'remote pull cached', path)
+        return await readFile(path)
+    } catch (err) {
+        log('storage', 'remote pull failed', path, String(err))
+        throw err
+    }
 }
 
 const NOT_FOUND = (err) => err && (err.name === 'NotFoundError' || (typeof err.message === 'string' && err.message.includes('could not be found')))
@@ -137,6 +176,16 @@ export async function readdir(path) {
 
 export async function deleteFile(path) {
     const { dir, fileName } = await dirFor(path, false)
+    // Issue #66: remove the mirrored artifact too, before the local mapping
+    // that points at it is dropped. Fail-soft, same as the write path.
+    if (remoteEnabled()) {
+        try {
+            const record = await idbOp(INDEX_STORE, 'readonly', (s) => s.get(path))
+            if (record && record.artifactId) await deleteRemote(record.artifactId)
+        } catch (err) {
+            log('storage', 'remote delete failed (local delete proceeds)', path, String(err))
+        }
+    }
     await dir.removeEntry(fileName, { recursive: true })
     await idbOp(INDEX_STORE, 'readwrite', (s) => s.delete(path)).catch(() => {})
     log('storage', 'deleteFile ok', path)
