@@ -199,12 +199,9 @@ def test_parse_reads_slideshow_ppsx_content_type() -> None:
     deck.slides.add_slide(deck.slide_layouts[1]).shapes.title.text = "Show"
     buffer = BytesIO()
     deck.save(buffer)
-    slideshow = (
-        buffer.getvalue()
-        .replace(
-            b"presentationml.presentation.main+xml",
-            b"presentationml.slideshow.main+xml",
-        )
+    slideshow = buffer.getvalue().replace(
+        b"presentationml.presentation.main+xml",
+        b"presentationml.slideshow.main+xml",
     )
 
     parsed = parse_deck(slideshow)

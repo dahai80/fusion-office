@@ -23,4 +23,4 @@ jobs:
         run: |
           python3 ci/validate_docs.py --root . --product fusion-office \
             --class app --entry guided-ui \
-            --skip-dirs ".git,node_modules,.venv,dist,build,templates,guidelines,apps,packages,services,scripts,dev,test-results"
+            --skip-dirs ".git,node_modules,.venv,dist,build,templates,guidelines,apps,packages,services,scripts,dev,test-results,fixtures"
