@@ -467,6 +467,17 @@ contract in issue #1:
   regression gate (baseline 71.9%) needs the local engine on
   `127.0.0.1:11432`, so it runs pre-release via
   `fusion-bench office-bench` from the fusion-bench checkout, not in CI.
+- Golden corpus gate (issue #66 Leg 2): 120 real-world OOXML files
+  (`fixtures/office-corpus/`, Apache-2.0 test data from apache/poi and
+  plutext/docx4j, prefixed `poi-`/`docx4j-`, hash-pinned in `SHA256SUMS`,
+  LFS-backed) must every one parse without error and parse deterministically
+  (`tests/test_golden_corpus.py`). Password-protected legacy OLE workbooks are
+  excluded at build time — they are not OOXML packages. `parse_deck` also
+  reads `.ppsx` slideshow packages, a gap the corpus caught. Rebuild the
+  corpus with `python scripts/build-office-corpus.py <poi-checkout>
+  <docx4j-checkout>`; sources and licenses are listed in the corpus
+  `SOURCES.md`. The LibreOffice re-serialize oracle stays deferred until the
+  gate can run somewhere with the engine.
 - `POST /v1/outcomes` — app-reported outcome records (rollout-tap schema v1:
   `rollout_id`, `model`, `messages`, `outcome.signal`), appended to the sink
   JSONL that fusion-trainer's `rollout_ingest` consumes (issue #33).

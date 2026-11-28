@@ -189,3 +189,21 @@ def test_write_deck_from_markdown_empty_input_makes_one_blank_slide() -> None:
     written = write_deck_from_markdown("")
 
     assert len(parse_deck(written)["slides"]) == 1
+
+
+def test_parse_reads_slideshow_ppsx_content_type() -> None:
+    # python-pptx refuses .ppsx slideshow packages; the service reads them.
+    deck = Presentation()
+    deck.slide_width = Inches(10)
+    deck.slide_height = Inches(7.5)
+    deck.slides.add_slide(deck.slide_layouts[1]).shapes.title.text = "Show"
+    buffer = BytesIO()
+    deck.save(buffer)
+    slideshow = buffer.getvalue().replace(
+        b"presentationml.presentation.main+xml",
+        b"presentationml.slideshow.main+xml",
+    )
+
+    parsed = parse_deck(slideshow)
+
+    assert [slide["title"] for slide in parsed["slides"]] == ["Show"]

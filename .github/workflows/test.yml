@@ -31,3 +31,21 @@ jobs:
         run: npm ci
       - name: Test apps/${{ matrix.app }}
         run: npm test -w apps/${{ matrix.app }}
+
+  office-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install fusion-core
+        run: pip install "git+https://github.com/dahai80/fusion-core.git"
+      - name: Install office-api with test extras
+        run: pip install -e "services/office-api[test]"
+      - name: Test services/office-api
+        run: python -m pytest tests -q
+        working-directory: services/office-api

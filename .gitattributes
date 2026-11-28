@@ -5,3 +5,7 @@
 **/public/thesaurus/LICENSE-WordNet.txt -text
 **/public/thesaurus/en.json -text
 **/public/dictionaries/* -text
+# Golden corpus binaries (issue #66 Leg 2): hash-pinned real-world OOXML files.
+fixtures/office-corpus/**/*.docx filter=lfs diff=lfs merge=lfs -text
+fixtures/office-corpus/**/*.xlsx filter=lfs diff=lfs merge=lfs -text
+fixtures/office-corpus/**/*.pptx filter=lfs diff=lfs merge=lfs -text

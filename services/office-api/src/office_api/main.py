@@ -134,13 +134,14 @@ def rollouts_grep(
 ) -> dict[str, object]:
     # Issue #45 (GrepMem pattern): regex retrieval over the append-only
     # outcome sink — exact facts across sessions, no new storage.
+    try:
+        re.compile(q)
+    except re.error as error:
+        raise HTTPException(status_code=422, detail=f"invalid regex: {error}") from error
     sink = default_sink()
     if not sink.exists():
         return {"matches": [], "pattern": q, "truncated": False, "sink": str(sink), "exists": False}
-    try:
-        result = grep_sink(sink, q, limit=limit)
-    except re.error as error:
-        raise HTTPException(status_code=422, detail=f"invalid regex: {error}") from error
+    result = grep_sink(sink, q, limit=limit)
     result["sink"] = str(sink)
     result["exists"] = True
     return result

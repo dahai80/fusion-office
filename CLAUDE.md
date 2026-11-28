@@ -35,7 +35,13 @@ Fusion projects. It implements the contract in issue #1, binds to
 `127.0.0.1:11492`, and holds no business logic. Docx write/fill roundtrips are
 anchor-checked against the office-bench fidelity semantics (issue #65,
 fusion-bench#67/#68); the live office-bench gate (baseline 71.9%) runs
-pre-release from the fusion-bench checkout — it needs the local engine. Large-sheet pattern (issue #45):
+pre-release from the fusion-bench checkout — it needs the local engine.
+Golden corpus gate (issue #66 Leg 2): the 120 LFS-backed real-world OOXML files in
+`fixtures/office-corpus/` (Apache-2.0 poi/docx4j test data, `SHA256SUMS`-pinned) must
+each parse error-free and deterministically (`tests/test_golden_corpus.py`); rebuild
+with `scripts/build-office-corpus.py` (poi + docx4j checkouts; OLE-encrypted workbooks
+excluded). `parse_deck` reads `.ppsx` slideshow content types — a corpus catch.
+Large-sheet pattern (issue #45):
 `/v1/xlsx/parse` takes `mode=sketch` (structure only) or `sheet`+`region`
 (bounded region read, 200,000-cell cap, absolute range names); the high-level
 action surface is the product — do not decompose it into primitive cell
