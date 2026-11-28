@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from 'bun:test'
+import { describe, expect, test, beforeEach } from 'vitest'
 import { configureRemote, deleteRemote, pullFile, pushFile, remoteEnabled } from '../src/remote.js'
 
 const kv = new Map()
@@ -53,7 +53,7 @@ beforeEach(() => {
     configureRemote({ enabled: true, fetchImpl: engine.fetch(), kvGet: (k) => kv.get(k), kvSet: (k, v) => kv.set(k, v) })
 })
 
-describe('storage remote leg (#66)', () => {
+describe('storage remote leg (#71)', () => {
     test('pushFile creates artifact with idempotency key and session id', async () => {
         const id = await pushFile('docs/a.txt', 'hello fusion')
         expect(id).toBe('art-1')
@@ -105,6 +105,6 @@ describe('storage remote leg (#66)', () => {
         expect(remoteEnabled()).toBe(false)
         expect(await pushFile('docs/d.txt', 'x')).toBe(null)
         configureRemote({ enabled: true, fetchImpl: async () => new Response('{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"upstream down"}}', { status: 503 }), kvGet: (k) => kv.get(k), kvSet: (k, v) => kv.set(k, v) })
-        expect(pushFile('docs/d.txt', 'x')).rejects.toThrow('rpc-artifact.create')
+        await expect(pushFile('docs/d.txt', 'x')).rejects.toThrow('rpc-artifact.create')
     })
 })

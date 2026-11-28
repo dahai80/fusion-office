@@ -49,3 +49,23 @@ jobs:
       - name: Test services/office-api
         run: python -m pytest tests -q
         working-directory: services/office-api
+
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [storage, ai-client]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test packages/${{ matrix.pkg }}
+        run: npm test -w packages/${{ matrix.pkg }}

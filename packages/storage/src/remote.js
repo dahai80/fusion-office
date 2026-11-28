@@ -1,6 +1,6 @@
 import { log } from './log.js'
 
-// Issue fusion-office#66 (RFC #64 H1): artifacts-engine is the store of
+// Issue fusion-office#71 (RFC #64 H1): artifacts-engine is the store of
 // record for office files. This module is the remote leg of the storage
 // package: every local file is mirrored to the engine through the gateway
 // session-authed JSON-RPC proxy (POST /api/v1/artifacts). All remote work

@@ -91,7 +91,7 @@ export async function writeFile(path, data) {
     await writable.write(data)
     await writable.close()
     const record = { path, size: data && data.size, at: Date.now() }
-    // Issue #66: write-through to the artifacts-engine store of record.
+    // Issue #71: write-through to the artifacts-engine store of record.
     // Fail-soft: a missing or refusing proxy leaves the local write intact.
     if (remoteEnabled()) {
         try {
@@ -114,11 +114,13 @@ export async function readFile(path) {
 }
 
 /**
- * Issue #66: read a file that exists only in the store of record (another
- * device, or this browser's local copy evicted). Pulls from the engine via
- * the recorded artifact id, caches the blob locally, and returns it as a
- * File so callers cannot tell the two origins apart. Throws the same
- * NotFoundError-shaped error as a local miss when there is no remote copy.
+ * Issue #71: read a file whose local blob is gone but whose index record
+ * still carries an artifact id (local copy evicted or deleted out-of-band).
+ * Pulls from the engine via the recorded artifact id, caches the blob
+ * locally, and returns it as a File so callers cannot tell the two origins
+ * apart. Throws the same NotFoundError-shaped error as a local miss when
+ * there is no record or no remote copy. (Cross-device pull needs a shared
+ * session id and is out of scope for this leg.)
  */
 export async function readRemoteFile(path) {
     const record = await idbOp(INDEX_STORE, 'readonly', (s) => s.get(path))
@@ -176,7 +178,7 @@ export async function readdir(path) {
 
 export async function deleteFile(path) {
     const { dir, fileName } = await dirFor(path, false)
-    // Issue #66: remove the mirrored artifact too, before the local mapping
+    // Issue #71: remove the mirrored artifact too, before the local mapping
     // that points at it is dropped. Fail-soft, same as the write path.
     if (remoteEnabled()) {
         try {
