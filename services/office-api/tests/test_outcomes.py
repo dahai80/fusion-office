@@ -142,6 +142,48 @@ def write_sink(path: Path, lines: list[str]) -> Path:
     return path
 
 
+def task_record() -> dict:
+    payload = record()
+    payload["outcome"] = dict(payload["outcome"], task_id="office-t-42")
+    return payload
+
+
+def test_task_tagged_record_is_accepted_and_stored(client: TestClient, sink: Path) -> None:
+    assert validate_record(task_record()) is None
+    response = client.post("/v1/outcomes", json=task_record())
+
+    assert response.status_code == 202
+    stored = json.loads(sink.read_text(encoding="utf-8").splitlines()[0])
+    assert stored["outcome"]["task_id"] == "office-t-42"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda r: r["outcome"].update(task_id=""),
+        lambda r: r["outcome"].update(task_id="   "),
+        lambda r: r["outcome"].update(task_id=42),
+    ],
+)
+def test_invalid_task_tags_are_422_and_write_nothing(
+    client: TestClient, sink: Path, mutate
+) -> None:
+    payload = task_record()
+    mutate(payload)
+
+    response = client.post("/v1/outcomes", json=payload)
+
+    assert response.status_code == 422
+    assert not sink.exists()
+
+
+def test_record_without_task_tag_stays_valid(client: TestClient, sink: Path) -> None:
+    assert validate_record(record()) is None
+    response = client.post("/v1/outcomes", json=record())
+
+    assert response.status_code == 202
+
+
 def test_grep_sink_matches_json_lines_as_records(tmp_path: Path) -> None:
     sink = write_sink(
         tmp_path / "rollout-outcomes.jsonl",

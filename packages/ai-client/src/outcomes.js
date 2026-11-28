@@ -36,25 +36,40 @@ function rawContent(content) {
     return text.length > RAW_MAX_CONTENT ? `${text.slice(0, RAW_MAX_CONTENT)}…` : text;
 }
 
+/** Task id for outcome records (#59): explicit option first, then the
+ * `?task=` query param a task runner appends when driving a defined run. */
+function resolveTaskId(explicit) {
+    if (explicit != null && String(explicit).trim()) return String(explicit).trim();
+    try {
+        const fromQuery = new URLSearchParams(globalThis.location?.search ?? '').get('task');
+        if (fromQuery && fromQuery.trim()) return fromQuery.trim();
+    } catch { /* non-browser context: no task tag */ }
+    return null;
+}
+
 /**
  * One reporter per app. contentMode defaults to the gateway tap's "redact":
  * message content is dropped, the length survives. "raw" keeps verbatim
  * content (capped) for SFT/GRPO quality — opt in per build.
  */
-export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/v1/outcomes', fetchImpl = globalThis.fetch?.bind(globalThis), contentMode = 'redact' } = {}) {
+export function createOutcomeReporter({ app, taskId, endpoint = 'http://127.0.0.1:11492/v1/outcomes', fetchImpl = globalThis.fetch?.bind(globalThis), contentMode = 'redact' } = {}) {
     const reported = new Set(); // rollout ids already emitted — a second report for one is dropped
     let warned = 0;
+    const defaultTaskId = resolveTaskId(taskId);
 
-    function buildRecord({ signal, detail, model, messages = [], rolloutId }) {
+    function buildRecord({ signal, detail, model, messages = [], rolloutId, taskId: reportTaskId }) {
         const maxMessages = contentMode === 'raw' ? RAW_MAX_MESSAGES : REDACT_MAX_MESSAGES;
         const shape = contentMode === 'raw' ? rawContent : redactContent;
+        const outcome = { signal, score: outcomeScore(signal), ...(detail ? { detail: String(detail).slice(0, 500) } : {}) };
+        const taskTag = resolveTaskId(reportTaskId) || defaultTaskId;
+        if (taskTag) outcome.task_id = taskTag;
         const record = {
             schema_version: 1,
             rollout_id: rolloutId || newRolloutId(),
             source: `fusion-office/${app || 'unknown'}`,
             created_at: new Date().toISOString(),
             messages: messages.slice(-maxMessages).map(m => ({ role: String(m.role || 'user'), content: shape(m.content) })),
-            outcome: { signal, score: outcomeScore(signal), ...(detail ? { detail: String(detail).slice(0, 500) } : {}) },
+            outcome,
         };
         if (model) record.model = model;
         return record;
@@ -64,7 +79,7 @@ export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/
      * Emit one outcome. Idempotent per rolloutId, never throws, never blocks:
      * the caller awaits nothing and a failed POST only logs.
      */
-    function report({ signal, detail, model, messages = [], rolloutId } = {}) {
+    function report({ signal, detail, model, messages = [], rolloutId, taskId } = {}) {
         if (!Object.prototype.hasOwnProperty.call(OUTCOME_SIGNALS, signal)) {
             console.warn(`[ai-client] dropped unknown outcome signal "${signal}"`);
             return;
@@ -75,7 +90,7 @@ export function createOutcomeReporter({ app, endpoint = 'http://127.0.0.1:11492/
             for (const id of reported) { reported.delete(id); if (reported.size <= 250) break; }
         }
         if (!fetchImpl) return;
-        const record = buildRecord({ signal, detail, model, messages, rolloutId });
+        const record = buildRecord({ signal, detail, model, messages, rolloutId, taskId });
         try {
             Promise.resolve(fetchImpl(endpoint, {
                 method: 'POST',
